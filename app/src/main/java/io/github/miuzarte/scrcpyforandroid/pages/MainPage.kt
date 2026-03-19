@@ -113,6 +113,9 @@ fun MainPage() {
     var themeBaseIndex by rememberSaveable { mutableIntStateOf(initialSettings.themeBaseIndex) }
     var monetEnabled by rememberSaveable { mutableStateOf(initialSettings.monetEnabled) }
     var fullscreenDebugInfoEnabled by rememberSaveable { mutableStateOf(initialSettings.fullscreenDebugInfoEnabled) }
+    var showFullscreenVirtualButtons by rememberSaveable {
+        mutableStateOf(initialSettings.showFullscreenVirtualButtons)
+    }
     var keepScreenOnWhenStreamingEnabled by rememberSaveable {
         mutableStateOf(initialSettings.keepScreenOnWhenStreamingEnabled)
     }
@@ -178,6 +181,7 @@ fun MainPage() {
         themeBaseIndex,
         monetEnabled,
         fullscreenDebugInfoEnabled,
+        showFullscreenVirtualButtons,
         keepScreenOnWhenStreamingEnabled,
         virtualButtonsOutside,
         virtualButtonsInMore,
@@ -195,6 +199,7 @@ fun MainPage() {
                 themeBaseIndex = themeBaseIndex,
                 monetEnabled = monetEnabled,
                 fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
+                showFullscreenVirtualButtons = showFullscreenVirtualButtons,
                 keepScreenOnWhenStreamingEnabled = keepScreenOnWhenStreamingEnabled,
                 virtualButtonsOutside = VirtualButtonActions.encodeStoredIds(virtualButtonsOutside),
                 virtualButtonsInMore = VirtualButtonActions.encodeStoredIds(virtualButtonsInMore),
@@ -467,10 +472,14 @@ fun MainPage() {
                                         onMonetEnabledChange = { monetEnabled = it },
                                         fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
                                         onFullscreenDebugInfoEnabledChange = { fullscreenDebugInfoEnabled = it },
+                                        showFullscreenVirtualButtons = showFullscreenVirtualButtons,
+                                        onShowFullscreenVirtualButtonsChange = { showFullscreenVirtualButtons = it },
                                         keepScreenOnWhenStreamingEnabled = keepScreenOnWhenStreamingEnabled,
                                         onKeepScreenOnWhenStreamingEnabledChange = {
                                             keepScreenOnWhenStreamingEnabled = it
                                         },
+                                        onOpenReorderDevices = { openReorderDevicesAction?.invoke() },
+                                        onOpenVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
                                         devicePreviewCardHeightDp = devicePreviewCardHeightDp,
                                         onDevicePreviewCardHeightDpChange = {
                                             devicePreviewCardHeightDp = it.coerceAtLeast(120)
@@ -635,6 +644,7 @@ fun MainPage() {
                     virtualButtonsOutside = virtualButtonsOutside,
                     virtualButtonsInMore = virtualButtonsInMore,
                     showDebugInfo = fullscreenDebugInfoEnabled,
+                    showVirtualButtons = showFullscreenVirtualButtons,
                     onDismiss = { popRoot() },
                 )
             }

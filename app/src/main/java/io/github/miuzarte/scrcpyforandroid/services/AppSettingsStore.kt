@@ -9,6 +9,7 @@ internal data class MainSettings(
     val themeBaseIndex: Int = AppDefaults.DefaultThemeBaseIndex,
     val monetEnabled: Boolean = AppDefaults.DefaultMonetEnabled,
     val fullscreenDebugInfoEnabled: Boolean = AppDefaults.DefaultFullscreenDebugInfoEnabled,
+    val showFullscreenVirtualButtons: Boolean = AppDefaults.DefaultShowFullscreenVirtualButtons,
     val devicePreviewCardHeightDp: Int = AppDefaults.DefaultDevicePreviewCardHeightDp,
     val keepScreenOnWhenStreamingEnabled: Boolean = AppDefaults.DefaultKeepScreenOnWhenStreamingEnabled,
     val virtualButtonsOutside: String = AppDefaults.DefaultVirtualButtonsOutside,
@@ -70,6 +71,10 @@ internal fun loadMainSettings(context: Context): MainSettings {
             AppPreferenceKeys.FullscreenDebugInfoEnabled,
             AppDefaults.DefaultFullscreenDebugInfoEnabled,
         ),
+        showFullscreenVirtualButtons = prefs.getBoolean(
+            AppPreferenceKeys.ShowFullscreenVirtualButtons,
+            AppDefaults.DefaultShowFullscreenVirtualButtons,
+        ),
         devicePreviewCardHeightDp = prefs.getInt(
             AppPreferenceKeys.DevicePreviewCardHeightDp,
             AppDefaults.DefaultDevicePreviewCardHeightDp,
@@ -108,6 +113,7 @@ internal fun saveMainSettings(context: Context, settings: MainSettings) {
             putInt(AppPreferenceKeys.ThemeBaseIndex, settings.themeBaseIndex)
                 .putBoolean(AppPreferenceKeys.MonetEnabled, settings.monetEnabled)
                 .putBoolean(AppPreferenceKeys.FullscreenDebugInfoEnabled, settings.fullscreenDebugInfoEnabled)
+                .putBoolean(AppPreferenceKeys.ShowFullscreenVirtualButtons, settings.showFullscreenVirtualButtons)
                 .putInt(AppPreferenceKeys.DevicePreviewCardHeightDp, settings.devicePreviewCardHeightDp.coerceAtLeast(120))
                 .putBoolean(AppPreferenceKeys.KeepScreenOnWhenStreamingEnabled, settings.keepScreenOnWhenStreamingEnabled)
                 .putString(AppPreferenceKeys.VirtualButtonsOutside, settings.virtualButtonsOutside)

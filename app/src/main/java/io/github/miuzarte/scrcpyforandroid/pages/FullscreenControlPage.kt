@@ -41,6 +41,7 @@ fun FullscreenControlPage(
     virtualButtonsOutside: List<String>,
     virtualButtonsInMore: List<String>,
     showDebugInfo: Boolean,
+    showVirtualButtons: Boolean,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -150,14 +151,16 @@ fun FullscreenControlPage(
                 },
             )
 
-            bar.Fullscreen(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                onPressHaptic = { haptics.press() },
-                onConfirmHaptic = { haptics.confirm() },
-                onAction = { action ->
-                    action.keycode?.let(::sendKeycode)
-                },
-            )
+            if (showVirtualButtons) {
+                bar.Fullscreen(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onPressHaptic = { haptics.press() },
+                    onConfirmHaptic = { haptics.confirm() },
+                    onAction = { action ->
+                        action.keycode?.let(::sendKeycode)
+                    },
+                )
+            }
         }
     }
 }

@@ -22,6 +22,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
@@ -60,8 +61,12 @@ fun SettingsScreen(
     onMonetEnabledChange: (Boolean) -> Unit,
     fullscreenDebugInfoEnabled: Boolean,
     onFullscreenDebugInfoEnabledChange: (Boolean) -> Unit,
+    showFullscreenVirtualButtons: Boolean,
+    onShowFullscreenVirtualButtonsChange: (Boolean) -> Unit,
     keepScreenOnWhenStreamingEnabled: Boolean,
     onKeepScreenOnWhenStreamingEnabledChange: (Boolean) -> Unit,
+    onOpenReorderDevices: () -> Unit,
+    onOpenVirtualButtonOrder: () -> Unit,
     devicePreviewCardHeightDp: Int,
     onDevicePreviewCardHeightDpChange: (Int) -> Unit,
     customServerUri: String?,
@@ -107,6 +112,12 @@ fun SettingsScreen(
                     onCheckedChange = onFullscreenDebugInfoEnabledChange,
                 )
                 SuperSwitch(
+                    title = "全屏显示虚拟按钮",
+                    summary = "在全屏模式底部显示返回/主页等虚拟按钮",
+                    checked = showFullscreenVirtualButtons,
+                    onCheckedChange = onShowFullscreenVirtualButtonsChange,
+                )
+                SuperSwitch(
                     title = "投屏时不允许息屏",
                     summary = "Scrcpy 启动后保持本机常亮，避免锁屏导致 ADB 断开",
                     checked = keepScreenOnWhenStreamingEnabled,
@@ -127,6 +138,16 @@ fun SettingsScreen(
                     onInputConfirm = { raw ->
                         raw.toIntOrNull()?.let { onDevicePreviewCardHeightDpChange(it.coerceAtLeast(120)) }
                     },
+                )
+                SuperArrow(
+                    title = "调整设备排序",
+                    summary = "调整设备页快捷设备列表顺序",
+                    onClick = onOpenReorderDevices,
+                )
+                SuperArrow(
+                    title = "虚拟按钮排序",
+                    summary = "调整底部虚拟按钮与更多菜单顺序",
+                    onClick = onOpenVirtualButtonOrder,
                 )
             }
 

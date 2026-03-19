@@ -3,6 +3,14 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val defaultAbiList = listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+val configuredAbiList = (project.findProperty("abiList") as String?)
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.ifEmpty { null }
+    ?: defaultAbiList
+
 android {
     namespace = "io.github.miuzarte.scrcpyforandroid"
     compileSdk {
@@ -19,7 +27,8 @@ android {
         versionName = "0.0.1"
 
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            abiFilters.clear()
+            abiFilters += configuredAbiList
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -29,7 +38,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include(*configuredAbiList.toTypedArray())
             isUniversalApk = true
         }
     }

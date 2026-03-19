@@ -63,6 +63,7 @@ object AppDefaults {
     const val DefaultMonetEnabled = false
 
     const val DefaultFullscreenDebugInfoEnabled = false
+    const val DefaultShowFullscreenVirtualButtons = true
     const val DefaultDevicePreviewCardHeightDp = 320
     const val DefaultKeepScreenOnWhenStreamingEnabled = false
     const val DefaultVirtualButtonsOutside = "more,home,back"

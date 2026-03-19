@@ -7,6 +7,7 @@ object AppPreferenceKeys {
     const val ThemeBaseIndex = "theme_base_index"
     const val MonetEnabled = "monet_enabled"
     const val FullscreenDebugInfoEnabled = "fullscreen_debug_info_enabled"
+    const val ShowFullscreenVirtualButtons = "show_fullscreen_virtual_buttons"
     const val DevicePreviewCardHeightDp = "device_preview_card_height_dp"
     const val KeepScreenOnWhenStreamingEnabled = "keep_screen_on_when_streaming_enabled"
     const val VirtualButtonsOutside = "virtual_buttons_outside"
