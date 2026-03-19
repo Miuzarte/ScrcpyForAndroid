@@ -5,7 +5,6 @@ on:
   push:
     tags:
       - "*"
-
 permissions:
   contents: write
 
@@ -141,10 +140,56 @@ jobs:
 
           ls -la dist
 
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+
+          notes_file="dist/RELEASE_NOTES.md"
+          download_base_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+
+          {
+            echo "**release-unsigned** 为未签名构建，无法直接安装"
+            echo
+            echo "| 架构 | 构建类型 | 文件 | SHA256 | 大小 |"
+            echo "| --- | --- | --- | --- | --- |"
+
+            shopt -s nullglob
+            for apk in dist/*.apk; do
+              file_name="$(basename "$apk")"
+
+              arch="unknown"
+              if [[ "$file_name" == *"arm64-v8a"* ]] || [[ "$file_name" == *"arm64"* ]]; then
+                arch="arm64"
+              elif [[ "$file_name" == *"armeabi-v7a"* ]] || [[ "$file_name" == *"arm32"* ]]; then
+                arch="arm32"
+              elif [[ "$file_name" == *"x86_64"* ]]; then
+                arch="x86_64"
+              elif [[ "$file_name" == *"x86"* ]]; then
+                arch="x86_32"
+              elif [[ "$file_name" == *"universal"* ]] || [[ "$file_name" == *"arm_all"* ]]; then
+                arch="arm_all"
+              fi
+
+              build_type="debug"
+              if [[ "$file_name" == *"unsigned"* ]]; then
+                build_type="release-unsigned"
+              fi
+
+              file_url="${download_base_url}/${file_name}"
+              sha256_value="$(sha256sum "$apk" | awk '{print $1}')"
+              size_bytes="$(stat -c%s "$apk")"
+              size_mb="$(awk -v bytes="$size_bytes" 'BEGIN { printf "%.1f MB", bytes / 1048576 }')"
+
+              echo "| ${arch} | ${build_type} | [${file_name}](${file_url}) | ${sha256_value} | ${size_mb} |"
+            done
+          } > "$notes_file"
+
+          cat "$notes_file"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: dist/RELEASE_NOTES.md
           files: dist/*.apk
