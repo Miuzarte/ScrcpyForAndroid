@@ -1,6 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,6 +89,10 @@ private sealed interface RootScreen : NavKey {
 @Composable
 fun MainPage() {
     val context = LocalContext.current
+    val activity = remember(context) { context as? Activity }
+    val initialOrientation = remember(activity) {
+        activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
     val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
     val initialSettings = remember(context) { loadMainSettings(context) }
     val initialDeviceSettings = remember(context) { loadDevicePageSettings(context) }
@@ -182,8 +189,25 @@ fun MainPage() {
     var openReorderDevicesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var canClearLogs by remember { mutableStateOf(false) }
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
+    var fullscreenOrientation by rememberSaveable {
+        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+    }
     val themeMode = resolveThemeMode(themeBaseIndex, monetEnabled)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
+
+    DisposableEffect(activity) {
+        onDispose {
+            activity?.requestedOrientation = initialOrientation
+        }
+    }
+
+    LaunchedEffect(activity, currentRootScreen, fullscreenOrientation) {
+        val targetOrientation = when (currentRootScreen) {
+            is RootScreen.Fullscreen -> fullscreenOrientation
+            else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        activity?.requestedOrientation = targetOrientation
+    }
 
     LaunchedEffect(
         audioEnabled,
@@ -232,9 +256,6 @@ fun MainPage() {
         nativeCore.setAdbKeyName(adbKeyName.ifBlank { AppDefaults.ADB_KEY_NAME })
     }
 
-    val canNavigateBack =
-        rootBackStack.size > 1 || pagerState.currentPage != MainTabDestination.Device.ordinal
-
     fun popRoot() {
         if (rootBackStack.size > 1) {
             rootBackStack.removeAt(rootBackStack.lastIndex)
@@ -256,6 +277,9 @@ fun MainPage() {
             }
         }
     }
+
+    val canNavigateBack = rootBackStack.size > 1 ||
+            pagerState.currentPage != MainTabDestination.Device.ordinal
 
     PredictiveBackHandler(enabled = canNavigateBack) { progress ->
         try {
@@ -467,6 +491,12 @@ fun MainPage() {
                                     },
                                     onOpenAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
                                     onOpenFullscreenPage = { session ->
+                                        fullscreenOrientation =
+                                            if (session.width >= session.height) {
+                                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                            } else {
+                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                            }
                                         rootBackStack.add(
                                             RootScreen.Fullscreen(
                                                 launch = FullscreenControlLaunch(
@@ -510,6 +540,10 @@ fun MainPage() {
                                     devicePreviewCardHeightDp = devicePreviewCardHeightDp,
                                     onDevicePreviewCardHeightDpChange = {
                                         devicePreviewCardHeightDp = it.coerceAtLeast(120)
+                                    },
+                                    showFullscreenVirtualButtons = showFullscreenVirtualButtons,
+                                    onShowFullscreenVirtualButtonsChange = {
+                                        showFullscreenVirtualButtons = it
                                     },
                                     customServerUri = customServerUri,
                                     onPickServer = {
@@ -692,6 +726,13 @@ fun MainPage() {
                 virtualButtonsInMore = virtualButtonsInMore,
                 showDebugInfo = fullscreenDebugInfoEnabled,
                 showVirtualButtons = showFullscreenVirtualButtons,
+                onVideoSizeChanged = { width, height ->
+                    fullscreenOrientation = if (width >= height) {
+                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    } else {
+                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    }
+                },
                 onDismiss = { popRoot() },
             )
         }

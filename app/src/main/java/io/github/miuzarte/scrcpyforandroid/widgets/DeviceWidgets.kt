@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -113,6 +112,8 @@ private object UiMotionActions {
     const val POINTER_DOWN = 5
     const val POINTER_UP = 6
 }
+
+private const val FULLSCREEN_TOUCH_LOG_TAG = "FullscreenTouch"
 
 @Composable
 internal fun StatusCard(
@@ -647,7 +648,11 @@ fun FullscreenControlScreen(
     var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
     val activePointerIds = remember { linkedSetOf<Int>() }
     val activePointerPositions = remember { linkedMapOf<Int, Offset>() }
+    val activePointerDevicePositions = remember { linkedMapOf<Int, Pair<Int, Int>>() }
+    val pointerLabels = remember { linkedMapOf<Int, Int>() }
+    var nextPointerLabel by remember { mutableIntStateOf(1) }
     var activeTouchCount by remember { mutableIntStateOf(0) }
+    var activeTouchDebug by remember { mutableStateOf("") }
     BackHandler(enabled = enableBackHandler, onBack = onDismiss)
 
     BoxWithConstraints(
@@ -659,125 +664,161 @@ fun FullscreenControlScreen(
                     return@pointerInteropFilter true
                 }
 
+                val sessionAspect = if (session.height == 0) {
+                    16f / 9f
+                } else {
+                    session.width.toFloat() / session.height.toFloat()
+                }
+                val containerWidth = touchAreaSize.width.toFloat()
+                val containerHeight = touchAreaSize.height.toFloat()
+                val containerAspect = containerWidth / containerHeight
+                val contentWidth: Float
+                val contentHeight: Float
+                if (sessionAspect > containerAspect) {
+                    contentWidth = containerWidth
+                    contentHeight = containerWidth / sessionAspect
+                } else {
+                    contentHeight = containerHeight
+                    contentWidth = containerHeight * sessionAspect
+                }
+                val contentLeft = (containerWidth - contentWidth) / 2f
+                val contentTop = (containerHeight - contentHeight) / 2f
+
+                fun isInsideContent(rawX: Float, rawY: Float): Boolean {
+                    return rawX in contentLeft..(contentLeft + contentWidth) &&
+                            rawY in contentTop..(contentTop + contentHeight)
+                }
+
                 fun mapToDevice(rawX: Float, rawY: Float): Pair<Int, Int> {
-                    val x = ((rawX / touchAreaSize.width) * session.width).roundToInt()
+                    val normalizedX = ((rawX - contentLeft) / contentWidth).coerceIn(0f, 1f)
+                    val normalizedY = ((rawY - contentTop) / contentHeight).coerceIn(0f, 1f)
+                    val x = (normalizedX * (session.width - 1).coerceAtLeast(0)).roundToInt()
                         .coerceIn(0, (session.width - 1).coerceAtLeast(0))
-                    val y = ((rawY / touchAreaSize.height) * session.height).roundToInt()
+                    val y = (normalizedY * (session.height - 1).coerceAtLeast(0)).roundToInt()
                         .coerceIn(0, (session.height - 1).coerceAtLeast(0))
                     return x to y
                 }
 
-                fun syncActivePointersFromEvent(skipPointerId: Int? = null) {
-                    for (i in 0 until event.pointerCount) {
-                        val pointerId = event.getPointerId(i)
-                        if (!activePointerIds.contains(pointerId) || pointerId == skipPointerId) continue
-                        val px = event.getX(i)
-                        val py = event.getY(i)
-                        activePointerPositions[pointerId] = Offset(px, py)
-                        val (x, y) = mapToDevice(px, py)
-                        onInjectTouch(
-                            UiMotionActions.MOVE,
-                            pointerId.toLong(),
-                            x,
-                            y,
-                            event.getPressure(i).coerceIn(0f, 1f),
-                            1
-                        )
+                fun pointerLabel(pointerId: Int): Int {
+                    val existing = pointerLabels[pointerId]
+                    if (existing != null) {
+                        return existing
+                    }
+                    val assigned = nextPointerLabel
+                    nextPointerLabel += 1
+                    pointerLabels[pointerId] = assigned
+                    return assigned
+                }
+
+                fun refreshTouchDebug() {
+                    if (activePointerIds.isEmpty()) {
+                        activeTouchDebug = ""
+                        return
+                    }
+                    activeTouchDebug = activePointerIds
+                        .sortedBy { pointerLabel(it) }
+                        .joinToString(separator = "\n") { pointerId ->
+                            val label = pointerLabel(pointerId)
+                            val pos = activePointerDevicePositions[pointerId]
+                            if (pos == null) {
+                                "#$label(id=$pointerId):?"
+                            } else {
+                                "#$label(id=$pointerId):${pos.first},${pos.second}"
+                            }
+                        }
+                }
+
+                fun releasePointer(pointerId: Int, reason: String) {
+                    if (!activePointerIds.contains(pointerId)) return
+                    val pos = activePointerPositions[pointerId] ?: Offset.Zero
+                    val (x, y) = mapToDevice(pos.x, pos.y)
+                    // val label = pointerLabel(pointerId)
+                    // Log.d(
+                    //     FULLSCREEN_TOUCH_LOG_TAG,
+                    //     "抬起($reason): pointer#$label(id=$pointerId) x=$x y=$y"
+                    // )
+                    onInjectTouch(UiMotionActions.UP, pointerId.toLong(), x, y, 0f, 0)
+                    activePointerIds -= pointerId
+                    activePointerPositions.remove(pointerId)
+                    activePointerDevicePositions.remove(pointerId)
+                    pointerLabels.remove(pointerId)
+                }
+
+                if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    val toCancel = activePointerIds.toList()
+                    for (pointerId in toCancel) {
+                        releasePointer(pointerId, reason = "cancel")
+                    }
+                    activeTouchCount = activePointerIds.size
+                    refreshTouchDebug()
+                    return@pointerInteropFilter true
+                }
+
+                val eventPointerIds = HashSet<Int>(event.pointerCount)
+                val eventPositions = HashMap<Int, Offset>(event.pointerCount)
+                val eventPressures = HashMap<Int, Float>(event.pointerCount)
+                for (i in 0 until event.pointerCount) {
+                    val pointerId = event.getPointerId(i)
+                    eventPointerIds += pointerId
+                    eventPositions[pointerId] = Offset(event.getX(i), event.getY(i))
+                    eventPressures[pointerId] = event.getPressure(i).coerceIn(0f, 1f)
+                }
+
+                val disappearedPointers = activePointerIds.filter { it !in eventPointerIds }
+                for (pointerId in disappearedPointers) {
+                    releasePointer(pointerId, reason = "missing")
+                }
+
+                val endedPointerId = when (event.actionMasked) {
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> event.getPointerId(event.actionIndex)
+                    else -> null
+                }
+
+                val justPressed = HashSet<Int>()
+                for (i in 0 until event.pointerCount) {
+                    val pointerId = event.getPointerId(i)
+                    if (pointerId == endedPointerId) continue
+                    val raw = eventPositions[pointerId] ?: continue
+                    val pressure = eventPressures[pointerId] ?: 0f
+                    if (!activePointerIds.contains(pointerId)) {
+                        if (!isInsideContent(raw.x, raw.y)) continue
+                        val (x, y) = mapToDevice(raw.x, raw.y)
+                        // val label = pointerLabel(pointerId)
+                        // Log.d(
+                        //     FULLSCREEN_TOUCH_LOG_TAG,
+                        //     "按下: pointer#$label(id=$pointerId) x=$x y=$y"
+                        // )
+                        activePointerIds += pointerId
+                        activePointerPositions[pointerId] = raw
+                        activePointerDevicePositions[pointerId] = x to y
+                        justPressed += pointerId
+                        onInjectTouch(UiMotionActions.DOWN, pointerId.toLong(), x, y, pressure, 0)
                     }
                 }
 
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        activePointerIds.clear()
-                        activePointerPositions.clear()
-                        activeTouchCount = 0
-                        val (x, y) = mapToDevice(event.x, event.y)
-                        val pointerId = event.getPointerId(0)
-                        activePointerIds += pointerId
-                        activePointerPositions[pointerId] = Offset(event.x, event.y)
-                        activeTouchCount = activePointerIds.size
-                        onInjectTouch(
-                            UiMotionActions.DOWN,
-                            pointerId.toLong(),
-                            x,
-                            y,
-                            event.getPressure(0).coerceIn(0f, 1f),
-                            1
-                        )
-                    }
-
-                    MotionEvent.ACTION_POINTER_DOWN -> {
-                        val index = event.actionIndex
-                        val px = event.getX(index)
-                        val py = event.getY(index)
-                        val (x, y) = mapToDevice(px, py)
-                        val pointerId = event.getPointerId(index)
-                        activePointerIds += pointerId
-                        activePointerPositions[pointerId] = Offset(px, py)
-                        activeTouchCount = activePointerIds.size
-                        onInjectTouch(
-                            UiMotionActions.POINTER_DOWN,
-                            pointerId.toLong(),
-                            x,
-                            y,
-                            event.getPressure(index).coerceIn(0f, 1f),
-                            1
-                        )
-                        syncActivePointersFromEvent()
-                    }
-
-                    MotionEvent.ACTION_MOVE -> {
-                        for (i in 0 until event.pointerCount) {
-                            val pointerId = event.getPointerId(i)
-                            if (!activePointerIds.contains(pointerId)) continue
-                            val px = event.getX(i)
-                            val py = event.getY(i)
-                            activePointerPositions[pointerId] = Offset(px, py)
-                            val (x, y) = mapToDevice(px, py)
-                            onInjectTouch(
-                                UiMotionActions.MOVE,
-                                pointerId.toLong(),
-                                x,
-                                y,
-                                event.getPressure(i).coerceIn(0f, 1f),
-                                1
-                            )
-                        }
-                    }
-
-                    MotionEvent.ACTION_POINTER_UP -> {
-                        val index = event.actionIndex
-                        val px = event.getX(index)
-                        val py = event.getY(index)
-                        val (x, y) = mapToDevice(px, py)
-                        val pointerId = event.getPointerId(index)
-                        onInjectTouch(UiMotionActions.POINTER_UP, pointerId.toLong(), x, y, 0f, 1)
-                        activePointerIds -= pointerId
-                        activePointerPositions.remove(pointerId)
-                        activeTouchCount = activePointerIds.size
-                        syncActivePointersFromEvent(skipPointerId = pointerId)
-                    }
-
-                    MotionEvent.ACTION_UP -> {
-                        val (x, y) = mapToDevice(event.x, event.y)
-                        val pointerId = event.getPointerId(0)
-                        onInjectTouch(UiMotionActions.UP, pointerId.toLong(), x, y, 0f, 1)
-                        activePointerIds.clear()
-                        activePointerPositions.clear()
-                        activeTouchCount = 0
-                    }
-
-                    MotionEvent.ACTION_CANCEL -> {
-                        for (pointerId in activePointerIds) {
-                            val pos = activePointerPositions[pointerId] ?: Offset.Zero
-                            val (x, y) = mapToDevice(pos.x, pos.y)
-                            onInjectTouch(UiMotionActions.CANCEL, pointerId.toLong(), x, y, 0f, 0)
-                        }
-                        activePointerIds.clear()
-                        activePointerPositions.clear()
-                        activeTouchCount = 0
-                    }
+                for (i in 0 until event.pointerCount) {
+                    val pointerId = event.getPointerId(i)
+                    if (!activePointerIds.contains(pointerId)) continue
+                    if (pointerId == endedPointerId) continue
+                    if (pointerId in justPressed) continue
+                    val raw = eventPositions[pointerId] ?: continue
+                    val pressure = eventPressures[pointerId] ?: 0f
+                    activePointerPositions[pointerId] = raw
+                    val (x, y) = mapToDevice(raw.x, raw.y)
+                    activePointerDevicePositions[pointerId] = x to y
+                    onInjectTouch(UiMotionActions.MOVE, pointerId.toLong(), x, y, pressure, 0)
                 }
+
+                if (endedPointerId != null) {
+                    val endPos = eventPositions[endedPointerId]
+                    if (endPos != null) {
+                        activePointerPositions[endedPointerId] = endPos
+                    }
+                    releasePointer(endedPointerId, reason = "event")
+                }
+
+                activeTouchCount = activePointerIds.size
+                refreshTouchDebug()
                 true
             }
             .onSizeChanged { touchAreaSize = it },
@@ -815,7 +856,7 @@ fun FullscreenControlScreen(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = UiSpacing.CardContent, top = UiSpacing.CardContent)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(25))
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .padding(horizontal = UiSpacing.CardContent, vertical = UiSpacing.Medium),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.Tiny)) {
@@ -825,14 +866,19 @@ fun FullscreenControlScreen(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
+                    @SuppressLint("DefaultLocale")
+                    Text(
+                        text = "FPS: ${String.format("%.1f", currentFps.coerceAtLeast(0f))}",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                    )
                     Text(
                         text = "触点: $activeTouchCount",
                         color = Color.White,
                         fontSize = 13.sp,
                     )
-                    @SuppressLint("DefaultLocale")
-                    Text(
-                        text = "FPS: ${String.format("%.1f", currentFps.coerceAtLeast(0f))}",
+                    if (activeTouchDebug.isNotEmpty()) Text(
+                        text = activeTouchDebug,
                         color = Color.White,
                         fontSize = 13.sp,
                     )

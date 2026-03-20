@@ -65,6 +65,8 @@ fun SettingsScreen(
     onKeepScreenOnWhenStreamingEnabledChange: (Boolean) -> Unit,
     devicePreviewCardHeightDp: Int,
     onDevicePreviewCardHeightDpChange: (Int) -> Unit,
+    showFullscreenVirtualButtons: Boolean,
+    onShowFullscreenVirtualButtonsChange: (Boolean) -> Unit,
     customServerUri: String?,
     onPickServer: () -> Unit,
     onClearServer: () -> Unit,
@@ -137,6 +139,12 @@ fun SettingsScreen(
                         raw.toIntOrNull()
                             ?.let { onDevicePreviewCardHeightDpChange(it.coerceAtLeast(120)) }
                     },
+                )
+                SuperSwitch(
+                    title = "全屏显示虚拟按钮",
+                    summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
+                    checked = showFullscreenVirtualButtons,
+                    onCheckedChange = onShowFullscreenVirtualButtonsChange,
                 )
             }
 

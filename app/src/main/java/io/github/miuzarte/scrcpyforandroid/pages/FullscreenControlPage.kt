@@ -1,7 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.Activity
-import android.content.pm.ActivityInfo
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,8 +42,13 @@ fun FullscreenControlPage(
     virtualButtonsInMore: List<String>,
     showDebugInfo: Boolean,
     showVirtualButtons: Boolean,
+    onVideoSizeChanged: (width: Int, height: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // 全屏控制页不使用预测性返回手势,
+    // 省得处理解码的问题
+    BackHandler(enabled = true, onBack = onDismiss)
+
     val context = LocalContext.current
     val haptics = rememberAppHaptics()
     val activity = remember(context) { context as? Activity }
@@ -55,9 +60,6 @@ fun FullscreenControlPage(
             outsideActions = virtualButtonLayout.first,
             moreActions = virtualButtonLayout.second,
         )
-    }
-    val initialOrientation = remember(activity) {
-        activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
     var session by remember(launch) {
         mutableStateOf(
@@ -71,18 +73,6 @@ fun FullscreenControlPage(
         )
     }
     var currentFps by remember { mutableFloatStateOf(0f) }
-
-    DisposableEffect(activity, session.width, session.height) {
-        val targetOrientation = if (session.width >= session.height) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-        }
-        activity?.requestedOrientation = targetOrientation
-        onDispose {
-            activity?.requestedOrientation = initialOrientation
-        }
-    }
 
     DisposableEffect(activity) {
         val window = activity?.window
@@ -107,6 +97,7 @@ fun FullscreenControlPage(
     DisposableEffect(nativeCore) {
         val listener: (Int, Int) -> Unit = { w, h ->
             session = session.copy(width = w, height = h)
+            onVideoSizeChanged(w, h)
         }
         nativeCore.addVideoSizeListener(listener)
         onDispose {
@@ -151,6 +142,7 @@ fun FullscreenControlPage(
                         screenWidth = session.width,
                         screenHeight = session.height,
                         pressure = pressure,
+                        actionButton = 0,
                         buttons = buttons,
                     )
                 },

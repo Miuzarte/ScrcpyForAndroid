@@ -161,8 +161,8 @@ internal class AdbPairingKey(
         }
 }
 
-private const val ANDROID_PUBKEY_MODULUS_SIZE = 2048 / 8
-private const val ANDROID_PUBKEY_MODULUS_SIZE_WORDS = ANDROID_PUBKEY_MODULUS_SIZE / 4
+private const val ANDROID_PUBKEY_MODULUS_SIZE = 2048 / 8 // 256
+private const val ANDROID_PUBKEY_MODULUS_SIZE_WORDS = ANDROID_PUBKEY_MODULUS_SIZE / 4 // 64
 private const val RSA_PUBLIC_KEY_SIZE = 524
 
 private fun BigInteger.toAdbEncoded(): IntArray {

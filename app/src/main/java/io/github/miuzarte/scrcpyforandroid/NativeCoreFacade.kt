@@ -33,6 +33,9 @@ class NativeCoreFacade(private val appContext: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bootstrapLock = Any()
     private val bootstrapPackets = ArrayDeque<CachedPacket>()
+
+    @Volatile
+    private var latestConfigPacket: CachedPacket? = null
     private var packetCount: Long = 0
 
     @Volatile
@@ -181,6 +184,7 @@ class NativeCoreFacade(private val appContext: Context) {
             releaseAllDecoders()
             synchronized(bootstrapLock) {
                 bootstrapPackets.clear()
+                latestConfigPacket = null
             }
             if (!request.noVideo) {
                 surfaceMap.forEach { (tag, surface) ->
@@ -221,6 +225,7 @@ class NativeCoreFacade(private val appContext: Context) {
             releaseAllDecoders()
             synchronized(bootstrapLock) {
                 bootstrapPackets.clear()
+                latestConfigPacket = null
             }
             currentSessionInfo = null
             sessionManager.clearVideoConsumer()
@@ -578,6 +583,20 @@ class NativeCoreFacade(private val appContext: Context) {
             isKeyFrame = packet.isKeyFrame,
         )
         synchronized(bootstrapLock) {
+            if (cached.isConfig) {
+                latestConfigPacket = cached
+                bootstrapPackets.clear()
+                bootstrapPackets.addLast(cached)
+                return
+            }
+
+            if (cached.isKeyFrame) {
+                bootstrapPackets.clear()
+                latestConfigPacket?.let { bootstrapPackets.addLast(it) }
+                bootstrapPackets.addLast(cached)
+                return
+            }
+
             while (bootstrapPackets.size >= MAX_BOOTSTRAP_PACKETS) {
                 bootstrapPackets.removeFirst()
             }
