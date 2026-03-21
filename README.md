@@ -26,6 +26,12 @@
 
 - 组件排序动画一坨
 - 退出全屏时的横竖屏状态可能不对，断开 scrcpy 重连就好
+- 如果受控机在锁屏时处理网络连接较慢，会导致应用界面无响应过长时间被系统杀掉（点名你米）
+
+## 建议搭配模块
+
+- 密码锁屏无法捕获: [LSPosed/DisableFlagSecure](https://github.com/LSPosed/DisableFlagSecure)
+- 开机自动启用 adb: [gist/906291](https://gist.github.com/Miuzarte/9062915f1615d5eebd363c759fda496c)
 
 ## 构建
 

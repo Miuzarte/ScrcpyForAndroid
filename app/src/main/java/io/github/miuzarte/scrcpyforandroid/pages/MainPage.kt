@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
+import android.os.SystemClock
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +56,9 @@ import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.services.saveMainSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -189,6 +196,7 @@ fun MainPage() {
     var openReorderDevicesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var canClearLogs by remember { mutableStateOf(false) }
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
+    var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
     var fullscreenOrientation by rememberSaveable {
         mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
     }
@@ -198,6 +206,19 @@ fun MainPage() {
     DisposableEffect(activity) {
         onDispose {
             activity?.requestedOrientation = initialOrientation
+        }
+    }
+
+    DisposableEffect(activity, keepScreenOnWhenStreamingEnabled, sessionStarted) {
+        val window = activity?.window
+        val shouldKeepScreenOn = keepScreenOnWhenStreamingEnabled && sessionStarted
+        if (window != null && shouldKeepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (window != null && shouldKeepScreenOn) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
         }
     }
 
@@ -275,13 +296,34 @@ fun MainPage() {
                     ),
                 )
             }
+        } else {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastExitBackPressAtMs > 2_000L) {
+                lastExitBackPressAtMs = now
+                Toast.makeText(context, "再按一次返回键退出", Toast.LENGTH_SHORT).show()
+                return
+            }
+            lastExitBackPressAtMs = 0L
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    runCatching { nativeCore.scrcpyStop() }
+                    runCatching { nativeCore.adbDisconnect() }
+                }
+                activity?.finish()
+            }
         }
     }
 
     val canNavigateBack = rootBackStack.size > 1 ||
             pagerState.currentPage != MainTabDestination.Device.ordinal
 
-    PredictiveBackHandler(enabled = canNavigateBack) { progress ->
+    BackHandler(enabled = currentRootScreen !is RootScreen.Fullscreen) {
+        handleBackNavigation()
+    }
+
+    PredictiveBackHandler(
+        enabled = canNavigateBack && currentRootScreen !is RootScreen.Fullscreen
+    ) { progress ->
         try {
             progress.collect { }
             handleBackNavigation()
@@ -380,7 +422,6 @@ fun MainPage() {
                                     nativeCore = nativeCore,
                                     snack = snackHostState,
                                     scrollBehavior = deviceScrollBehavior,
-                                    keepScreenOnWhenStreamingEnabled = keepScreenOnWhenStreamingEnabled,
                                     virtualButtonsOutside = virtualButtonsOutside,
                                     virtualButtonsInMore = virtualButtonsInMore,
                                     customServerUri = customServerUri,

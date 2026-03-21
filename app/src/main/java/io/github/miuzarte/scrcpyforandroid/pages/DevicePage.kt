@@ -1,9 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.util.Log
-import android.view.WindowManager
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -61,6 +59,7 @@ import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +72,7 @@ import java.net.Socket
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 private const val ADB_CONNECT_TIMEOUT_MS = 3_000L
@@ -125,7 +125,6 @@ fun DeviceTabScreen(
     nativeCore: NativeCoreFacade,
     snack: SnackbarHostState,
     scrollBehavior: ScrollBehavior,
-    keepScreenOnWhenStreamingEnabled: Boolean,
     virtualButtonsOutside: List<String>,
     virtualButtonsInMore: List<String>,
     previewCardHeightDp: Int,
@@ -222,9 +221,19 @@ fun DeviceTabScreen(
     val virtualButtonLayout = remember(virtualButtonsOutside, virtualButtonsInMore) {
         VirtualButtonActions.resolveLayout(virtualButtonsOutside, virtualButtonsInMore)
     }
-    val activity = remember(context) { context as? Activity }
     val initialSettings = remember(context) { loadDevicePageSettings(context) }
     val scope = rememberCoroutineScope()
+    val adbWorkerDispatcher = remember {
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "adb-connect-worker").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
+    }
+
+    DisposableEffect(adbWorkerDispatcher) {
+        onDispose {
+            adbWorkerDispatcher.close()
+        }
+    }
 
     var busy by rememberSaveable { mutableStateOf(false) }
     var statusLine by rememberSaveable { mutableStateOf("未连接") }
@@ -315,6 +324,46 @@ fun DeviceTabScreen(
         }
     }
 
+    suspend fun disconnectAdbConnection(
+        clearQuickOnlineForTarget: ConnectionTarget? = currentTarget,
+        logMessage: String? = null,
+        showSnackMessage: String? = null,
+    ) {
+        withContext(adbWorkerDispatcher) {
+            runCatching { nativeCore.scrcpyStop() }
+            runCatching { nativeCore.adbDisconnect() }
+        }
+        adbConnected = false
+        currentTargetHost = ""
+        currentTargetPort = AppDefaults.ADB_PORT
+        audioForwardingSupported = true
+        cameraMirroringSupported = true
+        sessionInfo = null
+        statusLine = "未连接"
+        connectedDeviceLabel = "未连接"
+        clearQuickOnlineForTarget?.let { target ->
+            if (target.host.isNotBlank()) {
+                upsertQuickDevice(context, quickDevices, target.host, target.port, false)
+            }
+        }
+        logMessage?.let { logEvent(it) }
+        if (!showSnackMessage.isNullOrBlank()) {
+            scope.launch {
+                snack.showSnackbar(showSnackMessage)
+            }
+        }
+    }
+
+    suspend fun disconnectCurrentTargetBeforeConnecting(newHost: String, newPort: Int) {
+        val current = currentTarget
+        if (!adbConnected || current == null) return
+        if (current.host == newHost && current.port == newPort) return
+
+        sessionReconnectBlacklistHosts += current.host
+        logEvent("切换连接目标，先断开当前设备: ${current.host}:${current.port}")
+        disconnectAdbConnection(clearQuickOnlineForTarget = current)
+    }
+
     fun applyConnectedDeviceCapabilities(sdkInt: Int, release: String) {
         val audioSupported = sdkInt !in 0..<30
         audioForwardingSupported = audioSupported
@@ -337,7 +386,7 @@ fun DeviceTabScreen(
     }
 
     suspend fun connectWithTimeout(host: String, port: Int): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(adbWorkerDispatcher) {
             withTimeout(ADB_CONNECT_TIMEOUT_MS) {
                 nativeCore.adbConnect(host, port)
             }
@@ -345,7 +394,7 @@ fun DeviceTabScreen(
     }
 
     suspend fun keepAliveCheck(host: String, port: Int): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(adbWorkerDispatcher) {
             withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
                 val connected = nativeCore.adbIsConnected()
                 if (!connected) {
@@ -381,7 +430,9 @@ fun DeviceTabScreen(
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 参数错误: $detail", Log.WARN, e)
-                snack.showSnackbar("$label 参数错误: $detail")
+                scope.launch {
+                    snack.showSnackbar("$label 参数错误: $detail")
+                }
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 失败: $detail", Log.ERROR, e)
@@ -403,7 +454,9 @@ fun DeviceTabScreen(
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 参数错误: $detail", Log.WARN, e)
-                snack.showSnackbar("$label 参数错误: $detail")
+                scope.launch {
+                    snack.showSnackbar("$label 参数错误: $detail")
+                }
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 失败: $detail", Log.ERROR, e)
@@ -411,6 +464,16 @@ fun DeviceTabScreen(
                 adbConnecting = false
                 onFinished?.invoke()
             }
+        }
+    }
+
+    suspend fun runAutoAdbConnect(host: String, port: Int): Boolean {
+        return runCatching {
+            connectWithTimeout(host, port)
+        }.getOrElse { error ->
+            val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+            logEvent("自动重连失败: $host:$port ($detail)", Log.WARN)
+            false
         }
     }
 
@@ -627,10 +690,8 @@ fun DeviceTabScreen(
                     snack.showSnackbar("ADB 自动重连成功")
                 }
             } else {
-                runCatching { nativeCore.adbDisconnect() }
+                disconnectAdbConnection()
                 statusLine = "ADB 连接断开"
-                connectedDeviceLabel = "未连接"
-                sessionInfo = null
                 logEvent("ADB 自动重连失败: $host:$port", Log.ERROR)
                 scope.launch {
                     snack.showSnackbar("ADB 自动重连失败")
@@ -662,20 +723,19 @@ fun DeviceTabScreen(
                     if (!portReachable) continue
 
                     quickConnectTriedOnce += targetKey
-                    runAdbConnect("快速设备端口可达，尝试连接一次") {
-                        val ok = connectWithTimeout(target.host, target.port)
-                        adbConnected = ok
-                        upsertQuickDevice(
-                            context,
-                            quickDevices,
-                            target.host,
-                            target.port,
-                            ok
-                        )
-                        if (ok) {
-                            handleAdbConnected(target.host, target.port)
-                            logEvent("ADB 快速探测连接成功: ${target.host}:${target.port}")
-                        }
+                    val ok = runAutoAdbConnect(target.host, target.port)
+                    adbConnected = ok
+                    upsertQuickDevice(
+                        context,
+                        quickDevices,
+                        target.host,
+                        target.port,
+                        ok
+                    )
+                    if (ok) {
+                        handleAdbConnected(target.host, target.port)
+                        logEvent("ADB 快速探测连接成功: ${target.host}:${target.port}")
+                        break
                     }
                 }
                 if (adbConnected) break
@@ -727,22 +787,20 @@ fun DeviceTabScreen(
                 continue
             }
 
-            runAdbConnect("自动重连 ADB") {
-                val ok = connectWithTimeout(discoveredHost, discoveredPort)
-                adbConnected = ok
-                upsertQuickDevice(
-                    context,
-                    quickDevices,
-                    discoveredHost,
-                    discoveredPort,
-                    ok
-                )
-                if (ok) {
-                    handleAdbConnected(discoveredHost, discoveredPort)
-                    logEvent("ADB 自动重连成功: $discoveredHost:$discoveredPort")
-                } else {
-                    logEvent("ADB 自动重连失败: $discoveredHost:$discoveredPort", Log.WARN)
-                }
+            val ok = runAutoAdbConnect(discoveredHost, discoveredPort)
+            adbConnected = ok
+            upsertQuickDevice(
+                context,
+                quickDevices,
+                discoveredHost,
+                discoveredPort,
+                ok
+            )
+            if (ok) {
+                handleAdbConnected(discoveredHost, discoveredPort)
+                logEvent("ADB 自动重连成功: $discoveredHost:$discoveredPort")
+            } else {
+                logEvent("ADB 自动重连失败: $discoveredHost:$discoveredPort", Log.WARN)
             }
 
             delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
@@ -756,19 +814,6 @@ fun DeviceTabScreen(
         nativeCore.addVideoSizeListener(listener)
         onDispose {
             nativeCore.removeVideoSizeListener(listener)
-        }
-    }
-
-    DisposableEffect(activity, keepScreenOnWhenStreamingEnabled, sessionInfo != null) {
-        val window = activity?.window
-        val shouldKeepScreenOn = keepScreenOnWhenStreamingEnabled && sessionInfo != null
-        if (window != null && shouldKeepScreenOn) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        onDispose {
-            if (window != null && shouldKeepScreenOn) {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
         }
     }
 
@@ -808,7 +853,6 @@ fun DeviceTabScreen(
             onClearLogsActionChange(null)
             onCanClearLogsChange(false)
             onOpenReorderDevicesActionChange(null)
-            onSessionStartedChange(false)
         }
     }
 
@@ -915,26 +959,18 @@ fun DeviceTabScreen(
                     haptics.press()
                     if (isConnectedTarget) {
                         activeDeviceActionId = device.id
-                        runBusy("断开 ADB", onFinished = { activeDeviceActionId = null }) {
-                            nativeCore.adbDisconnect()
+                        runAdbConnect("断开 ADB", onFinished = { activeDeviceActionId = null }) {
                             sessionReconnectBlacklistHosts += host
-                            adbConnected = false
-                            currentTargetHost = ""
-                            currentTargetPort = AppDefaults.ADB_PORT
-                            audioForwardingSupported = true
-                            cameraMirroringSupported = true
-                            sessionInfo = null
-                            statusLine = "未连接"
-                            connectedDeviceLabel = "未连接"
-                            upsertQuickDevice(context, quickDevices, host, port, false)
-                            logEvent("ADB 已断开: ${device.name}")
-                            scope.launch {
-                                snack.showSnackbar("ADB 已断开")
-                            }
+                            disconnectAdbConnection(
+                                clearQuickOnlineForTarget = ConnectionTarget(host, port),
+                                logMessage = "ADB 已断开: ${device.name}",
+                                showSnackMessage = "ADB 已断开",
+                            )
                         }
                     } else {
                         activeDeviceActionId = device.id
                         runAdbConnect("连接 ADB", onFinished = { activeDeviceActionId = null }) {
+                            disconnectCurrentTargetBeforeConnecting(host, port)
                             val ok = connectWithTimeout(host, port)
                             adbConnected = ok
                             upsertQuickDevice(context, quickDevices, host, port, ok)
@@ -975,6 +1011,7 @@ fun DeviceTabScreen(
                 onConnect = {
                     val target = parseQuickTarget(quickConnectInput) ?: return@QuickConnectCard
                     runAdbConnect("连接 ADB") {
+                        disconnectCurrentTargetBeforeConnecting(target.host, target.port)
                         val ok = connectWithTimeout(target.host, target.port)
                         adbConnected = ok
                         upsertQuickDevice(context, quickDevices, target.host, target.port, ok)
