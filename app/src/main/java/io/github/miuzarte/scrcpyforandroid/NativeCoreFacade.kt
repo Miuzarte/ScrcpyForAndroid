@@ -20,6 +20,14 @@ import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 
+/**
+ * Facade that centralizes ADB and scrcpy native operations.
+ *
+ * Provides synchronous and asynchronous helpers that run on an internal
+ * single-thread executor to serialize access to the native session manager
+ * and decoders. Callers should use the provided methods from UI code but
+ * not perform heavy work on the main thread directly.
+ */
 class NativeCoreFacade(private val appContext: Context) {
 
     private val adbService = NativeAdbService(appContext)
@@ -51,6 +59,16 @@ class NativeCoreFacade(private val appContext: Context) {
         executor.shutdown()
     }
 
+    /**
+     * Register a rendering Surface for a given `tag`.
+     *
+     * - If the surface is already known and the decoder is active, this is a no-op.
+     * - If a decoder exists but cannot switch output surface, a new decoder is created
+     *   and bound to the supplied surface.
+     * - This method must be called from the UI thread (it is called by the composable
+     *   that owns the TextureView). Native decoder operations are performed synchronously
+     *   on the UI thread only via the decoder API; heavy work happens inside the decoder.
+     */
     fun registerVideoSurface(tag: String, surface: Surface) {
         val newId = System.identityHashCode(surface)
         val oldId = surfaceIdentityMap[tag]
@@ -73,6 +91,14 @@ class NativeCoreFacade(private val appContext: Context) {
         createOrReplaceDecoder(tag, surface, session)
     }
 
+
+    /**
+     * Unregister the rendering Surface previously bound to `tag`.
+     *
+     * - If a stale surface reference is supplied (identity mismatch), the request is ignored.
+     * - When there is no active session, the decoder for the tag is released immediately.
+     * - This protects the native decoder from feeding into a released Surface.
+     */
     fun unregisterVideoSurface(tag: String, surface: Surface? = null) {
         val currentId = surfaceIdentityMap[tag]
         val requestId = surface?.let { System.identityHashCode(it) }
@@ -91,10 +117,18 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+    /**
+     * Pair with a device over ADB pairing protocol.
+     * @return true on successful pairing, false otherwise.
+     */
     fun adbPair(host: String, port: Int, pairingCode: String): Boolean {
         return ioCall { adbService.pair(host, port, pairingCode) }
     }
 
+    /**
+     * Discover an ADB pairing service (mDNS) and return its host:port.
+     * Returns null if no service is found within `timeoutMs`.
+     */
     fun adbDiscoverPairingService(
         timeoutMs: Long = 12_000,
         includeLanDevices: Boolean = true,
@@ -102,6 +136,9 @@ class NativeCoreFacade(private val appContext: Context) {
         return ioCall { adbService.discoverPairingService(timeoutMs, includeLanDevices) }
     }
 
+    /**
+     * Discover an ADB connect service for direct connection (mDNS).
+     */
     fun adbDiscoverConnectService(
         timeoutMs: Long = 12_000,
         includeLanDevices: Boolean = true,
@@ -109,21 +146,47 @@ class NativeCoreFacade(private val appContext: Context) {
         return ioCall { adbService.discoverConnectService(timeoutMs, includeLanDevices) }
     }
 
+    /**
+     * Connect to an ADB server at the given host and port.
+     * Returns true on success.
+     */
     fun adbConnect(host: String, port: Int): Boolean = ioCall { adbService.connect(host, port) }
 
+    /**
+     * Disconnect current ADB connection. Always returns true.
+     */
     fun adbDisconnect(): Boolean {
         ioCall { adbService.disconnect() }
         return true
     }
 
+    /**
+     * Check whether an ADB connection is currently established.
+     */
     fun adbIsConnected(): Boolean = ioCall { adbService.isConnected() }
 
+    /**
+     * Execute a shell command over ADB and return its stdout as a string.
+     */
     fun adbShell(command: String): String = ioCall { adbService.shell(command) }
 
+    /**
+     * Set the local ADB key name used when generating or selecting key files.
+     */
     fun setAdbKeyName(name: String) {
         adbService.keyName = name
     }
 
+    /**
+     * Start a scrcpy session synchronously.
+     *
+     * - This method runs on the internal single-threaded [executor] via [ioCall], so
+     *   callers block until the start completes. It handles server extraction, starting
+     *   the session manager, creating decoders for any registered surfaces, and setting
+     *   up audio playback when available.
+     * - After the session is established, `currentSessionInfo` is populated and
+     *   bootstrap packets are reset so newly created decoders can be primed.
+     */
     fun scrcpyStart(request: ScrcpyStartRequest): ScrcpySessionInfo {
         return ioCall {
             Log.i(TAG, "scrcpyStart(): request codec=${request.videoCodec} audio=${request.audio}")
@@ -220,6 +283,13 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+    /**
+     * Stop any running scrcpy session and clear all video/audio consumers.
+     *
+     * - Executes on the internal executor to keep scrcpy/session-manager operations
+     *   serialized with other IO operations.
+     * - Releases decoders and audio players and resets session state.
+     */
     fun scrcpyStop(): Boolean {
         ioCall {
             releaseAllDecoders()
@@ -517,6 +587,15 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+    /**
+     * Create or replace a decoder bound to `surface` for `session`.
+     *
+     * - Chooses MIME type from `session.codec` and constructs an [AnnexBDecoder].
+     * - The decoder's `onOutputSizeChanged` callback publishes size changes to
+     *   registered listeners on the main thread.
+     * - Newly created decoders are fed with any cached bootstrap packets to allow
+     *   faster playback startup.
+     */
     private fun createOrReplaceDecoder(tag: String, surface: Surface, session: ScrcpySessionInfo) {
         decoderMap.remove(tag)?.release()
         val mime = when (session.codec.lowercase()) {
@@ -604,6 +683,15 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+    /**
+     * Attach a single consumer to the session manager to deliver incoming video packets
+     * to all active decoders.
+     *
+     * - Called when a session is active and at least one decoder exists. Packets are
+     *   cached into [bootstrapPackets] to allow late-attaching decoders to catch up.
+     * - The consumer iterates [decoderMap] and feeds each decoder. Errors are
+     *   isolated with `runCatching` so one codec failure doesn't stop others.
+     */
     private fun ensureVideoConsumerAttached() {
         sessionManager.attachVideoConsumer { packet ->
             cacheBootstrapPacket(packet)
@@ -630,6 +718,7 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+
     private fun releaseAllDecoders() {
         decoderMap.values.forEach { decoder ->
             runCatching { decoder.release() }
@@ -637,6 +726,12 @@ class NativeCoreFacade(private val appContext: Context) {
         decoderMap.clear()
     }
 
+    /**
+     * Execute a blocking IO task on the internal single-thread executor and return its result.
+     *
+     * - This serializes access to native adb/session operations and unwraps
+     *   ExecutionException to rethrow the underlying cause.
+     */
     private fun <T> ioCall(task: () -> T): T {
         return try {
             executor.submit<T> { task() }.get()
@@ -649,6 +744,12 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
+    /**
+     * Submit a non-blocking IO task to the internal executor.
+     *
+     * - Use this for fire-and-forget native operations where the caller does not need
+     *   a synchronous result (e.g. injecting input, toggling power, etc.).
+     */
     private fun ioExecute(task: () -> Unit) {
         executor.execute(task)
     }

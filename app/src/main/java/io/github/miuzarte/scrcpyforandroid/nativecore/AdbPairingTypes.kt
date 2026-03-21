@@ -26,6 +26,10 @@ import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
 import javax.net.ssl.X509ExtendedTrustManager
 
+/**
+ * Helper that wraps a generated/private RSA key and exposes ADB-compatible
+ * public key bytes and an `SSLContext` configured for the pairing handshake.
+ */
 internal class AdbPairingKey(
     private val privateKey: PrivateKey,
     private val alias: String,
@@ -165,6 +169,10 @@ private const val ANDROID_PUBKEY_MODULUS_SIZE = 2048 / 8 // 256
 private const val ANDROID_PUBKEY_MODULUS_SIZE_WORDS = ANDROID_PUBKEY_MODULUS_SIZE / 4 // 64
 private const val RSA_PUBLIC_KEY_SIZE = 524
 
+/**
+ * Convert a BigInteger modulus into the little-endian int-array encoding
+ * expected by the ADB public key format.
+ */
 private fun BigInteger.toAdbEncoded(): IntArray {
     val encoded = IntArray(ANDROID_PUBKEY_MODULUS_SIZE_WORDS)
     val r32 = BigInteger.ZERO.setBit(32)
@@ -177,6 +185,10 @@ private fun BigInteger.toAdbEncoded(): IntArray {
     return encoded
 }
 
+/**
+ * Encode an RSA public key into the ADB public-key blob format with a UTF-8
+ * name suffix.
+ */
 private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
     val r32 = BigInteger.ZERO.setBit(32)
     val n0inv = modulus.remainder(r32).modInverse(r32).negate()
@@ -198,4 +210,7 @@ private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
     }
 }
 
+/**
+ * Thrown when the supplied pairing code is invalid during the pairing flow.
+ */
 internal class AdbInvalidPairingCodeException : Exception()

@@ -1,5 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
+// Go reader note: Audio output helper for scrcpy stream: decodes/plays PCM or codec audio frames.
+
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -118,6 +120,12 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
         }.onFailure { Log.w(TAG, "prepareFlac failed", it) }
     }
 
+    /**
+     * Initialize MediaCodec decoder and an AudioTrack for playback.
+     *
+     * - Configures codec with provided format and starts an AudioTrack in streaming mode.
+     * - Called once when a config packet is received for codec formats.
+     */
     private fun startCodecAndTrack(format: MediaFormat) {
         val mime = format.getString(MediaFormat.KEY_MIME)!!
         val codec = MediaCodec.createDecoderByType(mime)
@@ -162,6 +170,11 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
         )
     }
 
+    /**
+     * Drain decoder output and write PCM frames to the AudioTrack.
+     *
+     * - Non-blocking writes are used so audio does not stall the decoder thread.
+     */
     private fun drainOutput(codec: MediaCodec) {
         val track = audioTrack ?: return
         var idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
@@ -179,6 +192,9 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
         }
     }
 
+    /**
+     * Release media and audio resources. Safe to call from any thread.
+     */
     fun release() {
         if (released) return
         released = true

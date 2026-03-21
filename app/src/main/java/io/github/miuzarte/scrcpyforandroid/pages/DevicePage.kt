@@ -229,6 +229,9 @@ fun DeviceTabScreen(
         }.asCoroutineDispatcher()
     }
 
+    // Run adb operations on a dedicated single thread.
+    // Try to avoid blocking UI/recomposition and keeps adb call ordering deterministic.
+
     DisposableEffect(adbWorkerDispatcher) {
         onDispose {
             adbWorkerDispatcher.close()
@@ -324,12 +327,35 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Disconnect the current ADB connection and stop any running scrcpy session.
+     *
+     * Concurrency / thread boundary:
+     * - Native calls that may block are executed on [adbWorkerDispatcher] using [withContext].
+     * - This ensures UI coroutines are never blocked by synchronous native I/O.
+     *
+     * Side effects:
+     * - Calls `nativeCore.scrcpyStop()` and `nativeCore.adbDisconnect()` (best-effort).
+     * - Resets UI-visible connection state: `adbConnected`, `currentTargetHost/Port`,
+     *   `sessionInfo`, device capability flags, `statusLine`, and `connectedDeviceLabel`.
+     * - Updates the saved quick-device list via [upsertQuickDevice] when a target is provided.
+     * - Logs an optional [logMessage] to the local event log.
+     * - Shows an optional snackbar message asynchronously (launched on the composition scope)
+     *   so callers don't get blocked by `snack.showSnackbar` (it is suspending).
+     *
+     * Usage notes:
+     * - Prefer calling this from UI code wrapped by `runAdbConnect`/`runBusy` where appropriate
+     *   so the UI busy/connect gates are respected.
+     * - This function is idempotent from the UI state perspective: calling it when already
+     *   disconnected will simply reset UI fields and not throw.
+     */
     suspend fun disconnectAdbConnection(
         clearQuickOnlineForTarget: ConnectionTarget? = currentTarget,
         logMessage: String? = null,
         showSnackMessage: String? = null,
     ) {
         withContext(adbWorkerDispatcher) {
+            // Also stops scrcpy.
             runCatching { nativeCore.scrcpyStop() }
             runCatching { nativeCore.adbDisconnect() }
         }
@@ -355,6 +381,7 @@ fun DeviceTabScreen(
     }
 
     suspend fun disconnectCurrentTargetBeforeConnecting(newHost: String, newPort: Int) {
+        // Force old target cleanup before switching to another endpoint.
         val current = currentTarget
         if (!adbConnected || current == null) return
         if (current.host == newHost && current.port == newPort) return
@@ -385,6 +412,18 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Attempt to connect to an adb endpoint within a short timeout.
+     *
+     * Execution:
+     * - Runs `nativeCore.adbConnect(host, port)` on [adbWorkerDispatcher] and wraps it with
+     *   [withTimeout] to avoid hanging forever. Returns true on success, false / throws on failure
+     *   depending on the underlying native behavior.
+     *
+     * Why this exists:
+     * - Some adb endpoints can take long to accept TCP connects; the UI should not wait
+     *   indefinitely. Use a small, caller-chosen timeout to keep UX snappy.
+     */
     suspend fun connectWithTimeout(host: String, port: Int): Boolean {
         return withContext(adbWorkerDispatcher) {
             withTimeout(ADB_CONNECT_TIMEOUT_MS) {
@@ -393,6 +432,19 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Validate that the current ADB connection is still alive.
+     *
+     * Behavior:
+     * - Runs on [adbWorkerDispatcher] with a short timeout.
+     * - First checks `nativeCore.adbIsConnected()` to avoid unnecessary shell calls.
+     * - Executes a lightweight `adb shell` command (`echo -n 1`) to verify the remote side is
+     *   responsive. Returns true only when both checks succeed.
+     *
+     * Notes for reliability:
+     * - Some devices may accept TCP connections but have a hung adb-server process; the shell
+     *   echo check helps detect that state.
+     */
     suspend fun keepAliveCheck(host: String, port: Int): Boolean {
         return withContext(adbWorkerDispatcher) {
             withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
@@ -408,6 +460,13 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Quickly test TCP reachability to an endpoint.
+     *
+     * - Uses a plain Socket connect on [Dispatchers.IO] with a very short timeout.
+     * - This is useful before attempting an adb connect to avoid long native timeouts.
+     * - Returns true when TCP handshake succeeds within [ADB_TCP_PROBE_TIMEOUT_MS].
+     */
     suspend fun probeTcpReachable(host: String, port: Int): Boolean {
         return withContext(Dispatchers.IO) {
             runCatching {
@@ -419,7 +478,17 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Execute a suspend [block] while toggling the `busy` UI gate.
+     *
+     * - Intended for non-adb user actions (UI-level operations) that should disable
+     *   certain controls while active (e.g. scrcpy start/stop, pairing, listing).
+     * - Errors are logged and surfaced via a snackbar where appropriate. The snackbar
+     *   is launched asynchronously so the outer coroutine can continue to unwind.
+     * - Ensures `busy` is reset in `finally` so the UI recovers even on exceptions.
+     */
     fun runBusy(label: String, onFinished: (() -> Unit)? = null, block: suspend () -> Unit) {
+        // For non-adb actions (start/stop/pair/list refresh...).
         if (busy) return
         scope.launch {
             busy = true
@@ -443,7 +512,20 @@ fun DeviceTabScreen(
         }
     }
 
+    /**
+     * Execute a manual ADB-related suspend [block] while toggling `adbConnecting`.
+     *
+     * Purpose:
+     * - Called from explicit user actions (pressing "connect" / "disconnect").
+     * - Keeps the UI responsive by marking only user-initiated connect operations as in-progress.
+     *
+     * Concurrency notes:
+     * - Background auto-reconnect attempts deliberately DO NOT set `adbConnecting` so that
+     *   UI controls remain actionable while background retries occur.
+     * - Errors and timeouts are logged and surfaced similarly to `runBusy`.
+     */
     fun runAdbConnect(label: String, onFinished: (() -> Unit)? = null, block: suspend () -> Unit) {
+        // For manual adb operations from user actions.
         if (adbConnecting) return
         scope.launch {
             adbConnecting = true
@@ -673,6 +755,8 @@ fun DeviceTabScreen(
     LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort) {
         if (!adbConnected || currentTargetHost.isBlank()) return@LaunchedEffect
 
+        // Keep-alive loop for current target.
+        // On failure: try to reconnect once; if failed, fully disconnect and reset UI state.
         val host = currentTargetHost
         val port = currentTargetPort
         while (adbConnected && currentTargetHost == host && currentTargetPort == port) {
@@ -704,6 +788,9 @@ fun DeviceTabScreen(
     LaunchedEffect(adbConnected, adbAutoReconnectPairedDevice, adbMdnsLanDiscoveryEnabled) {
         if (adbConnected || !adbAutoReconnectPairedDevice) return@LaunchedEffect
 
+        // Background auto reconnect pipeline:
+        // 1) try quick list targets with reachable TCP ports
+        // 2) fallback to mDNS discovery
         val quickConnectTriedOnce = mutableSetOf<String>()
         while (!adbConnected && adbAutoReconnectPairedDevice) {
             if (busy || adbConnecting || sessionInfo != null) {

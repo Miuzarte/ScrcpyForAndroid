@@ -36,6 +36,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLSocket
 import kotlin.concurrent.thread
 
+/**
+ * Low-level transport helper that manages local RSA keys and creates
+ * `DirectAdbConnection` instances for direct TCP/TLS ADB connections.
+ *
+ * This type is responsible for persisting the private key and performing
+ * pairing/connect discovery helpers.
+ */
 internal class DirectAdbTransport(private val context: Context) {
 
     private val keys: Pair<PrivateKey, ByteArray> by lazy { loadOrCreate() }
@@ -94,6 +101,10 @@ internal class DirectAdbTransport(private val context: Context) {
         return AdbMdnsDiscoverer(context).discoverConnectService(timeoutMs, includeLanDevices)
     }
 
+    /**
+     * Load persisted RSA keypair from shared preferences, or generate a new one.
+     * Returns (privateKey, publicX509Bytes).
+     */
     private fun loadOrCreate(): Pair<PrivateKey, ByteArray> {
         val prefs = context.getSharedPreferences(
             AppPreferenceKeys.NATIVE_ADB_KEY_PREFS_NAME,
@@ -181,6 +192,12 @@ internal class DirectAdbTransport(private val context: Context) {
     }
 }
 
+/**
+ * Represents a single direct ADB connection over TCP (optionally upgraded to TLS).
+ *
+ * Exposes framed ADB streams via `openStream` and handles the protocol handshake,
+ * reader thread and stream routing.
+ */
 internal class DirectAdbConnection(
     val host: String,
     val port: Int,
@@ -222,6 +239,14 @@ internal class DirectAdbConnection(
         private const val MAX_PAYLOAD = 256 * 1024
     }
 
+    /**
+     * Perform the ADB protocol handshake over TCP.
+     *
+     * - Establishes TCP, negotiates optional TLS (STLS), and performs the ADB
+     *   authentication exchange (TOKEN -> SIGNATURE or PUBKEY flow).
+     * - After a successful handshake, starts a reader thread to process incoming
+     *   ADB frames and dispatch them to logical streams.
+     */
     fun handshake() {
         Log.i(TAG, "handshake(): tcp connect -> $host:$port")
         socket.connect(InetSocketAddress(host, port), 10_000)
@@ -290,6 +315,12 @@ internal class DirectAdbConnection(
         rawOut = sslSocket.outputStream
     }
 
+    /**
+     * Open a logical ADB stream for `service` and return an [AdbSocketStream].
+     *
+     * - Sends an A_OPEN message and waits for remote acknowledgment. The returned
+     *   stream exposes blocking InputStream/OutputStream wrappers usable by callers.
+     */
     fun openStream(service: String): AdbSocketStream {
         val localId = nextLocalId.getAndIncrement()
         val stream = AdbSocketStream(localId) { cmd, a0, a1, d -> sendMsg(cmd, a0, a1, d) }
@@ -307,6 +338,11 @@ internal class DirectAdbConnection(
     fun shell(command: String): String =
         openStream("shell:$command").use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
 
+    /**
+     * Push raw bytes to a remote path using the minimal ADB "sync" protocol.
+     *
+     * - Implements SEND/DATA/DONE/OKAY sequence and throws IOException on failure.
+     */
     fun push(data: ByteArray, remotePath: String, unixMode: Int = 420) {
         openStream("sync:").use { stream ->
             val out = stream.outputStream
@@ -385,6 +421,11 @@ internal class DirectAdbConnection(
         }
     }
 
+    /**
+     * Send a framed ADB message (header + optional payload).
+     *
+     * - Header fields are little-endian as required by the ADB protocol.
+     */
     @Synchronized
     private fun sendMsg(
         command: Int,
@@ -402,6 +443,11 @@ internal class DirectAdbConnection(
         rawOut.flush()
     }
 
+    /**
+     * Receive and parse a single ADB framed message from the socket.
+     *
+     * - Blocks until the full 24-byte header is read and then reads the payload.
+     */
     private fun recvMsg(): AdbMsg {
         val h = ByteArray(24)
         rawIn.readExact(h)
@@ -498,6 +544,10 @@ internal class DirectAdbConnection(
     }
 }
 
+/**
+ * Logical ADB stream abstraction mapped to a local id. Provides blocking
+ * `InputStream`/`OutputStream` implementations and lifecycle helpers used by callers.
+ */
 internal class AdbSocketStream(
     val localId: Int,
     private val sender: (cmd: Int, arg0: Int, arg1: Int, data: ByteArray) -> Unit,

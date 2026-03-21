@@ -24,6 +24,9 @@ private const val EXPORTED_KEY_LABEL = "adb-label\u0000"
 private const val EXPORTED_KEY_SIZE = 64
 private const val PAIRING_PACKET_HEADER_SIZE = 6
 
+/**
+ * PeerInfo container used to pack peer metadata for the pairing exchange.
+ */
 private class PeerInfo(val type: Byte, rawData: ByteArray) {
     val data = ByteArray(MAX_PEER_INFO_SIZE - 1)
 
@@ -48,6 +51,9 @@ private class PeerInfo(val type: Byte, rawData: ByteArray) {
     }
 }
 
+/**
+ * Small header framing structure used by the ADB pairing packet format.
+ */
 private class PairingPacketHeader(val version: Byte, val type: Byte, val payload: Int) {
     object Type {
         const val SPAKE2_MSG: Byte = 0
@@ -83,6 +89,10 @@ private class PairingPacketHeader(val version: Byte, val type: Byte, val payload
     }
 }
 
+/**
+ * Wrapper around native SPAKE2 pairing context used to perform the cryptographic
+ * exchanges. The native implementation is provided by the `adbpairing` library.
+ */
 private class PairingContext private constructor(private val nativePtr: Long) {
 
     val msg: ByteArray = nativeMsg(nativePtr)
@@ -114,6 +124,13 @@ private class PairingContext private constructor(private val nativePtr: Long) {
     }
 }
 
+/**
+ * Client-side implementation of the ADB pairing protocol.
+ *
+ * Connects to the device's pairing port, performs the TLS handshake, derives
+ * keying material using the user-supplied pairing code, and exchanges peer
+ * information to complete pairing.
+ */
 @RequiresApi(Build.VERSION_CODES.R)
 internal class DirectAdbPairingClient(
     private val host: String,

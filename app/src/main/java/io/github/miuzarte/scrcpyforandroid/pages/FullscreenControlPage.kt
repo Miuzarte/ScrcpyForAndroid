@@ -45,8 +45,7 @@ fun FullscreenControlPage(
     onVideoSizeChanged: (width: Int, height: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // 全屏控制页不使用预测性返回手势,
-    // 省得处理解码的问题
+    // Disable predictive back handler temporarily to avoid decoding issues.
     BackHandler(enabled = true, onBack = onDismiss)
 
     val context = LocalContext.current

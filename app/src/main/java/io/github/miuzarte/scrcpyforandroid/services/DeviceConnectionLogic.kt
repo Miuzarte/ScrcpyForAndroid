@@ -12,6 +12,15 @@ internal data class ConnectedDeviceInfo(
     val sdkInt: Int,
 )
 
+/**
+ * Fetch basic device properties from an already-connected device.
+ *
+ * Notes:
+ * - This function issues multiple `adb shell getprop` commands via [nativeCore.adbShell].
+ *   Each call may block on native I/O, so callers should execute this on the dedicated
+ *   ADB worker dispatcher rather than the UI thread.
+ * - Returns a lightweight [ConnectedDeviceInfo] structure with commonly-used properties.
+ */
 internal fun fetchConnectedDeviceInfo(
     nativeCore: NativeCoreFacade,
     host: String,

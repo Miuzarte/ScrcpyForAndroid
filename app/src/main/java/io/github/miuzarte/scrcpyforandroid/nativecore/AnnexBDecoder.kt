@@ -5,6 +5,19 @@ import android.media.MediaFormat
 import android.util.Log
 import android.view.Surface
 
+/**
+ * AnnexBDecoder
+ *
+ * Purpose:
+ * - Wraps Android MediaCodec for Annex-B framed codecs (H.264/H.265/AV1).
+ * - Handles critical startup packets (config/keyframes) and provides callbacks
+ *   for output size changes and FPS updates.
+ *
+ * Threading / safety:
+ * - Public methods are synchronized to allow calls from multiple threads
+ *   (packet producer vs. teardown). Internally, MediaCodec callbacks and
+ *   buffer queues are used on the calling thread.
+ */
 class AnnexBDecoder(
     width: Int,
     height: Int,
@@ -40,6 +53,16 @@ class AnnexBDecoder(
         codec.start()
     }
 
+    /**
+     * Feed an Annex-B framed packet into the decoder.
+     *
+     * - `isConfig` indicates codec configuration packets (SPS/PPS) and are handled with
+     *   higher priority: they can clear bootstrap buffering and are retried for input.
+     * - `isKeyFrame` is used to mark access units that allow decoder restarts.
+     * - The method attempts to dequeue an input buffer and queue the data; if no
+     *   input buffer is available for critical packets, it drains output and retries
+     *   to reduce startup stalls.
+     */
     @Synchronized
     fun feedAnnexB(data: ByteArray, ptsUs: Long, isKeyFrame: Boolean, isConfig: Boolean = false) {
         if (released) {
@@ -89,6 +112,12 @@ class AnnexBDecoder(
         }
     }
 
+    /**
+     * Switch the codec's output surface.
+     *
+     * - Returns true when the codec accepted the new surface, false otherwise.
+     * - Safe to call during playback to move rendering between preview/fullscreen surfaces.
+     */
     @Synchronized
     fun switchOutputSurface(surface: Surface): Boolean {
         if (released) {
@@ -100,6 +129,12 @@ class AnnexBDecoder(
         }.getOrElse { false }
     }
 
+    /**
+     * Release the codec resources.
+     *
+     * - Stops decoding, releases the MediaCodec instance, and marks this decoder as released
+     *   so subsequent calls are no-ops.
+     */
     @Synchronized
     fun release() {
         released = true

@@ -4,6 +4,13 @@ import android.content.Context
 import android.util.Log
 import java.nio.file.Path
 
+/**
+ * Higher-level ADB service that wraps `DirectAdbTransport` and provides
+ * synchronized connect/disconnect/shell helpers for callers.
+ *
+ * Methods are synchronized because the underlying transport is single-connection
+ * and accessed from the app's serialized IO executor.
+ */
 class NativeAdbService(appContext: Context) {
 
     private val transport = DirectAdbTransport(appContext)
@@ -65,6 +72,11 @@ class NativeAdbService(appContext: Context) {
         }
     }
 
+    /**
+     * Connect to a remote ADB endpoint. If an existing connection points to the
+     * same host:port it is reused; otherwise the previous connection is closed
+     * before attempting the new connect.
+     */
     @Synchronized
     fun connect(host: String, port: Int): Boolean {
         Log.i(TAG, "connect(): host=$host port=$port")
@@ -86,6 +98,9 @@ class NativeAdbService(appContext: Context) {
         }
     }
 
+    /**
+     * Close the current ADB connection immediately.
+     */
     @Synchronized
     fun disconnect() {
         runCatching { connection?.close() }
@@ -97,6 +112,9 @@ class NativeAdbService(appContext: Context) {
     @Synchronized
     fun isConnected(): Boolean = connection?.isAlive() == true
 
+    /**
+     * Execute a shell command on the connected device and return stdout text.
+     */
     @Synchronized
     fun shell(command: String): String = requireConnection().shell(command)
 

@@ -34,6 +34,21 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     private var lastServerCommand: String? = null
     private val serverLogBuffer = ArrayDeque<String>()
 
+    /**
+     * Start a scrcpy session.
+     *
+     * Responsibilities:
+     * - Pushes the server artifact to the device, constructs the server command,
+     *   and opens the server shell stream.
+     * - Opens the required abstract sockets (video/audio/control) with retries and
+     *   reads initial session metadata (device name, codec, resolution).
+     * - Initializes an [ActiveSession] which holds socket streams and reader threads.
+     *
+     * Threading notes:
+     * - This is synchronized to avoid concurrent starts/stops.
+     * - It may block while interacting with adb; callers should execute it off the UI
+     *   thread when appropriate. The facade uses an executor to serialize such calls.
+     */
     @Synchronized
     fun start(serverJarPath: Path, options: ScrcpyStartOptions): SessionInfo {
         stop()
@@ -152,6 +167,14 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         }
     }
 
+    /**
+     * Attach a video consumer callback.
+     *
+     * - Spawns a dedicated `scrcpy-video-reader` thread that reads framed Annex B
+     *   packets from the video socket and delivers `VideoPacket` instances to [consumer].
+     * - The reader thread stops when the session ends or the socket is closed.
+     * - Consumers should be resilient to occasional dropped packets or reader errors.
+     */
     @Synchronized
     fun attachVideoConsumer(consumer: (VideoPacket) -> Unit) {
         val session = activeSession ?: throw IllegalStateException("scrcpy session not started")
@@ -206,6 +229,14 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         videoConsumer = null
     }
 
+    /**
+     * Attach an audio consumer callback.
+     *
+     * - Similar to the video consumer, this starts a `scrcpy-audio-reader` thread
+     *   which reads audio packets and dispatches `AudioPacket` to the provided callback.
+     * - The function reads the audio stream header to determine whether audio is
+     *   available and exits early if disabled.
+     */
     @Synchronized
     fun attachAudioConsumer(consumer: (AudioPacket) -> Unit) {
         val session = activeSession ?: throw IllegalStateException("scrcpy session not started")
@@ -281,6 +312,12 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         audioConsumer = null
     }
 
+    /**
+     * Inject a keycode event to the control channel.
+     *
+     * - Requires an active control channel; throws if absent.
+     * - Synchronized to serialize control writes.
+     */
     @Synchronized
     fun injectKeycode(action: Int, keycode: Int, repeat: Int = 0, metaState: Int = 0) {
         requireControlWriter().injectKeycode(action, keycode, repeat, metaState)
@@ -291,6 +328,13 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         requireControlWriter().injectText(text)
     }
 
+    /**
+     * Inject a touch event to the control channel.
+     *
+     * - Coordinates are expected in device pixels and are written together with
+     *   screen dimensions so the server can interpret them correctly.
+     * - Synchronized to serialize control writes.
+     */
     @Synchronized
     fun injectTouch(
         action: Int,
@@ -347,6 +391,12 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         requireControlWriter().setDisplayPower(on)
     }
 
+    /**
+     * Stop the active session and clean up reader threads and streams.
+     *
+     * - Interrupts and joins reader threads with short timeouts, closes sockets,
+     *   and clears state. It is safe to call from any thread.
+     */
     @Synchronized
     fun stop() {
         val session = activeSession ?: return
@@ -815,6 +865,12 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         return serverLogBuffer.toList().takeLast(take).joinToString("\n")
     }
 
+    /**
+     * Open an abstract adb socket with retry.
+     *
+     * - Retries a number of times with a short delay (useful during server startup).
+     * - Optionally expects a dummy byte on the stream to validate the server handshake.
+     */
     private fun openAbstractSocketWithRetry(
         socketName: String,
         expectDummyByte: Boolean

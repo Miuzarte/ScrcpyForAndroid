@@ -45,6 +45,21 @@ data class SortDropPayload(
     val transferDirection: SortTransferDirection,
 )
 
+/**
+ * Displays a titled list of sortable cards.
+ *
+ * Each item can be long-pressed and dragged. When a drag ends the
+ * `onDrop` callback receives a payload describing the item id and
+ * the drag delta which callers can use to perform reordering or
+ * transfer actions.
+ *
+ * @param title The section title displayed above the list.
+ * @param items The list of items to render as sortable cards.
+ * @param modifier Optional [Modifier] applied to the outer column.
+ * @param transferDirection Hint for transfer direction used by callers.
+ * @param onLongPressHaptic Optional callback invoked when an item is long-pressed.
+ * @param onDrop Callback invoked when a dragged item is dropped.
+ */
 @Composable
 fun SortableCardList(
     title: String,

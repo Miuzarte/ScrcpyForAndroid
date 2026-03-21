@@ -203,12 +203,14 @@ fun MainPage() {
     val themeMode = resolveThemeMode(themeBaseIndex, monetEnabled)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
+    // Restore system orientation when MainPage leaves composition.
     DisposableEffect(activity) {
         onDispose {
             activity?.requestedOrientation = initialOrientation
         }
     }
 
+    // Keep-screen-on is controlled globally, so fullscreen and preview share the same behavior.
     DisposableEffect(activity, keepScreenOnWhenStreamingEnabled, sessionStarted) {
         val window = activity?.window
         val shouldKeepScreenOn = keepScreenOnWhenStreamingEnabled && sessionStarted
@@ -222,6 +224,7 @@ fun MainPage() {
         }
     }
 
+    // Fullscreen route can force orientation based on stream ratio; all other routes are portrait.
     LaunchedEffect(activity, currentRootScreen, fullscreenOrientation) {
         val targetOrientation = when (currentRootScreen) {
             is RootScreen.Fullscreen -> fullscreenOrientation
@@ -283,6 +286,10 @@ fun MainPage() {
         }
     }
 
+    // Unified back behavior:
+    // 1) pop inner route
+    // 2) switch tab back to Device
+    // 3) double-back to exit and disconnect adb/scrcpy
     fun handleBackNavigation() {
         if (rootBackStack.size > 1) {
             popRoot()

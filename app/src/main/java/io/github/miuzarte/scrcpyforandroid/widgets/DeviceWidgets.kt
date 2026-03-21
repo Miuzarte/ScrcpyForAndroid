@@ -485,6 +485,19 @@ internal fun ConfigPanel(
     }
 }
 
+/**
+ * PairingDialog
+ *
+ * Purpose:
+ * - A small helper dialog UI that optionally performs an asynchronous discovery
+ *   step (`onDiscoverTarget`) to pre-fill host/port fields.
+ *
+ * Behavior:
+ * - Discovery runs on [Dispatchers.IO] to avoid blocking the UI and updates
+ *   local `host`/`port` state on success.
+ * - Input validation is simple (non-empty checks) and the final `onConfirm` callback
+ *   receives trimmed values.
+ */
 @Composable
 private fun PairingDialog(
     showDialog: Boolean,
@@ -635,6 +648,22 @@ internal fun LogsPanel(lines: List<String>) {
     }
 }
 
+/**
+ * FullscreenControlScreen
+ *
+ * Purpose:
+ * - Presents a fullscreen interactive touch surface that maps Compose touch events
+ *   to device coordinates and injects them via [onInjectTouch].
+ * - Responsible for pointer tracking, multi-touch mapping, coordinate normalization,
+ *   and lifetime of synthetic touch events sent to the device.
+ *
+ * Concurrency and side-effects:
+ * - All heavy computations are local to the UI thread; injection itself is a quick
+ *   callback (`onInjectTouch`) which delegates to native code elsewhere — keep that
+ *   callback lightweight.
+ * - Use `pointerInteropFilter` to receive raw MotionEvent instances for precise
+ *   multi-touch handling and to map Android pointer IDs to device pointers.
+ */
 @Composable
 fun FullscreenControlScreen(
     session: ScrcpySessionInfo,
@@ -888,6 +917,26 @@ fun FullscreenControlScreen(
     }
 }
 
+/**
+ * ScrcpyVideoSurface
+ *
+ * Purpose:
+ * - Hosts a `TextureView` and bridges its `Surface` to `nativeCore` for video rendering.
+ * - Ensures only a single `Surface` instance is registered at any time under the
+ *   stable `surfaceTag` ("video-main"). This reduces surface recreation bugs seen
+ *   when preview/fullscreen used separate tags.
+ *
+ * Concurrency / lifecycle:
+ * - `currentSurface` is only mutated on the UI thread via TextureView callbacks.
+ * - Registration to `nativeCore` is triggered from a [LaunchedEffect] when both
+ *   `session` and `currentSurface` are available. Unregistration happens in
+ *   `onSurfaceTextureDestroyed` and `DisposableEffect.onDispose` to guarantee
+ *   cleanup even if the composable leaves composition.
+ *
+ * Reliability notes:
+ * - Always release old surfaces before assigning new ones to avoid native renderer
+ *   referencing stale surfaces.
+ */
 @Composable
 private fun ScrcpyVideoSurface(
     modifier: Modifier,
