@@ -29,7 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,6 +92,7 @@ private sealed interface RootScreen : NavKey {
 @Composable
 fun MainPage() {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
 
     val activity = remember(context) { context as? Activity }
@@ -105,9 +105,9 @@ fun MainPage() {
         }
     }
 
-    val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
-    val adbService = remember(context) { NativeAdbService(context) }
-    val scrcpy = remember(context) { Scrcpy(context) }
+    val nativeCore = remember(appContext) { NativeCoreFacade.get(appContext) }
+    val adbService = remember(appContext) { NativeAdbService(appContext) }
+    val scrcpy = remember(appContext, adbService) { Scrcpy(appContext, adbService) }
 
     val snackHostState = remember { SnackbarHostState() }
     val saveableStateHolder = rememberSaveableStateHolder()
@@ -194,16 +194,9 @@ fun MainPage() {
     val appSettings = Storage.appSettings
     val scrcpyOptions = Storage.scrcpyOptions
 
-    val videoEncoderOptions = remember { mutableStateListOf<String>() }
-    val audioEncoderOptions = remember { mutableStateListOf<String>() }
-    val videoEncoderTypeMap = remember { mutableStateMapOf<String, String>() }
-    val audioEncoderTypeMap = remember { mutableStateMapOf<String, String>() }
-    val cameraSizeOptions = remember { mutableStateListOf<String>() }
     var sessionStarted by remember { mutableStateOf(false) }
-    var refreshEncodersAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var refreshCameraSizesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var clearLogsAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var openReorderDevicesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var clearLogsAction by remember { mutableStateOf({}) }
+    var openReorderDevicesAction by remember { mutableStateOf({}) }
     var canClearLogs by remember { mutableStateOf(false) }
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
     var fullscreenOrientation by rememberSaveable {
@@ -314,7 +307,7 @@ fun MainPage() {
                                                 canClearLogs = canClearLogs,
                                                 onDismissRequest = { showDeviceMenu = false },
                                                 onReorderDevices = {
-                                                    openReorderDevicesAction?.invoke()
+                                                    openReorderDevicesAction()
                                                     showDeviceMenu = false
                                                 },
                                                 onOpenVirtualButtonOrder = {
@@ -322,7 +315,7 @@ fun MainPage() {
                                                     showDeviceMenu = false
                                                 },
                                                 onClearLogs = {
-                                                    clearLogsAction?.invoke()
+                                                    clearLogsAction()
                                                     showDeviceMenu = false
                                                 },
                                             )
@@ -338,34 +331,7 @@ fun MainPage() {
                                     scrcpy = scrcpy,
                                     snack = snackHostState,
                                     scrollBehavior = devicesPageScrollBehavior,
-                                    videoEncoderOptions = videoEncoderOptions,
-                                    onVideoEncoderOptionsChange = {
-                                        videoEncoderOptions.clear()
-                                        videoEncoderOptions.addAll(it)
-                                    },
-                                    onVideoEncoderTypeMapChange = {
-                                        videoEncoderTypeMap.clear()
-                                        videoEncoderTypeMap.putAll(it)
-                                    },
-                                    audioEncoderOptions = audioEncoderOptions,
-                                    onAudioEncoderOptionsChange = {
-                                        audioEncoderOptions.clear()
-                                        audioEncoderOptions.addAll(it)
-                                    },
-                                    onAudioEncoderTypeMapChange = {
-                                        audioEncoderTypeMap.clear()
-                                        audioEncoderTypeMap.putAll(it)
-                                    },
-                                    cameraSizeOptions = cameraSizeOptions,
-                                    onCameraSizeOptionsChange = {
-                                        cameraSizeOptions.clear()
-                                        cameraSizeOptions.addAll(it)
-                                    },
                                     onSessionStartedChange = { sessionStarted = it },
-                                    onRefreshEncodersActionChange = { refreshEncodersAction = it },
-                                    onRefreshCameraSizesActionChange = {
-                                        refreshCameraSizesAction = it
-                                    },
                                     onClearLogsActionChange = { clearLogsAction = it },
                                     onCanClearLogsChange = { canClearLogs = it },
                                     onOpenReorderDevicesActionChange = {
@@ -385,7 +351,7 @@ fun MainPage() {
                                                     deviceName = session.deviceName,
                                                     width = session.width,
                                                     height = session.height,
-                                                    codec = session.codec,
+                                                    codec = session.codecName,
                                                 ),
                                             ),
                                         )
@@ -404,7 +370,7 @@ fun MainPage() {
                                 SettingsScreen(
                                     contentPadding = pagePadding,
                                     onOpenReorderDevices = {
-                                        openReorderDevicesAction?.invoke()
+                                        openReorderDevicesAction()
                                     },
                                     onOpenVirtualButtonOrder = {
                                         rootBackStack.add(RootScreen.VirtualButtonOrder)
@@ -427,14 +393,7 @@ fun MainPage() {
             }
         }
 
-        val videoEncoder by scrcpyOptions.videoEncoder.asState()
-        val audioEncoder by scrcpyOptions.audioEncoder.asState()
         entry(RootScreen.Advanced) {
-            val videoEncoderDropdownItems = listOf("默认") + videoEncoderOptions
-            val audioEncoderDropdownItems = listOf("默认") + audioEncoderOptions
-            val videoEncoderIndex = (videoEncoderOptions.indexOf(videoEncoder) + 1).coerceAtLeast(0)
-            val audioEncoderIndex = (audioEncoderOptions.indexOf(audioEncoder) + 1).coerceAtLeast(0)
-
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -456,16 +415,7 @@ fun MainPage() {
                     contentPadding = pagePadding,
                     scrollBehavior = advancedPageScrollBehavior,
                     snackbarHostState = snackHostState,
-                    cameraSizeDropdownItems = listOf("默认") + cameraSizeOptions + listOf("自定义"),
-                    cameraSizeOptions = cameraSizeOptions,
-                    videoEncoderDropdownItems = videoEncoderDropdownItems,
-                    videoEncoderTypeMap = videoEncoderTypeMap,
-                    videoEncoderIndex = videoEncoderIndex,
-                    audioEncoderDropdownItems = audioEncoderDropdownItems,
-                    audioEncoderTypeMap = audioEncoderTypeMap,
-                    audioEncoderIndex = audioEncoderIndex,
-                    onRefreshEncoders = { refreshEncodersAction?.invoke() },
-                    onRefreshCameraSizes = { refreshCameraSizesAction?.invoke() },
+                    scrcpy = scrcpy,
                 )
             }
         }

@@ -2,8 +2,10 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Path
 import kotlin.time.Duration
@@ -14,6 +16,8 @@ import kotlin.time.Duration
  *
  * Methods use Mutex for thread-safety because the underlying transport is single-connection
  * and may be accessed from multiple coroutines.
+ * 
+ * All network operations are executed on Dispatchers.IO.
  */
 class NativeAdbService(appContext: Context) {
     private val transport = DirectAdbTransport(appContext)
@@ -82,35 +86,39 @@ class NativeAdbService(appContext: Context) {
         host: String,
         port: Int,
         timeout: Duration = Duration.INFINITE,
-    ) = mutex.withLock {
-        Log.i(TAG, "connect(): host=$host port=$port")
+    ) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            Log.i(TAG, "connect(): host=$host port=$port")
 
-        if (connection != null
-            && connection!!.isAlive()
-            && connectedHost == host
-            && connectedPort == port
-        ) {
-            return@withLock
-        }
-        disconnectInternal()
+            if (connection != null
+                && connection!!.isAlive()
+                && connectedHost == host
+                && connectedPort == port
+            ) {
+                return@withLock
+            }
+            disconnectInternal()
 
-        try {
-            val conn = withTimeout(timeout) { transport.connect(host, port) }
-            connection = conn
-            connectedHost = host
-            connectedPort = port
-        } catch (e: Exception) {
-            Log.e(TAG, "connect(): failed host=$host port=$port", e)
-            val detail = e.message ?: "${e.javaClass.simpleName} (no message)"
-            throw IllegalStateException("ADB connect failed to $host:$port -> $detail", e)
+            try {
+                val conn = withTimeout(timeout) { transport.connect(host, port) }
+                connection = conn
+                connectedHost = host
+                connectedPort = port
+            } catch (e: Exception) {
+                Log.e(TAG, "connect(): failed host=$host port=$port", e)
+                val detail = e.message ?: "${e.javaClass.simpleName} (no message)"
+                throw IllegalStateException("ADB connect failed to $host:$port -> $detail", e)
+            }
         }
     }
 
     /**
      * Close the current ADB connection immediately.
      */
-    suspend fun disconnect() = mutex.withLock {
-        disconnectInternal()
+    suspend fun disconnect() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            disconnectInternal()
+        }
     }
 
     suspend fun isConnected(): Boolean = mutex.withLock {
@@ -121,7 +129,9 @@ class NativeAdbService(appContext: Context) {
      * Execute a shell command on the connected device and return stdout text.
      */
     suspend fun shell(command: String): String = mutex.withLock {
-        requireConnection().shell(command)
+        val response = requireConnection().shell(command)
+        Log.d(TAG, "command: $command, response: $response")
+        response
     }
 
     suspend fun openShellStream(command: String): AdbSocketStream = mutex.withLock {
@@ -136,7 +146,9 @@ class NativeAdbService(appContext: Context) {
         requireConnection().openStream("localabstract:$name")
     }
 
-    suspend fun close() = disconnect()
+    suspend fun close() {
+        disconnect()
+    }
 
     private fun disconnectInternal() {
         runCatching { connection?.close() }

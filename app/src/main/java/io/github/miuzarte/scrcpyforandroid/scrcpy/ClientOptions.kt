@@ -88,9 +88,9 @@ data class ClientOptions(
     var maxSize: UShort = 0u, // to server
 
     // --video-bit-rate
-    var videoBitRate: UInt = 0u, // to server
+    var videoBitRate: Int = 0, // to server
     // --audio-bit-rate
-    var audioBitRate: UInt = 0u, // to server
+    var audioBitRate: Int = 0, // to server
 
     // --max-fps
     var maxFps: String = "", // float to be parsed by the server
@@ -115,7 +115,8 @@ data class ClientOptions(
     // var windowHeight: UShort,
 
     // --display-id
-    var displayId: UInt = 0u, // to server
+    // -1 for empty text field
+    var displayId: Int = -1, // to server
 
     // var videoBuffer: Tick,
     // var audioBuffer: Tick,
@@ -278,7 +279,7 @@ data class ClientOptions(
         }
 
         if (videoSource == VideoSource.CAMERA) {
-            if (displayId > 0u) {
+            if (displayId > 0) {
                 throw IllegalArgumentException(
                     "--display-id is only available with --video-source=display"
                 )
@@ -331,14 +332,14 @@ data class ClientOptions(
             )
         }
 
-        if (displayId > 0u && newDisplay.isNotBlank()) {
+        if (displayId > 0 && newDisplay.isNotBlank()) {
             throw IllegalArgumentException(
                 "Cannot specify both --display-id and --new-display"
             )
         }
 
         if (displayImePolicy != DisplayImePolicy.UNDEFINED
-            && displayId == 0u && newDisplay.isBlank()
+            && displayId == 0 && newDisplay.isBlank()
         ) {
             throw IllegalArgumentException(
                 "--display-ime-policy is only supported on a secondary display"
@@ -466,7 +467,7 @@ data class ClientOptions(
         }
          */
 
-        if (control) {
+        if (!control) {
             if (turnScreenOff) {
                 throw IllegalArgumentException(
                     "Cannot request to turn screen off if control is disabled"

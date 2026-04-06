@@ -42,6 +42,9 @@ class AnnexBDecoder(
     private var released = false
 
     init {
+        if (!outputSurface.isValid) {
+            throw IllegalStateException("Cannot initialize decoder: output surface is not valid")
+        }
         val format = MediaFormat.createVideoFormat(mimeType, width, height)
         if (sps != null) {
             format.setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(sps))

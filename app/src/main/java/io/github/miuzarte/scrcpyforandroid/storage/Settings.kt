@@ -54,6 +54,8 @@ abstract class Settings(
 
         operator fun getValue(thisRef: Any?, property: KProperty<*>): SettingProperty<T> = this
 
+        suspend fun isDefaultValue() = getValue(pair) == pair.defaultValue
+
         suspend fun get(): T = getValue(pair)
 
         suspend fun set(value: T) = setValue(pair, value)

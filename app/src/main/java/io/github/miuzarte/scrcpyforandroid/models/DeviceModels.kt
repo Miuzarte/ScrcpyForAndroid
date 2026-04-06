@@ -160,7 +160,7 @@ data class ConnectionTarget(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
 ) {
-    fun marshalToString(): String = "$host:$port"
+    override fun toString(): String = "$host:$port"
 
     companion object {
         fun unmarshalFrom(s: String): ConnectionTarget? {

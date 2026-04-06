@@ -14,13 +14,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
@@ -30,7 +28,6 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
@@ -50,7 +47,6 @@ import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,46 +56,13 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.extra.SuperBottomSheet
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.util.concurrent.Executors
 
-private const val ADB_CONNECT_TIMEOUT_MS = 3_000L
+private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
 private const val ADB_KEEPALIVE_INTERVAL_MS = 3_000L
 private const val ADB_KEEPALIVE_TIMEOUT_MS = 1_500L
 private const val ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS = 2_000L
 private const val ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS = 2_000L
 private const val ADB_TCP_PROBE_TIMEOUT_MS = 500
-
-private const val DEVICE_SHORTCUT_SEPARATOR = "\u001F"
-
-private val DeviceShortcutsSaver =
-    listSaver<DeviceShortcuts, String>(
-        save = { shortcuts ->
-            // 将 DeviceShortcuts 中的每个设备转换为一行字符串
-            shortcuts.devices.map { device ->
-                listOf(
-                    device.id,
-                    device.name,
-                    device.host,
-                    device.port.toString(),
-                    if (device.online) "1" else "0"
-                ).joinToString(DEVICE_SHORTCUT_SEPARATOR)
-            }
-        },
-        restore = { saved ->
-            // 从保存的字符串列表恢复 DeviceShortcuts
-            DeviceShortcuts(saved.mapNotNull { line ->
-                val parts = line.split(DEVICE_SHORTCUT_SEPARATOR)
-                if (parts.size != 5) return@mapNotNull null
-                val port = parts[3].toIntOrNull() ?: return@mapNotNull null
-                DeviceShortcut(
-                    name = parts[1],
-                    host = parts[2],
-                    port = port,
-                    online = parts[4] == "1"
-                )
-            }.toMutableList())
-        },
-    )
 
 @Composable
 fun DeviceTabScreen(
@@ -109,23 +72,12 @@ fun DeviceTabScreen(
     scrcpy: Scrcpy,
     snack: SnackbarHostState,
     scrollBehavior: ScrollBehavior,
-
-    videoEncoderOptions: List<String>,
-    onVideoEncoderOptionsChange: (List<String>) -> Unit,
-    onVideoEncoderTypeMapChange: (Map<String, String>) -> Unit,
-    audioEncoderOptions: List<String>,
-    onAudioEncoderOptionsChange: (List<String>) -> Unit,
-    onAudioEncoderTypeMapChange: (Map<String, String>) -> Unit,
-    cameraSizeOptions: List<String>,
-    onCameraSizeOptionsChange: (List<String>) -> Unit,
     onSessionStartedChange: (Boolean) -> Unit,
-    onRefreshEncodersActionChange: ((() -> Unit)?) -> Unit,
-    onRefreshCameraSizesActionChange: ((() -> Unit)?) -> Unit,
-    onClearLogsActionChange: ((() -> Unit)?) -> Unit,
+    onClearLogsActionChange: ((() -> Unit)) -> Unit,
     onCanClearLogsChange: (Boolean) -> Unit,
-    onOpenReorderDevicesActionChange: ((() -> Unit)?) -> Unit,
+    onOpenReorderDevicesActionChange: ((() -> Unit)) -> Unit,
     onOpenAdvancedPage: () -> Unit,
-    onOpenFullscreenPage: (ScrcpySessionInfo) -> Unit,
+    onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
 ) {
     val appSettings = Storage.appSettings
     val quickDevices = Storage.quickDevices
@@ -141,24 +93,14 @@ fun DeviceTabScreen(
     }
     // val initialSettings = remember(context) { loadDevicePageSettings(context) }
     val scope = rememberCoroutineScope()
-    val adbWorkerDispatcher = remember {
-        Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "adb-connect-worker").apply { isDaemon = true }
-        }.asCoroutineDispatcher()
-    }
 
     // Run adb operations on a dedicated single thread.
     // Try to avoid blocking UI/recomposition and keeps adb call ordering deterministic.
 
-    DisposableEffect(adbWorkerDispatcher) {
-        onDispose {
-            adbWorkerDispatcher.close()
-        }
-    }
-
     var busy by rememberSaveable { mutableStateOf(false) }
     var statusLine by rememberSaveable { mutableStateOf("未连接") }
     var adbConnected by rememberSaveable { mutableStateOf(false) }
+    var isQuickConnected by rememberSaveable { mutableStateOf(false) }
     var currentTargetHost by rememberSaveable { mutableStateOf("") }
     var currentTargetPort by rememberSaveable { mutableIntStateOf(Defaults.ADB_PORT) }
     var connectedDeviceLabel by rememberSaveable { mutableStateOf("未连接") }
@@ -168,7 +110,7 @@ fun DeviceTabScreen(
     var sessionInfoCodec by rememberSaveable { mutableStateOf("") }
     var sessionInfoControlEnabled by rememberSaveable { mutableStateOf(false) }
     var sessionInfo by remember {
-        mutableStateOf<ScrcpySessionInfo?>(null)
+        mutableStateOf<Scrcpy.Session.SessionInfo?>(null)
     }
     LaunchedEffect(
         sessionInfoWidth,
@@ -178,12 +120,16 @@ fun DeviceTabScreen(
         sessionInfoControlEnabled
     ) {
         sessionInfo = if (sessionInfoDeviceName.isNotBlank()) {
-            ScrcpySessionInfo(
+            Scrcpy.Session.SessionInfo(
                 width = sessionInfoWidth,
                 height = sessionInfoHeight,
                 deviceName = sessionInfoDeviceName,
-                codec = sessionInfoCodec,
+                codecId = 0,
+                codecName = sessionInfoCodec,
+                audioCodecId = 0,
                 controlEnabled = sessionInfoControlEnabled,
+                host = currentTargetHost,
+                port = currentTargetPort,
             )
         } else {
             null
@@ -202,7 +148,7 @@ fun DeviceTabScreen(
         if (currentTargetHost.isNotBlank())
             ConnectionTarget(
                 currentTargetHost,
-                currentTargetPort
+                currentTargetPort,
             ) else null
 
     val sessionReconnectBlacklistHosts = remember { mutableSetOf<String>() }
@@ -212,11 +158,11 @@ fun DeviceTabScreen(
     }
 
     var quickDevicesList by quickDevices.quickDevicesList.asMutableState()
-    var savedShortcuts = rememberSaveable(quickDevicesList, saver = DeviceShortcutsSaver) {
-        DeviceShortcuts.unmarshalFrom(quickDevicesList)
-    }
-    var quickConnectInput by quickDevices.quickConnectInput.asMutableState()
+    var savedShortcuts by remember { mutableStateOf(DeviceShortcuts.unmarshalFrom(quickDevicesList)) }
 
+    LaunchedEffect(quickDevicesList) {
+        savedShortcuts = DeviceShortcuts.unmarshalFrom(quickDevicesList)
+    }
     // save changes when [savedShortcuts] was modified
     LaunchedEffect(savedShortcuts) {
         val serialized = savedShortcuts.marshalToString()
@@ -225,15 +171,18 @@ fun DeviceTabScreen(
         }
     }
 
+    var quickConnectInput by quickDevices.quickConnectInput.asMutableState()
+    var quickConnectInputTemp by remember(quickConnectInput) { mutableStateOf(quickConnectInput) }
+
     /**
      * Disconnect the current ADB connection and stop any running scrcpy session.
      *
      * Concurrency / thread boundary:
-     * - Native calls that may block are executed on [adbWorkerDispatcher] using [withContext].
+     * - Native calls that may block are executed on ADB dispatcher using adbService.withAdbDispatcher.
      * - This ensures UI coroutines are never blocked by synchronous native I/O.
      *
      * Side effects:
-     * - Calls `nativeCore.scrcpyStop()` and `nativeCore.adbDisconnect()` (best-effort).
+     * - Calls `scrcpy.stop()` and `adbService.disconnect()` (best-effort).
      * - Resets UI-visible connection state: `adbConnected`, `currentTargetHost/Port`,
      *   `sessionInfo`, device capability flags, `statusLine`, and `connectedDeviceLabel`.
      * - Updates the saved quick-device list via [savedShortcuts.update] when a target is provided.
@@ -252,11 +201,9 @@ fun DeviceTabScreen(
         logMessage: String? = null,
         showSnackMessage: String? = null,
     ) {
-        withContext(adbWorkerDispatcher) {
-            // Also stops scrcpy.
-            runCatching { scrcpy.stop() }
-            runCatching { adbService.disconnect() }
-        }
+        // Also stops scrcpy.
+        runCatching { scrcpy.stop() }
+        runCatching { adbService.disconnect() }
         adbConnected = false
         currentTargetHost = ""
         currentTargetPort = Defaults.ADB_PORT
@@ -326,10 +273,8 @@ fun DeviceTabScreen(
      *   indefinitely. Use a small, caller-chosen timeout to keep UX snappy.
      */
     suspend fun connectWithTimeout(host: String, port: Int) {
-        return withContext(adbWorkerDispatcher) {
-            withTimeout(ADB_CONNECT_TIMEOUT_MS) {
-                adbService.connect(host, port)
-            }
+        return withTimeout(ADB_CONNECT_TIMEOUT_MS) {
+            adbService.connect(host, port)
         }
     }
 
@@ -347,17 +292,12 @@ fun DeviceTabScreen(
      *   echo check helps detect that state.
      */
     suspend fun keepAliveCheck(host: String, port: Int): Boolean {
-        return withContext(adbWorkerDispatcher) {
-            withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
-                val connected = adbService.isConnected()
-                if (!connected) {
-                    return@withTimeout false
-                }
-                runCatching {
-                    adbService.shell("echo -n 1")
-                    true
-                }.getOrElse { false }
+        return withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
+            val connected = adbService.isConnected()
+            if (!connected) {
+                return@withTimeout false
             }
+            return@withTimeout true
         }
     }
 
@@ -391,7 +331,7 @@ fun DeviceTabScreen(
     fun runBusy(label: String, onFinished: (() -> Unit)? = null, block: suspend () -> Unit) {
         // For non-adb actions (start/stop/pair/list refresh...).
         if (busy) return
-        scope.launch {
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
             busy = true
             try {
                 block()
@@ -425,10 +365,16 @@ fun DeviceTabScreen(
      *   UI controls remain actionable while background retries occur.
      * - Errors and timeouts are logged and surfaced similarly to `runBusy`.
      */
-    fun runAdbConnect(label: String, onFinished: (() -> Unit)? = null, block: suspend () -> Unit) {
+    fun runAdbConnect(
+        label: String,
+        onStarted: (() -> Unit)? = null,
+        onFinished: (() -> Unit)? = null,
+        block: suspend () -> Unit,
+    ) {
         // For manual adb operations from user actions.
         if (adbConnecting) return
         scope.launch {
+            onStarted?.invoke()
             adbConnecting = true
             try {
                 block()
@@ -465,35 +411,23 @@ fun DeviceTabScreen(
     suspend fun refreshEncoderLists() {
         if (!adbConnected) return
         runCatching {
-            scrcpy.listOptions(list = ListOptions.ENCODERS)
-        }.onSuccess { result ->
-            val lists = result as Scrcpy.ListResult.Encoders
-            onVideoEncoderOptionsChange(lists.videoEncoders)
-            onAudioEncoderOptionsChange(lists.audioEncoders)
-            onVideoEncoderTypeMapChange(lists.videoEncoderTypes)
-            onAudioEncoderTypeMapChange(lists.audioEncoderTypes)
-            if (videoEncoder.isNotBlank() && videoEncoder !in videoEncoderOptions) {
+            scrcpy.refreshEncoders()
+        }.onSuccess {
+            // Validate current selections
+            if (videoEncoder.isNotBlank() && videoEncoder !in scrcpy.videoEncoders) {
                 videoEncoder = ""
             }
-            if (audioEncoder.isNotBlank() && audioEncoder !in audioEncoderOptions) {
+            if (audioEncoder.isNotBlank() && audioEncoder !in scrcpy.audioEncoders) {
                 audioEncoder = ""
             }
-            logEvent("编码器列表已刷新: video=${lists.videoEncoders.size} audio=${lists.audioEncoders.size}")
-            if (lists.videoEncoders.isEmpty() && lists.audioEncoders.isEmpty()) {
+            logEvent("编码器列表已刷新: video=${scrcpy.videoEncoders.size} audio=${scrcpy.audioEncoders.size}")
+            if (scrcpy.videoEncoders.isEmpty() && scrcpy.audioEncoders.isEmpty()) {
                 logEvent(
                     "提示: 编码器为空，请检查 server 路径/版本与设备系统日志",
                     Log.WARN
                 )
-                val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                if (preview.isNotBlank()) {
-                    logEvent("编码器原始输出: $preview", Log.DEBUG)
-                }
             }
         }.onFailure { e ->
-            onVideoEncoderOptionsChange(emptyList())
-            onAudioEncoderOptionsChange(emptyList())
-            onVideoEncoderTypeMapChange(emptyMap())
-            onAudioEncoderTypeMapChange(emptyMap())
             logEvent(
                 "读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}",
                 Log.ERROR,
@@ -507,22 +441,14 @@ fun DeviceTabScreen(
     suspend fun refreshCameraSizeLists() {
         if (!adbConnected) return
         runCatching {
-            scrcpy.listOptions(ListOptions.CAMERA_SIZES)
-        }.onSuccess { result ->
-            val lists = result as Scrcpy.ListResult.CameraSizes
-            onCameraSizeOptionsChange(lists.sizes)
-            if (cameraSize.isNotBlank() && cameraSize != "custom" && cameraSize !in lists.sizes) {
+            scrcpy.refreshCameraSizes()
+        }.onSuccess {
+            // Validate current selection
+            if (cameraSize.isNotBlank() && cameraSize != "custom" && cameraSize !in scrcpy.cameraSizes) {
                 cameraSize = ""
             }
-            logEvent("camera sizes 已刷新: count=${lists.sizes.size}")
-            if (lists.sizes.isEmpty()) {
-                val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                if (preview.isNotBlank()) {
-                    logEvent("camera sizes 原始输出: $preview", Log.DEBUG)
-                }
-            }
+            logEvent("camera sizes 已刷新: count=${scrcpy.cameraSizes.size}")
         }.onFailure { e ->
-            onCameraSizeOptionsChange(emptyList())
             logEvent(
                 "读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}",
                 Log.ERROR,
@@ -738,7 +664,7 @@ fun DeviceTabScreen(
             sessionInfoWidth = sessionInfo?.width ?: 0
             sessionInfoHeight = sessionInfo?.height ?: 0
             sessionInfoDeviceName = sessionInfo?.deviceName.orEmpty()
-            sessionInfoCodec = sessionInfo?.codec.orEmpty()
+            sessionInfoCodec = sessionInfo?.codecName.orEmpty()
             sessionInfoControlEnabled = sessionInfo?.controlEnabled == true
         } else {
             sessionInfoWidth = 0
@@ -751,12 +677,6 @@ fun DeviceTabScreen(
     }
 
     DisposableEffect(Unit) {
-        onRefreshEncodersActionChange {
-            runBusy("刷新编码器") { refreshEncoderLists() }
-        }
-        onRefreshCameraSizesActionChange {
-            runBusy("刷新 Camera Sizes") { refreshCameraSizeLists() }
-        }
         onClearLogsActionChange {
             EventLogger.clearLogs()
         }
@@ -764,11 +684,8 @@ fun DeviceTabScreen(
             showReorderSheet = true
         }
         onDispose {
-            onRefreshEncodersActionChange(null)
-            onRefreshCameraSizesActionChange(null)
-            onClearLogsActionChange(null)
+            // canClearLogs 是 DevicePage 特有的状态，需要重置
             onCanClearLogsChange(false)
-            onOpenReorderDevicesActionChange(null)
         }
     }
 
@@ -800,8 +717,8 @@ fun DeviceTabScreen(
     fun sendVirtualButtonAction(action: VirtualButtonAction) {
         val keycode = action.keycode ?: return
         runBusy("发送 ${action.title}") {
-            nativeCore.sessionManager.injectKeycode(0, keycode)
-            nativeCore.sessionManager.injectKeycode(1, keycode)
+            nativeCore.session?.injectKeycode(0, keycode)
+            nativeCore.session?.injectKeycode(1, keycode)
         }
     }
 
@@ -870,14 +787,19 @@ fun DeviceTabScreen(
                 onAction = {
                     haptics.contextClick()
                     if (!isConnectedTarget) {
-                        activeDeviceActionId = device.id
-                        runAdbConnect("连接 ADB", onFinished = { activeDeviceActionId = null }) {
+                        runAdbConnect(
+                            "连接 ADB",
+                            onStarted = { activeDeviceActionId = device.id },
+                            onFinished = { activeDeviceActionId = null },
+                        ) {
                             disconnectCurrentTargetBeforeConnecting(host, port)
                             try {
                                 connectWithTimeout(host, port)
                                 adbConnected = true
-                                savedShortcuts =
-                                    savedShortcuts.update(host = host, port = port, online = true)
+                                isQuickConnected = false // 标记为快速设备连接
+                                savedShortcuts = savedShortcuts.update(
+                                    host = host, port = port, online = true
+                                )
                                 handleAdbConnected(host, port)
                             } catch (e: Exception) {
                                 statusLine = "ADB 连接失败"
@@ -889,7 +811,11 @@ fun DeviceTabScreen(
                         }
                     } else {
                         activeDeviceActionId = device.id
-                        runAdbConnect("断开 ADB", onFinished = { activeDeviceActionId = null }) {
+                        runAdbConnect(
+                            "断开 ADB",
+                            onStarted = { activeDeviceActionId = device.id },
+                            onFinished = { activeDeviceActionId = null },
+                        ) {
                             sessionReconnectBlacklistHosts += host
                             disconnectAdbConnection(
                                 clearQuickOnlineForTarget = ConnectionTarget(host, port),
@@ -905,28 +831,37 @@ fun DeviceTabScreen(
         if (!adbConnected) item {
             // "快速连接"
             QuickConnectCard(
-                input = quickConnectInput,
-                onValueChange = { quickConnectInput = it },
+                input = quickConnectInputTemp,
+                onValueChange = {
+                    quickConnectInputTemp = it
+                    quickConnectInput = quickConnectInputTemp
+                },
+                // onFocusChange = { quickConnectInput = quickConnectInputTemp },
                 enabled = !adbConnecting,
                 onAddDevice = {
-                    val target = ConnectionTarget.unmarshalFrom(quickConnectInput)
+                    val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                         ?: return@QuickConnectCard
                     savedShortcuts = savedShortcuts.upsert(
                         DeviceShortcut(host = target.host, port = target.port)
                     )
-                    Log.i("SavedShortcuts", "size: ${savedShortcuts.size}, list: $quickDevicesList")
+                    Log.d("SavedShortcuts", "size: ${savedShortcuts.size}, list: $quickDevicesList")
                     scope.launch {
                         snack.showSnackbar("已添加设备: ${target.host}:${target.port}")
                     }
                 },
                 onConnect = {
-                    val target = ConnectionTarget.unmarshalFrom(quickConnectInput)
+                    val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                         ?: return@QuickConnectCard
-                    runAdbConnect("连接 ADB", onFinished = { activeDeviceActionId = null }) {
+                    runAdbConnect(
+                        "连接 ADB",
+                        onStarted = { activeDeviceActionId = target.toString() },
+                        onFinished = { activeDeviceActionId = null },
+                    ) {
                         disconnectCurrentTargetBeforeConnecting(target.host, target.port)
                         try {
                             connectWithTimeout(target.host, target.port)
                             adbConnected = true
+                            isQuickConnected = true // 标记为快速连接
                             savedShortcuts = savedShortcuts.update(
                                 host = target.host,
                                 port = target.port,
@@ -956,7 +891,7 @@ fun DeviceTabScreen(
                 onPair = { host, port, code ->
                     runBusy("执行配对") {
                         val resolvedHost = host.trim()
-                        val resolvedPort = port.toIntOrNull() ?: return@runBusy
+                        val resolvedPort = port.trim().toIntOrNull() ?: return@runBusy
                         val resolvedCode = code.trim()
                         val ok = adbService.pair(
                             resolvedHost,
@@ -980,26 +915,30 @@ fun DeviceTabScreen(
                 ConfigPanel(
                     busy = busy,
                     audioForwardingSupported = audioForwardingSupported,
+                    cameraMirroringSupported = cameraMirroringSupported,
                     onOpenAdvanced = onOpenAdvancedPage,
                     onStartStopHaptic = { haptics.contextClick() },
                     onStart = {
                         runBusy("启动 scrcpy") {
                             val options = scrcpyOptions.toClientOptions()
                             val session = scrcpy.start(options)
-                            sessionInfo = session
+                            sessionInfo = session.copy(
+                                host = currentTargetHost,
+                                port = currentTargetPort
+                            )
                             statusLine = "scrcpy 运行中"
                             @SuppressLint("DefaultLocale")
                             val videoDetail = if (!options.video) {
                                 "off"
                             } else {
-                                "${session.codec} ${session.width}x${session.height} " +
-                                        "@${String.format("%.1f", videoBitRate / 1_000_000)}Mbps"
+                                "${session.codecName} ${session.width}x${session.height} " +
+                                        "@${String.format("%.1f", videoBitRate / 1_000_000f)}Mbps"
                             }
                             val audioDetail = if (!audio) {
                                 "off"
                             } else {
                                 val playback = if (!options.audioPlayback) "(no-playback)" else ""
-                                "${options.audioCodec} ${videoBitRate / 1_000}Kbps source=${options.audioSource}$playback"
+                                "${options.audioCodec} ${videoBitRate / 1_000f}Kbps source=${options.audioSource}$playback"
                             }
                             logEvent(
                                 "scrcpy 已启动: device=${session.deviceName}" +
@@ -1009,9 +948,6 @@ fun DeviceTabScreen(
                             )
                             scope.launch {
                                 snack.showSnackbar("scrcpy 已启动")
-                            }
-                            scrcpy.getLastServerCommand()?.let { command ->
-                                logEvent("scrcpy-server args: $command")
                             }
                         }
                     },
@@ -1026,7 +962,23 @@ fun DeviceTabScreen(
                             }
                         }
                     },
-                    sessionStarted = sessionInfo != null,
+                    sessionInfo = sessionInfo,
+                    onDisconnect = {
+                        runAdbConnect(
+                            "断开 ADB",
+                            onStarted = {},
+                            onFinished = {},
+                        ) {
+                            currentTarget?.let { target ->
+                                sessionReconnectBlacklistHosts += target.host
+                                disconnectAdbConnection(
+                                    clearQuickOnlineForTarget = target,
+                                    logMessage = "ADB 已断开",
+                                    showSnackMessage = "ADB 已断开",
+                                )
+                            }
+                        }
+                    },
                 )
             }
 
@@ -1068,7 +1020,6 @@ fun DeviceTabScreen(
             LogsPanel(lines = EventLogger.eventLog)
         }
 
-        // TODO: 放进 [AppPageLazyColumn] 里
         item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
     }
 }

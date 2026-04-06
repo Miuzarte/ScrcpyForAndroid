@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import android.util.Base64
 import android.util.Log
-import io.github.miuzarte.scrcpyforandroid.storage.AdbClientData
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
@@ -394,7 +393,12 @@ internal class DirectAdbConnection(
         }
     }
 
-    fun isAlive(): Boolean = !closed && !socket.isClosed && socket.isConnected
+    fun isAlive(): Boolean {
+        val isClosed = socket.isClosed
+        val isConnected = socket.isConnected
+        Log.d(TAG, "isClose: $isClosed, isConnected: $isConnected")
+        return !closed && !isClosed && isConnected
+    }
 
     override fun close() {
         if (!closed) {

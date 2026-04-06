@@ -60,19 +60,33 @@ class Shared {
         ERROR("error");
     }
 
-    enum class Codec(val string: String) {
-        H264("h264"), // default, ignore when passing
-        H265("h265"),
-        AV1("av1"),
-        OPUS("opus"), // default, ignore when passing
-        AAC("aac"),
-        FLAC("flac"),
-        RAW("raw"); // wav raw
+    enum class Codec(val string: String, val displayName: String) {
+        H264("h264", "H.264"), // default, ignore when passing
+        H265("h265", "H.265"),
+        AV1("av1", "AV1"),
+        OPUS("opus", "Opus"), // default, ignore when passing
+        AAC("aac", "AAC"),
+        FLAC("flac", "FLAC"),
+        RAW("raw", "RAW"); // wav raw
+
+        fun isLossyAudio(): Boolean? = when (this) {
+            OPUS, AAC -> true
+            FLAC, RAW -> false
+            else -> null
+        }
+
+        enum class Type { VIDEO, AUDIO }
 
         companion object {
-            fun fromString(value: String): Codec {
-                return entries.find { it.string.equals(value, ignoreCase = true) } ?: H264
-            }
+            val VIDEO = listOf(H264, H265, AV1)
+            val AUDIO = listOf(OPUS, AAC, FLAC, RAW)
+
+            fun fromString(value: String, type: Type = Type.VIDEO) =
+                entries.find { it.string.equals(value, ignoreCase = true) }
+                    ?: when (type) {
+                        Type.VIDEO -> H264
+                        Type.AUDIO -> OPUS
+                    }
         }
     }
 
@@ -81,9 +95,9 @@ class Shared {
         CAMERA("camera");
 
         companion object {
-            fun fromString(value: String): VideoSource {
-                return entries.find { it.string.equals(value, ignoreCase = true) } ?: DISPLAY
-            }
+            fun fromString(value: String) =
+                entries.find { it.string.equals(value, ignoreCase = true) }
+                    ?: DISPLAY
         }
     }
 
@@ -102,9 +116,9 @@ class Shared {
         VOICE_PERFORMANCE("voice-performance");
 
         companion object {
-            fun fromString(value: String): AudioSource {
-                return entries.find { it.string.equals(value, ignoreCase = true) } ?: AUTO
-            }
+            fun fromString(value: String) =
+                entries.find { it.string.equals(value, ignoreCase = true) }
+                    ?: AUTO
         }
     }
 
@@ -115,9 +129,9 @@ class Shared {
         EXTERNAL("external");
 
         companion object {
-            fun fromString(value: String): CameraFacing {
-                return entries.find { it.string.equals(value, ignoreCase = true) } ?: ANY
-            }
+            fun fromString(value: String) =
+                entries.find { it.string.equals(value, ignoreCase = true) }
+                    ?: ANY
         }
     }
 

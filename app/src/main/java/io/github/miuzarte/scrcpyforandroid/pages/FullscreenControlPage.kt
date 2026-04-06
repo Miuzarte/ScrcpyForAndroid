@@ -20,8 +20,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
@@ -68,11 +68,13 @@ fun FullscreenControlPage(
     }
     var session by remember(launch) {
         mutableStateOf(
-            ScrcpySessionInfo(
+            Scrcpy.Session.SessionInfo(
                 width = launch.width,
                 height = launch.height,
                 deviceName = launch.deviceName.ifBlank { "设备" },
-                codec = launch.codec.ifBlank { "unknown" },
+                codecId = 0,
+                codecName = launch.codec.ifBlank { "unknown" },
+                audioCodecId = 0,
                 controlEnabled = true,
             ),
         )
@@ -121,8 +123,12 @@ fun FullscreenControlPage(
     }
 
     suspend fun sendKeycode(keycode: Int) {
-        nativeCore.sessionManager.injectKeycode(0, keycode)
-        nativeCore.sessionManager.injectKeycode(1, keycode)
+        runCatching {
+            nativeCore.session?.injectKeycode(0, keycode)
+            nativeCore.session?.injectKeycode(1, keycode)
+        }.onFailure { e ->
+            android.util.Log.w("FullscreenControlPage", "sendKeycode failed for keycode=$keycode", e)
+        }
     }
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { contentPadding ->
@@ -139,7 +145,7 @@ fun FullscreenControlPage(
                 currentFps = currentFps,
                 enableBackHandler = false,
                 onInjectTouch = { action, pointerId, x, y, pressure, buttons ->
-                    nativeCore.sessionManager.injectTouch(
+                    nativeCore.session?.injectTouch(
                         action = action,
                         pointerId = pointerId,
                         x = x,

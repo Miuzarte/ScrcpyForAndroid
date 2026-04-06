@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,25 +12,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.Crop
+import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.NewDisplay
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
-import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
+import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
+import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.ServerParams
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
@@ -42,82 +51,19 @@ import top.yukonga.miuix.kmp.extra.SuperSpinner
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import kotlin.math.roundToInt
 
-private val AUDIO_SOURCE_OPTIONS = listOf(
-    "output" to "output",
-    "playback" to "playback",
-    "mic" to "mic",
-    "mic-unprocessed" to "mic-unprocessed",
-    "mic-camcorder" to "mic-camcorder",
-    "mic-voice-recognition" to "mic-voice-recognition",
-    "mic-voice-communication" to "mic-voice-communication",
-    "voice-call" to "voice-call",
-    "voice-call-uplink" to "voice-call-uplink",
-    "voice-call-downlink" to "voice-call-downlink",
-    "voice-performance" to "voice-performance",
-    "custom" to "自定义",
-)
-
-// TODO: Scrcpy.VideoSource
-private val VIDEO_SOURCE_OPTIONS = listOf(
-    "display" to "display",
-    "camera" to "camera",
-)
-
-private val CAMERA_FACING_OPTIONS = listOf(
-    "" to "默认",
-    "front" to "front",
-    "back" to "back",
-    "external" to "external",
-)
-
-private val CAMERA_FPS_PRESETS = listOf(0, 10, 15, 24, 30, 60, 120, 240, 480, 960)
-
 @Composable
 internal fun AdvancedConfigPage(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
     snackbarHostState: SnackbarHostState,
-    cameraSizeOptions: SnapshotStateList<String>,
-    cameraSizeDropdownItems: List<String>,
-    videoEncoderDropdownItems: List<String>,
-    videoEncoderTypeMap: Map<String, String>,
-    videoEncoderIndex: Int,
-    audioEncoderDropdownItems: List<String>,
-    audioEncoderTypeMap: Map<String, String>,
-    audioEncoderIndex: Int,
-    onRefreshEncoders: () -> Unit,
-    onRefreshCameraSizes: () -> Unit,
+    scrcpy: Scrcpy,
 ) {
     val scrcpyOptions = Storage.scrcpyOptions
-
-    val context = LocalContext.current
 
     val focusManager = LocalFocusManager.current
 
     val scope = rememberCoroutineScope()
-
-    val videoEncoderEntries = videoEncoderDropdownItems.map { encoderName ->
-        if (encoderName == "默认") {
-            SpinnerEntry(title = encoderName)
-        } else {
-            val type = resolveEncoderTypeLabel(videoEncoderTypeMap[encoderName])
-            SpinnerEntry(
-                title = encoderName,
-                summary = type.ifBlank { null },
-            )
-        }
-    }
-    val audioEncoderEntries = audioEncoderDropdownItems.map { encoderName ->
-        if (encoderName == "默认") {
-            SpinnerEntry(title = encoderName)
-        } else {
-            val type = resolveEncoderTypeLabel(audioEncoderTypeMap[encoderName])
-            SpinnerEntry(
-                title = encoderName,
-                summary = type.ifBlank { null },
-            )
-        }
-    }
+    var refreshBusy by remember { mutableStateOf(false) }
 
     // TODO: handle custom value
     // TODO: handle empty input
@@ -126,100 +72,164 @@ internal fun AdvancedConfigPage(
     var video by scrcpyOptions.video.asMutableState()
 
     var videoSource by scrcpyOptions.videoSource.asMutableState()
-    val videoSourceItems = VIDEO_SOURCE_OPTIONS.map { it.second }
-    val videoSourceIndex = VIDEO_SOURCE_OPTIONS.indexOfFirst {
-        it.first == videoSource
-    }.let { if (it >= 0) it else 0 }
+    val videoSourceItems = remember { Shared.VideoSource.entries.map { it.string } }
+    val videoSourceIndex = remember(videoSource) {
+        Shared.VideoSource.entries.indexOfFirst { it.string == videoSource }.coerceAtLeast(0)
+    }
     var displayId by scrcpyOptions.displayId.asMutableState()
 
     var cameraId by scrcpyOptions.cameraId.asMutableState()
     var cameraFacing by scrcpyOptions.cameraFacing.asMutableState()
-    val cameraFacingItems = CAMERA_FACING_OPTIONS.map { it.second }
-    val cameraFacingIndex = CAMERA_FACING_OPTIONS.indexOfFirst {
-        it.first == cameraFacing
-    }.let { if (it >= 0) it else 0 }
-    var cameraSize by scrcpyOptions.cameraSize.asMutableState()
-    val cameraSizeIndex = when (cameraSize) {
-        "custom" -> cameraSizeOptions.size + 1
-        in cameraSizeOptions -> cameraSizeOptions.indexOf(cameraSize) + 1
-        else -> 0
+    val cameraFacingItems = remember {
+        listOf("默认") + Shared.CameraFacing.entries.drop(1).map { it.string }
     }
+    val cameraFacingIndex = remember(cameraFacing) {
+        if (cameraFacing.isEmpty()) {
+            0
+        } else {
+            val idx = Shared.CameraFacing.entries.indexOfFirst { it.string == cameraFacing }
+            if (idx > 0) idx else 0
+        }
+    }
+
+    var cameraSize by scrcpyOptions.cameraSize.asMutableState()
+    var cameraSizeCustom by scrcpyOptions.cameraSizeCustom.asMutableState()
+    var cameraSizeUseCustom by scrcpyOptions.cameraSizeUseCustom.asMutableState()
+
+    var cameraSizeCustomInput by rememberSaveable { mutableStateOf(cameraSizeCustom) }
+    val cameraSizeDropdownItems = rememberSaveable(scrcpy.cameraSizes) {
+        listOf("自动", "自定义") + scrcpy.cameraSizes
+    }
+    var cameraSizeDropdownIndex by rememberSaveable {
+        mutableIntStateOf(
+            when {
+                cameraSizeUseCustom -> 1 // "自定义"
+                cameraSize.isEmpty() -> 0 // "自动"
+                cameraSize in scrcpy.cameraSizes -> scrcpy.cameraSizes.indexOf(cameraSize) + 2
+                else -> 0 // 默认自动
+            }
+        )
+    }
+
     var cameraAr by scrcpyOptions.cameraAr.asMutableState()
     var cameraFps by scrcpyOptions.cameraFps.asMutableState()
-    val cameraFpsPresetIndex = presetIndexFromInputForAdvancedPage(
-        cameraFps, CAMERA_FPS_PRESETS
-    )
+    val cameraFpsPresetIndex = ScrcpyPresets.CameraFps.indexOfOrNearest(cameraFps)
     var cameraHighSpeed by scrcpyOptions.cameraHighSpeed.asMutableState()
 
     var audioSource by scrcpyOptions.audioSource.asMutableState()
-    val audioSourceItems = AUDIO_SOURCE_OPTIONS.map { it.second }
-    val audioSourceIndex = AUDIO_SOURCE_OPTIONS.indexOfFirst {
-        it.first == audioSource
-    }.let { if (it >= 0) it else 0 }
+    val audioSourceItems = remember {
+        Shared.AudioSource.entries.map { it.string }
+    }
+    val audioSourceIndex = remember(audioSource) {
+        Shared.AudioSource.entries.indexOfFirst { it.string == audioSource }.coerceAtLeast(0)
+    }
     var audioDup by scrcpyOptions.audioDup.asMutableState()
     var audioPlayback by scrcpyOptions.audioPlayback.asMutableState()
     var requireAudio by scrcpyOptions.requireAudio.asMutableState()
 
     var maxSize by scrcpyOptions.maxSize.asMutableState()
-    val maxSizePresetIndex = presetIndexFromInputForAdvancedPage(
-        maxSize.toString(), ScrcpyPresets.MaxSize
-    )
+    val maxSizePresetIndex = ScrcpyPresets.MaxSize.indexOfOrNearest(maxSize)
     var maxFps by scrcpyOptions.maxFps.asMutableState()
-    val maxFpsPresetIndex = presetIndexFromInputForAdvancedPage(
-        maxFps, ScrcpyPresets.MaxFPS
-    )
+    val maxFpsPresetIndex = ScrcpyPresets.MaxFPS.indexOfOrNearest(maxFps.toIntOrNull() ?: 0)
 
     var videoEncoder by scrcpyOptions.videoEncoder.asMutableState()
     var videoCodecOptions by scrcpyOptions.videoCodecOptions.asMutableState()
     var audioEncoder by scrcpyOptions.audioEncoder.asMutableState()
     var audioCodecOptions by scrcpyOptions.audioCodecOptions.asMutableState()
 
-    var newDisplayWidth by remember {
-        mutableStateOf("")
+    val videoEncoderDropdownItems = remember(scrcpy.videoEncoders) {
+        listOf("") + scrcpy.videoEncoders
     }
-    var newDisplayHeight by remember {
-        mutableStateOf("")
+    val videoEncoderIndex = remember(videoEncoder, scrcpy.videoEncoders) {
+        (scrcpy.videoEncoders.indexOf(videoEncoder) + 1).coerceAtLeast(0)
     }
-    var newDisplayDpi by remember {
-        mutableStateOf("")
+    val audioEncoderDropdownItems = remember(scrcpy.audioEncoders) {
+        listOf("") + scrcpy.audioEncoders
     }
+    val audioEncoderIndex = remember(audioEncoder, scrcpy.audioEncoders) {
+        (scrcpy.audioEncoders.indexOf(audioEncoder) + 1).coerceAtLeast(0)
+    }
+    val videoEncoderEntries = videoEncoderDropdownItems.map { encoderName ->
+        if (encoderName == "") {
+            SpinnerEntry(title = "自动")
+        } else {
+            SpinnerEntry(
+                title = encoderName,
+                summary = scrcpy.videoEncoderTypes[encoderName],
+            )
+        }
+    }
+    val audioEncoderEntries = audioEncoderDropdownItems.map { encoderName ->
+        if (encoderName == "") {
+            SpinnerEntry(title = "自动")
+        } else {
+            SpinnerEntry(
+                title = encoderName,
+                summary = scrcpy.audioEncoderTypes[encoderName],
+            )
+        }
+    }
+
     // [<width>x<height>][/<dpi>]
-    // TODO: 填充当前值到输入框
     var newDisplay by scrcpyOptions.newDisplay.asMutableState()
+    val (width, height, dpi) = NewDisplay.parseFrom(newDisplay)
+    var newDisplayWidth by remember(newDisplay) { mutableStateOf(width?.toString() ?: "") }
+    var newDisplayHeight by remember(newDisplay) { mutableStateOf(height?.toString() ?: "") }
+    var newDisplayDpi by remember(newDisplay) { mutableStateOf(dpi?.toString() ?: "") }
     fun updateNewDisplay() {
-        var nd = ""
-        if (newDisplayWidth.isNotBlank() && newDisplayHeight.isNotBlank()) {
-            nd += "${newDisplayWidth}x${newDisplayHeight}"
-        }
-        if (newDisplayDpi.isNotBlank()) {
-            nd += "/$newDisplayDpi"
-        }
-        newDisplay = nd
+        newDisplay = NewDisplay
+            .parseFrom(newDisplayWidth, newDisplayHeight, newDisplayDpi)
+            .toString()
     }
 
-    var cropWidth by remember {
-        mutableStateOf("")
-    }
-    var cropHeight by remember {
-        mutableStateOf("")
-    }
-    var cropX by remember {
-        mutableStateOf("")
-    }
-    var cropY by remember {
-        mutableStateOf("")
-    }
     // width:height:x:y
-    // TODO: 填充当前值到输入框
     var crop by scrcpyOptions.crop.asMutableState()
-    fun updateCrop(): Unit {
-        if (cropWidth.isNotBlank()
-            && cropHeight.isNotBlank()
-            && cropX.isNotBlank()
-            && cropY.isNotBlank()
-        ) crop = "$cropWidth:$cropHeight:$cropX:$cropY"
+    val (cWidth, cHeight, cX, cY) = Crop.parseFrom(crop)
+    var cropWidth by remember(crop) { mutableStateOf(cWidth?.toString() ?: "") }
+    var cropHeight by remember(crop) { mutableStateOf(cHeight?.toString() ?: "") }
+    var cropX by remember(crop) { mutableStateOf(cX?.toString() ?: "") }
+    var cropY by remember(crop) { mutableStateOf(cY?.toString() ?: "") }
+    fun updateCrop() {
+        crop = Crop
+            .parseFrom(cropWidth, cropHeight, cropX, cropY)
+            .toString()
     }
 
+    var serverParamsPreview by rememberSaveable {
+        mutableStateOf(runBlocking {
+            scrcpyOptions
+                .toClientOptions()
+                .toServerParams(0u)
+                .toList(simplify = true)
+                .joinToString(ServerParams.SEPARATOR)
+        })
+    }
+
+    // 监听所有选项变化，自动更新 serverParams 预览
+    LaunchedEffect(
+        turnScreenOff, control, video,
+        videoSource, displayId,
+        cameraId, cameraFacing, cameraSize, cameraAr, cameraFps, cameraHighSpeed,
+        audioSource, audioDup, audioPlayback, requireAudio,
+        maxSize, maxFps,
+        videoEncoder, videoCodecOptions,
+        audioEncoder, audioCodecOptions,
+        newDisplay, crop,
+    ) {
+        val clientOptions = scrcpyOptions.toClientOptions()
+
+        try {
+            clientOptions.validate()
+        } catch (e: IllegalArgumentException) {
+            snackbarHostState.showSnackbar("Invalid options: ${e.message}")
+            return@LaunchedEffect
+        }
+
+        serverParamsPreview = clientOptions
+            .toServerParams(0u)
+            .toList(simplify = true)
+            .joinToString(ServerParams.SEPARATOR)
+    }
 
     // 高级参数
     AppPageLazyColumn(
@@ -227,6 +237,15 @@ internal fun AdvancedConfigPage(
         scrollBehavior = scrollBehavior,
     ) {
         item {
+            Card {
+                TextField(
+                    value = serverParamsPreview,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             Card {
                 SuperSwitch(
                     title = "启动后关闭屏幕",
@@ -265,13 +284,13 @@ internal fun AdvancedConfigPage(
                     items = videoSourceItems,
                     selectedIndex = videoSourceIndex,
                     onSelectedIndexChange = {
-                        videoSource = VIDEO_SOURCE_OPTIONS[it].first
+                        videoSource = Shared.VideoSource.entries[it].string
                     },
                 )
-                if (videoSource == "display") {
+                AnimatedVisibility(videoSource == "display") {
                     TextField(
-                        value = displayId.toString(),
-                        onValueChange = { displayId = it.toInt() },
+                        value = if (displayId == -1) "" else displayId.toString(),
+                        onValueChange = { displayId = it.toIntOrNull() ?: -1 },
                         label = "--display-id",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -281,7 +300,7 @@ internal fun AdvancedConfigPage(
                             .padding(bottom = UiSpacing.CardContent),
                     )
                 }
-                if (videoSource == "camera") {
+                AnimatedVisibility(videoSource == "camera") {
                     TextField(
                         value = cameraId,
                         onValueChange = { cameraId = it },
@@ -292,47 +311,95 @@ internal fun AdvancedConfigPage(
                             .padding(horizontal = UiSpacing.CardContent)
                             .padding(bottom = UiSpacing.CardContent),
                     )
+                }
+                AnimatedVisibility(videoSource == "camera") {
                     SuperArrow(
                         title = "重新获取 Camera Sizes",
                         summary = "--list-camera-sizes",
-                        onClick = onRefreshCameraSizes,
+                        onClick = {
+                            if (refreshBusy) return@SuperArrow
+                            scope.launch {
+                                refreshBusy = true
+                                try {
+                                    scrcpy.refreshCameraSizes()
+                                    snackbarHostState.showSnackbar("Camera Sizes 已刷新")
+                                } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar("刷新失败: ${e.message}")
+                                } finally {
+                                    refreshBusy = false
+                                }
+                            }
+                        },
                     )
+                }
+                AnimatedVisibility(videoSource == "camera") {
                     SuperDropdown(
                         title = "摄像头朝向",
                         summary = "--camera-facing",
                         items = cameraFacingItems,
                         selectedIndex = cameraFacingIndex,
                         onSelectedIndexChange = {
-                            cameraFacing = CAMERA_FACING_OPTIONS[it].first
+                            cameraFacing =
+                                if (it == 0) "" else Shared.CameraFacing.entries[it].string
                         },
                     )
+                }
+                AnimatedVisibility(videoSource == "camera") {
                     SuperDropdown(
                         title = "摄像头分辨率",
                         summary = "--camera-size",
                         items = cameraSizeDropdownItems,
-                        selectedIndex = cameraSizeIndex.coerceIn(
-                            0, (cameraSizeDropdownItems.size - 1).coerceAtLeast(0)
-                        ),
+                        selectedIndex = cameraSizeDropdownIndex,
                         onSelectedIndexChange = {
-                            cameraSize = when (it) {
-                                0 -> ""
-                                cameraSizeDropdownItems.lastIndex -> "custom"
-                                else -> cameraSizeDropdownItems[it]
+                            cameraSizeDropdownIndex = it
+                            cameraSizeUseCustom = it == 1
+                            when (it) {
+                                0 -> {
+                                    // "自动"
+                                    cameraSize = ""
+                                    cameraSizeCustomInput = ""
+                                }
+
+                                1 -> {
+                                    // "自定义" - 进入自定义输入模式
+                                    cameraSizeCustomInput = cameraSize.takeIf { size ->
+                                        size.isNotEmpty() && size !in scrcpy.cameraSizes
+                                    } ?: ""
+                                }
+
+                                else -> {
+                                    // 选择列表中的实际分辨率
+                                    cameraSize = cameraSizeDropdownItems[it]
+                                    cameraSizeCustomInput = ""
+                                }
                             }
                         },
                     )
-                    if (cameraSize == "custom") {
-                        TextField(
-                            value = cameraSize,
-                            onValueChange = { cameraSize = it },
-                            label = "--camera-size",
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = UiSpacing.CardContent)
-                                .padding(bottom = UiSpacing.CardContent),
-                        )
-                    }
+                }
+                // 只在选择"自定义"时显示输入框
+                AnimatedVisibility(videoSource == "camera" && cameraSizeUseCustom) {
+                    SuperTextField(
+                        value = cameraSizeCustomInput,
+                        onValueChange = { cameraSizeCustomInput = it },
+                        onFocusLost = {
+                            if (cameraSizeCustomInput in scrcpy.cameraSizes) {
+                                cameraSizeDropdownIndex =
+                                    scrcpy.cameraSizes.indexOf(cameraSizeCustomInput) + 2
+                                cameraSizeUseCustom = false
+                            } else {
+                                cameraSizeCustom = cameraSizeCustomInput
+                            }
+                        },
+                        label = "--camera-size",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = UiSpacing.CardContent)
+                            .padding(bottom = UiSpacing.CardContent),
+                    )
+                }
+                AnimatedVisibility(videoSource == "camera") {
                     TextField(
                         value = cameraAr,
                         onValueChange = { cameraAr = it },
@@ -343,28 +410,37 @@ internal fun AdvancedConfigPage(
                             .padding(horizontal = UiSpacing.CardContent)
                             .padding(bottom = UiSpacing.CardContent),
                     )
-                    SuperSlide(
+                }
+                AnimatedVisibility(videoSource == "camera") {
+                    SuperSlider(
                         title = "摄像头帧率",
                         summary = "--camera-fps",
                         value = cameraFpsPresetIndex.toFloat(),
                         onValueChange = { value ->
-                            val idx = value.roundToInt().coerceIn(0, CAMERA_FPS_PRESETS.lastIndex)
-                            cameraFps = CAMERA_FPS_PRESETS[idx]
+                            val idx =
+                                value.roundToInt().coerceIn(0, ScrcpyPresets.CameraFps.lastIndex)
+                            cameraFps = ScrcpyPresets.CameraFps[idx]
                         },
-                        valueRange = 0f..CAMERA_FPS_PRESETS.lastIndex.toFloat(),
-                        steps = (CAMERA_FPS_PRESETS.size - 2).coerceAtLeast(0),
+                        valueRange = 0f..ScrcpyPresets.CameraFps.lastIndex.toFloat(),
+                        steps = (ScrcpyPresets.CameraFps.size - 2).coerceAtLeast(0),
                         unit = "fps",
                         zeroStateText = "默认",
                         showUnitWhenZeroState = false,
                         showKeyPoints = true,
-                        keyPoints = CAMERA_FPS_PRESETS.indices.map { it.toFloat() },
+                        keyPoints = ScrcpyPresets.CameraFps.indices.map { it.toFloat() },
                         displayText = cameraFps.toString(),
                         inputHint = "0 或留空表示默认",
                         inputInitialValue = cameraFps.toString(),
                         inputFilter = { it.filter(Char::isDigit) },
-                        inputValueRange = 0f..Float.MAX_VALUE,
-                        onInputConfirm = { cameraFps = it.toInt() },
+                        inputValueRange = 0f..UShort.MAX_VALUE.toFloat(),
+                        onInputConfirm = { input ->
+                            input.toIntOrNull()
+                                ?.let { cameraFps = it }
+                                ?: run { cameraFps = 0 }
+                        },
                     )
+                }
+                AnimatedVisibility(videoSource == "camera") {
                     SuperSwitch(
                         title = "高帧率模式",
                         summary = "--camera-high-speed",
@@ -382,20 +458,10 @@ internal fun AdvancedConfigPage(
                     summary = "--audio-source",
                     items = audioSourceItems,
                     selectedIndex = audioSourceIndex,
-                    onSelectedIndexChange = { audioSource = AUDIO_SOURCE_OPTIONS[it].first },
+                    onSelectedIndexChange = {
+                        audioSource = Shared.AudioSource.entries[it].string
+                    },
                 )
-                if (audioSource == "custom") {
-                    TextField(
-                        value = audioSource,
-                        onValueChange = { audioSource = it },
-                        label = "--audio-source",
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = UiSpacing.CardContent)
-                            .padding(bottom = UiSpacing.CardContent),
-                    )
-                }
                 SuperSwitch(
                     title = "音频双路输出",
                     summary = "--audio-dup",
@@ -420,12 +486,13 @@ internal fun AdvancedConfigPage(
 
         item {
             Card {
-                SuperSlide(
+                SuperSlider(
                     title = "最大分辨率",
                     summary = "--max-size",
                     value = maxSizePresetIndex.toFloat(),
                     onValueChange = { value ->
-                        val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.MaxSize.lastIndex)
+                        val idx =
+                            value.roundToInt().coerceIn(0, ScrcpyPresets.MaxSize.lastIndex)
                         maxSize = ScrcpyPresets.MaxSize[idx]
                     },
                     valueRange = 0f..ScrcpyPresets.MaxSize.lastIndex.toFloat(),
@@ -439,16 +506,16 @@ internal fun AdvancedConfigPage(
                     inputHint = "0 或留空表示关闭",
                     inputInitialValue = maxSize.toString(),
                     inputFilter = { it.filter(Char::isDigit) },
-                    inputValueRange = 0f..Float.MAX_VALUE,
-                    onInputConfirm = { maxSize = it.toInt() },
+                    inputValueRange = 0f..UInt.MAX_VALUE.toFloat(),
+                    onInputConfirm = { input -> input.toIntOrNull()?.let { maxSize = it } },
                 )
-                SuperSlide(
+                SuperSlider(
                     title = "最大帧率",
                     summary = "--max-fps",
                     value = maxFpsPresetIndex.toFloat(),
                     onValueChange = { value ->
                         val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.MaxFPS.lastIndex)
-                        maxFps = ScrcpyPresets.MaxFPS[idx].toString()
+                        maxFps = if (idx == 0) "" else ScrcpyPresets.MaxFPS[idx].toString()
                     },
                     valueRange = 0f..ScrcpyPresets.MaxFPS.lastIndex.toFloat(),
                     steps = (ScrcpyPresets.MaxFPS.size - 2).coerceAtLeast(0),
@@ -461,7 +528,7 @@ internal fun AdvancedConfigPage(
                     inputHint = "0 或留空表示关闭",
                     inputInitialValue = maxFps,
                     inputFilter = { it.filter(Char::isDigit) },
-                    inputValueRange = 0f..Float.MAX_VALUE,
+                    inputValueRange = 0f..UShort.MAX_VALUE.toFloat(),
                     onInputConfirm = { maxFps = it },
                 )
             }
@@ -472,14 +539,29 @@ internal fun AdvancedConfigPage(
                 SuperArrow(
                     title = "重新获取编码器列表",
                     summary = "--list-encoders",
-                    onClick = onRefreshEncoders,
+                    onClick = {
+                        if (refreshBusy) return@SuperArrow
+                        scope.launch {
+                            refreshBusy = true
+                            try {
+                                scrcpy.refreshEncoders()
+                                snackbarHostState.showSnackbar("编码器列表已刷新")
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("刷新失败: ${e.message}")
+                            } finally {
+                                refreshBusy = false
+                            }
+                        }
+                    },
                 )
                 SuperSpinner(
                     title = "视频编码器",
                     summary = "--video-encoder",
                     items = videoEncoderEntries,
                     selectedIndex = videoEncoderIndex,
-                    onSelectedIndexChange = { videoEncoder = videoEncoderEntries[it].title ?: "" },
+                    onSelectedIndexChange = {
+                        videoEncoder = videoEncoderEntries[it].title ?: ""
+                    },
                 )
                 TextField(
                     value = videoCodecOptions,
@@ -496,7 +578,9 @@ internal fun AdvancedConfigPage(
                     summary = "--audio-encoder",
                     items = audioEncoderEntries,
                     selectedIndex = audioEncoderIndex,
-                    onSelectedIndexChange = { audioEncoder = audioEncoderEntries[it].title ?: "" },
+                    onSelectedIndexChange = {
+                        audioEncoder = audioEncoderEntries[it].title ?: ""
+                    },
                 )
                 TextField(
                     value = audioCodecOptions,
@@ -531,9 +615,9 @@ internal fun AdvancedConfigPage(
                     horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                 ) {
                     TextField(
+                        label = "width",
                         value = newDisplayWidth,
                         onValueChange = { newDisplayWidth = it; updateNewDisplay() },
-                        label = "width",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
@@ -545,9 +629,9 @@ internal fun AdvancedConfigPage(
                         modifier = Modifier.weight(1f),
                     )
                     TextField(
+                        label = "height",
                         value = newDisplayHeight,
                         onValueChange = { newDisplayHeight = it; updateNewDisplay() },
-                        label = "height",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
@@ -559,9 +643,9 @@ internal fun AdvancedConfigPage(
                         modifier = Modifier.weight(1f),
                     )
                     TextField(
+                        label = "dpi",
                         value = newDisplayDpi,
                         onValueChange = { newDisplayDpi = it; updateNewDisplay() },
-                        label = "dpi",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
@@ -600,9 +684,9 @@ internal fun AdvancedConfigPage(
                         horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                     ) {
                         TextField(
-                            value = cropWidth,
-                            onValueChange = { cropWidth = it },
                             label = "width",
+                            value = cropWidth,
+                            onValueChange = { cropWidth = it; updateCrop() },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -614,9 +698,9 @@ internal fun AdvancedConfigPage(
                             modifier = Modifier.weight(1f),
                         )
                         TextField(
-                            value = cropHeight,
-                            onValueChange = { cropHeight = it },
                             label = "height",
+                            value = cropHeight,
+                            onValueChange = { cropHeight = it; updateCrop() },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -633,9 +717,9 @@ internal fun AdvancedConfigPage(
                         horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                     ) {
                         TextField(
-                            value = cropX,
-                            onValueChange = { cropX = it },
                             label = "x",
+                            value = cropX,
+                            onValueChange = { cropX = it; updateCrop() },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -647,9 +731,9 @@ internal fun AdvancedConfigPage(
                             modifier = Modifier.weight(1f),
                         )
                         TextField(
-                            value = cropY,
-                            onValueChange = { cropY = it },
                             label = "y",
+                            value = cropY,
+                            onValueChange = { cropY = it; updateCrop() },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Number,
@@ -667,29 +751,5 @@ internal fun AdvancedConfigPage(
 
         // TODO: 放进 [AppPageLazyColumn] 里
         item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
-    }
-}
-
-private fun presetIndexFromInputForAdvancedPage(raw: Int, presets: List<Int>): Int {
-    val exact = presets.indexOf(raw)
-    if (exact >= 0) return exact
-    val nearest = presets.withIndex().minByOrNull { (_, preset) -> kotlin.math.abs(preset - raw) }
-    return nearest?.index ?: 0
-}
-
-private fun presetIndexFromInputForAdvancedPage(raw: String, presets: List<Int>): Int {
-    if (raw.isBlank()) return 0
-    val value = raw.toIntOrNull() ?: return 0
-    val exact = presets.indexOf(value)
-    if (exact >= 0) return exact
-    val nearest = presets.withIndex().minByOrNull { (_, preset) -> kotlin.math.abs(preset - value) }
-    return nearest?.index ?: 0
-}
-
-private fun resolveEncoderTypeLabel(raw: String?): String {
-    return when (raw?.trim()?.lowercase()) {
-        "hw" -> "hw"
-        "sw" -> "sw"
-        else -> ""
     }
 }

@@ -18,7 +18,7 @@ class PreferenceMigration(private val appContext: Context) {
     private val appSharedPrefs: SharedPreferences by lazy {
         appContext.getSharedPreferences(AppPreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE)
     }
-    
+
     private val sharedPrefs: SharedPreferences by lazy {
         appContext.getSharedPreferences("nativecore_adb_rsa", Context.MODE_PRIVATE)
     }

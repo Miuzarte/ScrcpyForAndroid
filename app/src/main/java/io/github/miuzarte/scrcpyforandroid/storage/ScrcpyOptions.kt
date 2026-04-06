@@ -22,207 +22,215 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
     companion object {
         val CROP = Pair(
             stringPreferencesKey("crop"),
-            ""
+            "",
         )
         val RECORD_FILENAME = Pair(
             stringPreferencesKey("record_filename"),
-            ""
+            "",
         )
         val VIDEO_CODEC_OPTIONS = Pair(
             stringPreferencesKey("video_codec_options"),
-            ""
+            "",
         )
         val AUDIO_CODEC_OPTIONS = Pair(
             stringPreferencesKey("audio_codec_options"),
-            ""
+            "",
         )
         val VIDEO_ENCODER = Pair(
             stringPreferencesKey("video_encoder"),
-            ""
+            "",
         )
         val AUDIO_ENCODER = Pair(
             stringPreferencesKey("audio_encoder"),
-            ""
+            "",
         )
         val CAMERA_ID = Pair(
             stringPreferencesKey("camera_id"),
-            ""
+            "",
         )
         val CAMERA_SIZE = Pair(
             stringPreferencesKey("camera_size"),
-            ""
+            "",
+        )
+        val CAMERA_SIZE_CUSTOM = Pair(
+            stringPreferencesKey("camera_size_custom"),
+            "",
+        )
+        val CAMERA_SIZE_USE_CUSTOM = Pair(
+            booleanPreferencesKey("camera_size_use_custom"),
+            false,
         )
         val CAMERA_AR = Pair(
             stringPreferencesKey("camera_ar"),
-            ""
+            "",
         )
         val CAMERA_FPS = Pair(
             intPreferencesKey("camera_fps"),
-            0
+            0,
         )
         val LOG_LEVEL = Pair(
             stringPreferencesKey("log_level"),
-            "info"
+            "info",
         )
         val VIDEO_CODEC = Pair(
             stringPreferencesKey("video_codec"),
-            "h264"
+            "h264",
         )
         val AUDIO_CODEC = Pair(
             stringPreferencesKey("audio_codec"),
-            "opus"
+            "opus",
         )
         val VIDEO_SOURCE = Pair(
             stringPreferencesKey("video_source"),
-            "display"
+            "display",
         )
         val AUDIO_SOURCE = Pair(
             stringPreferencesKey("audio_source"),
-            "output"
+            "output",
         )
         val RECORD_FORMAT = Pair(
             stringPreferencesKey("record_format"),
-            "auto"
+            "auto",
         )
         val CAMERA_FACING = Pair(
             stringPreferencesKey("camera_facing"),
-            "any"
+            "any",
         )
         val MAX_SIZE = Pair(
             intPreferencesKey("max_size"),
-            0
+            0,
         )
         val VIDEO_BIT_RATE = Pair(
             intPreferencesKey("video_bit_rate"),
-            8000000
+            8000000,
         )
         val AUDIO_BIT_RATE = Pair(
             intPreferencesKey("audio_bit_rate"),
-            128000
+            128000,
         )
         val MAX_FPS = Pair(
             stringPreferencesKey("max_fps"),
-            ""
+            "",
         )
         val ANGLE = Pair(
             stringPreferencesKey("angle"),
-            ""
+            "",
         )
         val CAPTURE_ORIENTATION = Pair(
             intPreferencesKey("capture_orientation"),
-            0
+            0,
         )
         val CAPTURE_ORIENTATION_LOCK = Pair(
             stringPreferencesKey("capture_orientation_lock"),
-            "unlocked"
+            "unlocked",
         )
         val DISPLAY_ORIENTATION = Pair(
             intPreferencesKey("display_orientation"),
-            0
+            0,
         )
         val RECORD_ORIENTATION = Pair(
             intPreferencesKey("record_orientation"),
-            0
+            0,
         )
         val DISPLAY_IME_POLICY = Pair(
             stringPreferencesKey("display_ime_policy"),
-            "undefined"
+            "undefined",
         )
         val DISPLAY_ID = Pair(
             intPreferencesKey("display_id"),
-            0
+            -1, // undefined
         )
         val SCREEN_OFF_TIMEOUT = Pair(
             longPreferencesKey("screen_off_timeout"),
-            -1
+            -1,
         )
         val SHOW_TOUCHES = Pair(
             booleanPreferencesKey("show_touches"),
-            false
+            false,
         )
         val FULLSCREEN = Pair(
             booleanPreferencesKey("fullscreen"),
-            false
+            false,
         )
         val CONTROL = Pair(
             booleanPreferencesKey("control"),
-            true
+            true,
         )
         val VIDEO_PLAYBACK = Pair(
             booleanPreferencesKey("video_playback"),
-            true
+            true,
         )
         val AUDIO_PLAYBACK = Pair(
             booleanPreferencesKey("audio_playback"),
-            true
+            true,
         )
         val TURN_SCREEN_OFF = Pair(
             booleanPreferencesKey("turn_screen_off"),
-            false
+            false,
         )
         val STAY_AWAKE = Pair(
             booleanPreferencesKey("stay_awake"),
-            false
+            false,
         )
         val DISABLE_SCREENSAVER = Pair(
             booleanPreferencesKey("disable_screensaver"),
-            false
+            false,
         )
         val POWER_OFF_ON_CLOSE = Pair(
             booleanPreferencesKey("power_off_on_close"),
-            false
+            false,
         )
         val CLEANUP = Pair(
             booleanPreferencesKey("cleanup"),
-            true
+            true,
         )
         val POWER_ON = Pair(
             booleanPreferencesKey("power_on"),
-            true
+            true,
         )
         val VIDEO = Pair(
             booleanPreferencesKey("video"),
-            true
+            true,
         )
         val AUDIO = Pair(
             booleanPreferencesKey("audio"),
-            true
+            true,
         )
         val REQUIRE_AUDIO = Pair(
             booleanPreferencesKey("require_audio"),
-            false
+            false,
         )
         val KILL_ADB_ON_CLOSE = Pair(
             booleanPreferencesKey("kill_adb_on_close"),
-            false
+            false,
         )
         val CAMERA_HIGH_SPEED = Pair(
             booleanPreferencesKey("camera_high_speed"),
-            false
+            false,
         )
         val LIST = Pair(
             stringPreferencesKey("list"),
-            "null"
+            "null",
         )
         val AUDIO_DUP = Pair(
             booleanPreferencesKey("audio_dup"),
-            false
+            false,
         )
         val NEW_DISPLAY = Pair(
             stringPreferencesKey("new_display"),
-            ""
+            "",
         )
         val START_APP = Pair(
             stringPreferencesKey("start_app"),
-            ""
+            "",
         )
         val VD_DESTROY_CONTENT = Pair(
             booleanPreferencesKey("vd_destroy_content"),
-            true
+            true,
         )
         val VD_SYSTEM_DECORATIONS = Pair(
             booleanPreferencesKey("vd_system_decorations"),
-            true
+            true,
         )
     }
 
@@ -234,6 +242,8 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
     val audioEncoder by setting(AUDIO_ENCODER)
     val cameraId by setting(CAMERA_ID)
     val cameraSize by setting(CAMERA_SIZE)
+    val cameraSizeCustom by setting(CAMERA_SIZE_CUSTOM)
+    val cameraSizeUseCustom by setting(CAMERA_SIZE_USE_CUSTOM)
     val cameraAr by setting(CAMERA_AR)
     val cameraFps by setting(CAMERA_FPS)
     val logLevel by setting(LOG_LEVEL)
@@ -294,19 +304,19 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         videoEncoder = videoEncoder.get(),
         audioEncoder = audioEncoder.get(),
         cameraId = cameraId.get(),
-        cameraSize = cameraSize.get(),
+        cameraSize = if (!cameraSizeUseCustom.get()) cameraSize.get() else cameraSizeCustom.get(),
         cameraAr = cameraAr.get(),
         cameraFps = cameraFps.get().toUShort(),
         logLevel = LogLevel.valueOf(logLevel.get().uppercase()),
-        videoCodec = Codec.valueOf(videoCodec.get().uppercase()),
-        audioCodec = Codec.valueOf(audioCodec.get().uppercase()),
-        videoSource = VideoSource.valueOf(videoSource.get().uppercase()),
-        audioSource = AudioSource.valueOf(audioSource.get().uppercase()),
+        videoCodec = Codec.fromString(videoCodec.get()),
+        audioCodec = Codec.fromString(audioCodec.get()),
+        videoSource = VideoSource.fromString(videoSource.get()),
+        audioSource = AudioSource.fromString(audioSource.get()),
         recordFormat = ClientOptions.RecordFormat.valueOf(recordFormat.get().uppercase()),
-        cameraFacing = CameraFacing.valueOf(cameraFacing.get().uppercase()),
+        cameraFacing = CameraFacing.fromString(cameraFacing.get()),
         maxSize = maxSize.get().toUShort(),
-        videoBitRate = videoBitRate.get().toUInt(),
-        audioBitRate = audioBitRate.get().toUInt(),
+        videoBitRate = videoBitRate.get(),
+        audioBitRate = audioBitRate.get(),
         maxFps = maxFps.get(),
         angle = angle.get(),
         captureOrientation = Orientation.fromInt(captureOrientation.get()),
@@ -316,7 +326,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         displayOrientation = Orientation.fromInt(displayOrientation.get()),
         recordOrientation = Orientation.fromInt(recordOrientation.get()),
         displayImePolicy = DisplayImePolicy.valueOf(displayImePolicy.get().uppercase()),
-        displayId = displayId.get().toUInt(),
+        displayId = displayId.get(),
         screenOffTimeout = Tick(screenOffTimeout.get()),
         showTouches = showTouches.get(),
         fullscreen = fullscreen.get(),

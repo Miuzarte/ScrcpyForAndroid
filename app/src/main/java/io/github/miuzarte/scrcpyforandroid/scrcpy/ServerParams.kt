@@ -45,8 +45,8 @@ data class ServerParams(
 
     var maxSize: UShort,
 
-    var videoBitRate: UInt,
-    var audioBitRate: UInt,
+    var videoBitRate: Int,
+    var audioBitRate: Int,
 
     var maxFps: String, // float to be parsed by the server
     var angle: String, // float to be parsed by the server
@@ -58,7 +58,7 @@ data class ServerParams(
 
     var control: Boolean,
 
-    var displayId: UInt,
+    var displayId: Int,
     var newDisplay: String,
 
     var displayImePolicy: DisplayImePolicy,
@@ -96,7 +96,7 @@ data class ServerParams(
         const val ILLEGAL_CHARACTER_SET: String = " ;'\"*$?&`#\\|<>[]{}()!~\r\n"
     }
 
-    private fun validate(str: String): Unit {
+    private fun validate(str: String) {
         // forbid special shell characters
         if (str.any { it in ILLEGAL_CHARACTER_SET }) {
             throw IllegalArgumentException("Invalid server param: [$str]")
@@ -107,23 +107,28 @@ data class ServerParams(
         return (extraArgs.toList() + this.toList()).joinToString(SEPARATOR)
     }
 
-    fun toList(): MutableList<String> {
+    fun toList(simplify: Boolean = false): MutableList<String> {
         val cmd = mutableListOf<String>()
 
-        cmd.add("scid=${scid.toString(16)}")
-        cmd.add("log_level=${logLevel.string}")
+        if (!simplify) {
+            cmd.add("scid=${scid.toString(16)}")
+            cmd.add("log_level=${logLevel.string}")
+        }
 
         if (!video) {
             cmd.add("video=false")
         }
-        if (videoBitRate > 0u) {
+        if (videoBitRate > 0) {
             cmd.add("video_bit_rate=$videoBitRate")
         }
         if (!audio) {
             cmd.add("audio=false")
         }
-        if (audioBitRate > 0u) {
-            cmd.add("audio_bit_rate=$audioBitRate")
+        if (audioBitRate > 0) {
+            if (audioCodec.isLossyAudio()!!) {
+                // 比官方实现多个判断编解码器类型
+                cmd.add("audio_bit_rate=$audioBitRate")
+            }
         }
         if (videoCodec != Codec.H264) {
             cmd.add("video_codec=${videoCodec.string}")
@@ -177,7 +182,7 @@ data class ServerParams(
             // By default, control is true
             cmd.add("control=false")
         }
-        if (displayId > 0u) {
+        if (displayId >= 0) {
             cmd.add("display_id=$displayId")
         }
         if (cameraId.isNotBlank()) {

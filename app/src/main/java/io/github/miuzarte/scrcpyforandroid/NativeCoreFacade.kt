@@ -6,9 +6,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
-import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
-import io.github.miuzarte.scrcpyforandroid.nativecore.ScrcpyAudioPlayer
-import io.github.miuzarte.scrcpyforandroid.nativecore.ScrcpySessionManager
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
@@ -16,15 +14,17 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * Facade that centralizes video rendering and ADB operations.
+ * Facade that centralizes video rendering.
  *
  * Provides helpers for:
- * - ADB operations (all suspend functions)
  * - Surface/Decoder management for video rendering
- * - Control input injection (all suspend functions)
+ * - Video size and FPS monitoring
  */
-class NativeCoreFacade(private val appContext: Context) {
-    val sessionManager = ScrcpySessionManager(NativeAdbService(appContext))
+class NativeCoreFacade private constructor() {
+    @Volatile
+    var session: Scrcpy.Session? = null
+        private set
+    
     private val sessionLifecycleMutex = Mutex()
     private val surfaceMap = ConcurrentHashMap<String, Surface>()
     private val surfaceIdentityMap = ConcurrentHashMap<String, Int>()
@@ -40,10 +40,7 @@ class NativeCoreFacade(private val appContext: Context) {
     private var packetCount: Long = 0
 
     @Volatile
-    private var audioPlayer: ScrcpyAudioPlayer? = null
-
-    @Volatile
-    private var currentSessionInfo: ScrcpySessionInfo? = null
+    private var currentSessionInfo: Scrcpy.Session.SessionInfo? = null
 
     suspend fun close() {
         sessionLifecycleMutex.withLock {
@@ -63,6 +60,10 @@ class NativeCoreFacade(private val appContext: Context) {
      */
     suspend fun registerVideoSurface(tag: String, surface: Surface) {
         sessionLifecycleMutex.withLock {
+            if (!surface.isValid) {
+                Log.w(TAG, "registerVideoSurface(): skip invalid surface for tag=$tag")
+                return
+            }
             val newId = System.identityHashCode(surface)
             val oldId = surfaceIdentityMap[tag]
             if (oldId != null && oldId == newId && decoderMap.containsKey(tag)) {
@@ -103,12 +104,12 @@ class NativeCoreFacade(private val appContext: Context) {
                 )
                 return
             }
-            Log.i(TAG, "unregisterVideoSurface(): tag=$tag surfaceId=$requestId")
+            Log.i(TAG, "unregisterVideoSurface(): tag=$tag surfaceId=$requestId, releasing decoder")
             surfaceMap.remove(tag)
             surfaceIdentityMap.remove(tag)
-            if (currentSessionInfo == null) {
-                decoderMap.remove(tag)?.release()
-            }
+            // Always release decoder when surface is unregistered
+            // This ensures clean state when surface is recreated
+            decoderMap.remove(tag)?.release()
         }
     }
 
@@ -129,7 +130,7 @@ class NativeCoreFacade(private val appContext: Context) {
     }
 
     suspend fun scrcpyBackOrScreenOn(action: Int = 0) {
-        sessionManager.pressBackOrScreenOn(action)
+        session?.pressBackOrScreenOn(action)
     }
 
     /**
@@ -137,9 +138,10 @@ class NativeCoreFacade(private val appContext: Context) {
      * Sets up video decoders for registered surfaces.
      */
     suspend fun onScrcpySessionStarted(
-        session: ScrcpySessionInfo,
-        sessionMgr: ScrcpySessionManager
+        session: Scrcpy.Session.SessionInfo,
+        sessionMgr: Scrcpy.Session
     ) = sessionLifecycleMutex.withLock {
+        this.session = sessionMgr
         currentSessionInfo = session
         releaseAllDecoders()
         synchronized(bootstrapLock) {
@@ -148,6 +150,10 @@ class NativeCoreFacade(private val appContext: Context) {
         }
 
         surfaceMap.forEach { (tag, surface) ->
+            if (!surface.isValid) {
+                Log.w(TAG, "onScrcpySessionStarted(): skip invalid surface for tag=$tag")
+                return@forEach
+            }
             Log.i(TAG, "onScrcpySessionStarted(): bind decoder to tag=$tag")
             createOrReplaceDecoder(tag, surface, session)
         }
@@ -164,8 +170,14 @@ class NativeCoreFacade(private val appContext: Context) {
                     "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoders=${decoderMap.size}"
                 )
             }
-            decoderMap.forEach { (tag, decoder) ->
+            // Snapshot decoders to avoid feeding released decoders during iteration
+            val decoders = decoderMap.toMap()
+            decoders.forEach { (tag, decoder) ->
                 if (!surfaceIdentityMap.containsKey(tag)) {
+                    return@forEach
+                }
+                // Double-check decoder is still in map before feeding
+                if (decoderMap[tag] != decoder) {
                     return@forEach
                 }
                 runCatching {
@@ -185,6 +197,7 @@ class NativeCoreFacade(private val appContext: Context) {
      * Cleans up decoders and resets state.
      */
     suspend fun onScrcpySessionStopped() = sessionLifecycleMutex.withLock {
+        session = null
         releaseAllDecoders()
         synchronized(bootstrapLock) {
             bootstrapPackets.clear()
@@ -202,7 +215,7 @@ class NativeCoreFacade(private val appContext: Context) {
 
         fun get(context: Context): NativeCoreFacade {
             return instance ?: synchronized(this) {
-                instance ?: NativeCoreFacade(context.applicationContext).also { instance = it }
+                instance ?: NativeCoreFacade().also { instance = it }
             }
         }
 
@@ -246,23 +259,26 @@ class NativeCoreFacade(private val appContext: Context) {
      * - Newly created decoders are fed with any cached bootstrap packets to allow
      *   faster playback startup.
      */
-    private fun createOrReplaceDecoder(tag: String, surface: Surface, session: ScrcpySessionInfo) {
-        decoderMap.remove(tag)?.release()
-        val mime = when (session.codec.lowercase()) {
-            "h264" -> "video/avc"
-            "h265" -> "video/hevc"
-            "av1" -> "video/av01"
-            else -> "video/avc"
+    private fun createOrReplaceDecoder(tag: String, surface: Surface, session: Scrcpy.Session.SessionInfo) {
+        if (!surface.isValid) {
+            Log.w(TAG, "createOrReplaceDecoder(): skip invalid surface for tag=$tag")
+            return
         }
+        decoderMap.remove(tag)?.release()
         Log.i(
             TAG,
-            "createOrReplaceDecoder(): tag=$tag codec=$mime size=${session.width}x${session.height}"
+            "createOrReplaceDecoder(): tag=$tag codec=${session.codecName} size=${session.width}x${session.height}"
         )
         val decoder = AnnexBDecoder(
             width = session.width,
             height = session.height,
             outputSurface = surface,
-            mimeType = mime,
+            mimeType = when (session.codecName.lowercase()) {
+                "h264" -> "video/avc"
+                "h265" -> "video/hevc"
+                "av1" -> "video/av01"
+                else -> "video/avc"
+            },
             onOutputSizeChanged = { width, height ->
                 val current = currentSessionInfo
                 if (current == null || (current.width == width && current.height == height)) {
@@ -304,7 +320,7 @@ class NativeCoreFacade(private val appContext: Context) {
         }
     }
 
-    private fun cacheBootstrapPacket(packet: ScrcpySessionManager.VideoPacket) {
+    private fun cacheBootstrapPacket(packet: Scrcpy.Session.VideoPacket) {
         val cached = CachedPacket(
             data = packet.data.copyOf(),
             ptsUs = packet.ptsUs,
@@ -343,7 +359,7 @@ class NativeCoreFacade(private val appContext: Context) {
      *   isolated with `runCatching` so one codec failure doesn't stop others.
      */
     @Deprecated("TODO: Determine if this is really unnecessary")
-    private suspend fun ensureVideoConsumerAttached(sessionMgr: ScrcpySessionManager) {
+    private suspend fun ensureVideoConsumerAttached(sessionMgr: Scrcpy.Session) {
         sessionMgr.attachVideoConsumer { packet ->
             cacheBootstrapPacket(packet)
             packetCount += 1
@@ -353,8 +369,14 @@ class NativeCoreFacade(private val appContext: Context) {
                     "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoders=${decoderMap.size}"
                 )
             }
-            decoderMap.forEach { (tag, decoder) ->
+            // Snapshot decoders to avoid feeding released decoders during iteration
+            val decoders = decoderMap.toMap()
+            decoders.forEach { (tag, decoder) ->
                 if (!surfaceIdentityMap.containsKey(tag)) {
+                    return@forEach
+                }
+                // Double-check decoder is still in map before feeding
+                if (decoderMap[tag] != decoder) {
                     return@forEach
                 }
                 runCatching {
@@ -375,12 +397,4 @@ class NativeCoreFacade(private val appContext: Context) {
         }
         decoderMap.clear()
     }
-
-    data class ScrcpySessionInfo(
-        val width: Int,
-        val height: Int,
-        val deviceName: String,
-        val codec: String,
-        val controlEnabled: Boolean,
-    )
 }

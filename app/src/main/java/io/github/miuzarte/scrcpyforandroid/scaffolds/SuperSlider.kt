@@ -2,16 +2,17 @@ package io.github.miuzarte.scrcpyforandroid.scaffolds
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Slider
@@ -23,7 +24,7 @@ import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun SuperSlide(
+fun SuperSlider(
     title: String,
     summary: String,
     value: Float,
@@ -82,60 +83,71 @@ fun SuperSlide(
         },
     )
 
-    if (showInputDialog) {
-        var valueText by remember(inputInitialValue) { mutableStateOf(inputInitialValue) }
-        val activeInputRange = inputValueRange ?: valueRange
-        SuperDialog(
-            show = true,
-            onDismissRequest = {
-                showInputDialog = false
-                holdArrow = false
-            },
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(text = inputTitle)
-            }
+    SliderInputDialog(
+        showDialog = showInputDialog,
+        title = inputTitle,
+        summary = inputHint,
+        initialValue = inputInitialValue,
+        inputFilter = inputFilter,
+        inputValueRange = inputValueRange ?: valueRange,
+        onDismissRequest = { showInputDialog = false },
+        onDismissFinished = { holdArrow = false },
+        onConfirm = { input ->
+            onInputConfirm(input)
+            showInputDialog = false
+        },
+    )
+}
+
+@Composable
+private fun SliderInputDialog(
+    showDialog: Boolean,
+    title: String,
+    summary: String,
+    initialValue: String,
+    inputFilter: (String) -> String,
+    inputValueRange: ClosedFloatingPointRange<Float>,
+    onDismissRequest: () -> Unit,
+    onDismissFinished: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    SuperDialog(
+        show = showDialog,
+        title = title,
+        summary = summary,
+        onDismissRequest = onDismissRequest,
+        onDismissFinished = onDismissFinished,
+        content = {
+            var text by remember(initialValue) { mutableStateOf(initialValue) }
+            
             TextField(
-                value = valueText,
-                onValueChange = { valueText = inputFilter(it) },
-                label = inputHint,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = UiSpacing.Large),
+                modifier = Modifier.padding(bottom = 16.dp),
+                value = text,
+                maxLines = 1,
+                onValueChange = { newValue ->
+                    text = inputFilter(newValue)
+                },
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = UiSpacing.Large),
-                horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
-            ) {
+            
+            Row(horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(
                     text = "取消",
+                    onClick = onDismissRequest,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        showInputDialog = false
-                        holdArrow = false
-                    },
                 )
+                Spacer(Modifier.width(20.dp))
                 TextButton(
                     text = "确定",
-                    modifier = Modifier.weight(1f),
                     onClick = {
-                        val inputValue = valueText.trim().toFloatOrNull()
-                        if (inputValue != null && inputValue >= activeInputRange.start && inputValue <= activeInputRange.endInclusive) {
-                            onInputConfirm(valueText.trim())
-                            showInputDialog = false
-                            holdArrow = false
+                        val inputValue = text.toFloatOrNull() ?: 0f
+                        if (inputValue >= inputValueRange.start && inputValue <= inputValueRange.endInclusive) {
+                            onConfirm(text.trim())
                         }
                     },
+                    modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
             }
-        }
-    }
+        },
+    )
 }

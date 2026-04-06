@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.content.Intent
 import android.os.Process
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +13,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,13 +26,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
-import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
+import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
+import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -77,6 +83,10 @@ fun SettingsScreen(
 ) {
     val appContext = LocalContext.current.applicationContext
     val appSettings = Storage.appSettings
+    var needMigration by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        needMigration = PreferenceMigration(appContext).needsMigration()
+    }
 
     val context = LocalContext.current
 
@@ -98,9 +108,22 @@ fun SettingsScreen(
     // scrcpy-server
     var customServerUri by appSettings.customServerUri.asMutableState()
     var serverRemotePath by appSettings.serverRemotePath.asMutableState()
+    var serverRemotePathInput by rememberSaveable {
+        mutableStateOf(
+            // 默认值留空显示为 hint
+            if (runBlocking { appSettings.serverRemotePath.isDefaultValue() }) ""
+            else serverRemotePath
+        )
+    }
 
     // ADB
     var adbKeyName by appSettings.adbKeyName.asMutableState()
+    var adbKeyNameInput by rememberSaveable {
+        mutableStateOf(
+            if (runBlocking { appSettings.adbKeyName.isDefaultValue() }) ""
+            else adbKeyName
+        )
+    }
     var adbPairingAutoDiscoverOnDialogOpen by appSettings.adbPairingAutoDiscoverOnDialogOpen.asMutableState()
     var adbAutoReconnectPairedDevice by appSettings.adbAutoReconnectPairedDevice.asMutableState()
 
@@ -141,7 +164,7 @@ fun SettingsScreen(
                     checked = keepScreenOnWhenStreaming,
                     onCheckedChange = { keepScreenOnWhenStreaming = it },
                 )
-                SuperSlide(
+                SuperSlider(
                     title = "预览卡高度",
                     summary = "设备页预览卡高度",
                     value = devicePreviewCardHeightDp.toFloat(),
@@ -149,12 +172,12 @@ fun SettingsScreen(
                         devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
                     },
                     valueRange = 160f..600f,
-                    steps = 439,
+                    steps = 600-160-1,
                     unit = "dp",
                     displayFormatter = { it.roundToInt().toString() },
                     inputInitialValue = devicePreviewCardHeightDp.toString(),
                     inputFilter = { it.filter(Char::isDigit) },
-                    inputValueRange = 120f..Float.MAX_VALUE,
+                    inputValueRange = 120f..UShort.MAX_VALUE.toFloat(),
                     onInputConfirm = { input ->
                         input.toIntOrNull()?.let {
                             devicePreviewCardHeightDp = it.coerceAtLeast(120)
@@ -218,9 +241,13 @@ fun SettingsScreen(
                         .padding(bottom = UiSpacing.FieldLabelBottom),
                     fontWeight = FontWeight.Medium,
                 )
-                TextField(
-                    value = serverRemotePath,
-                    onValueChange = { serverRemotePath = it },
+                SuperTextField(
+                    value = serverRemotePathInput,
+                    onValueChange = { serverRemotePathInput = it },
+                    onFocusLost = {
+                        if (serverRemotePathInput == AppSettings.SERVER_REMOTE_PATH.defaultValue)
+                            serverRemotePathInput = ""
+                    },
                     label = AppSettings.SERVER_REMOTE_PATH.defaultValue,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
@@ -240,9 +267,13 @@ fun SettingsScreen(
                         .padding(top = UiSpacing.CardContent, bottom = UiSpacing.FieldLabelBottom),
                     fontWeight = FontWeight.Medium,
                 )
-                TextField(
-                    value = adbKeyName,
-                    onValueChange = { adbKeyName = it },
+                SuperTextField(
+                    value = adbKeyNameInput,
+                    onValueChange = { adbKeyNameInput = it },
+                    onFocusLost = {
+                        if (adbKeyNameInput == AppSettings.ADB_KEY_NAME.defaultValue)
+                            adbKeyNameInput = ""
+                    },
                     label = AppSettings.ADB_KEY_NAME.defaultValue,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
@@ -265,35 +296,41 @@ fun SettingsScreen(
                 )
             }
 
-            SectionSmallTitle("应用")
-            Card {
-                SuperArrow(
-                    title = "恢复旧版本配置",
-                    summary = "从旧版本的 SharedPreferences 恢复至 DataStore",
-                    onClick = {
-                        scope.launch {
-                            val migration = PreferenceMigration(appContext)
-                            migration.migrate(clearSharedPrefs = false)
-                            snackHostState.showSnackbar("迁移完成，应用将重启")
+            // 这部分应该不会显示出来,
+            // 应用启动时就会执行迁移与旧数据的删除
+            AnimatedVisibility(needMigration) {
+                SectionSmallTitle("应用")
+            }
+            AnimatedVisibility(needMigration) {
+                Card {
+                    SuperArrow(
+                        title = "恢复旧版本配置",
+                        summary = "从旧版本的 SharedPreferences 恢复至 DataStore",
+                        onClick = {
+                            scope.launch {
+                                val migration = PreferenceMigration(appContext)
+                                migration.migrate(clearSharedPrefs = false)
+                                snackHostState.showSnackbar("迁移完成，应用将重启")
 
-                            delay(1000)
+                                delay(1000)
 
-                            val intent = context.packageManager.getLaunchIntentForPackage(
-                                context.packageName
-                            )
-                            intent?.apply {
-                                addFlags(
-                                    Intent.FLAG_ACTIVITY_NEW_TASK
-                                            or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                val intent = context.packageManager.getLaunchIntentForPackage(
+                                    context.packageName
                                 )
-                            }
-                            context.startActivity(intent)
+                                intent?.apply {
+                                    addFlags(
+                                        Intent.FLAG_ACTIVITY_NEW_TASK
+                                                or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    )
+                                }
+                                context.startActivity(intent)
 
-                            Process.killProcess(Process.myPid())
-                            exitProcess(0)
-                        }
-                    },
-                )
+                                Process.killProcess(Process.myPid())
+                                exitProcess(0)
+                            }
+                        },
+                    )
+                }
             }
 
             SectionSmallTitle("关于")
@@ -313,7 +350,6 @@ fun SettingsScreen(
             }
         }
 
-        // TODO: 放进 [AppPageLazyColumn] 里
         item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
     }
 }

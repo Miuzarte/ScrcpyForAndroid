@@ -1,8 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class ConnectedDeviceInfo(
     val model: String,
@@ -18,16 +18,15 @@ internal data class ConnectedDeviceInfo(
  * Fetch basic device properties from an already-connected device.
  *
  * Notes:
- * - This function issues multiple `adb shell getprop` commands via [nativeCore.adbShell].
- *   Each call may block on native I/O, so callers should execute this on the dedicated
- *   ADB worker dispatcher rather than the UI thread.
+ * - This function issues multiple `shell getprop` commands via [adbService.shell].
+ *   Each call may block on native I/O, so it should be called from a coroutine context.
  * - Returns a lightweight [ConnectedDeviceInfo] structure with commonly-used properties.
  */
-internal fun fetchConnectedDeviceInfo(
+internal suspend fun fetchConnectedDeviceInfo(
     adbService: NativeAdbService,
     host: String,
     port: Int
-): ConnectedDeviceInfo = runBlocking {
+): ConnectedDeviceInfo = withContext(Dispatchers.IO) {
     suspend fun prop(name: String): String = runCatching {
         adbService.shell("getprop $name").trim()
     }.getOrDefault("")
