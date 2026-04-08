@@ -20,7 +20,7 @@ import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
-fun AppPageLazyColumn(
+fun LazyColumn(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
     modifier: Modifier = Modifier,

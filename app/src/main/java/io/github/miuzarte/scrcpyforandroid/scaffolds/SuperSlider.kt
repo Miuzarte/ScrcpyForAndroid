@@ -3,7 +3,6 @@ package io.github.miuzarte.scrcpyforandroid.scaffolds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -13,12 +12,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -40,7 +37,9 @@ fun SuperSlider(
     displayFormatter: (Float) -> String = { it.toInt().toString() },
     displayText: String? = null,
     inputTitle: String = title,
-    inputHint: String = unit,
+    inputSummary: String = summary,
+    inputLabel: String = unit,
+    useLabelAsPlaceholder: Boolean = false,
     inputInitialValue: String = displayFormatter(value),
     inputFilter: (String) -> String = { text -> text.filter { it.isDigit() || it == '.' } },
     inputValueRange: ClosedFloatingPointRange<Float>? = null,
@@ -60,7 +59,8 @@ fun SuperSlider(
         endActions = {
             val isZeroState = value == 0f && zeroStateText != null
             val valueText =
-                if (isZeroState) zeroStateText else (displayText ?: displayFormatter(value))
+                if (isZeroState) zeroStateText
+                else (displayText ?: displayFormatter(value))
             val shouldShowUnit = unit.isNotBlank() && (!isZeroState || showUnitWhenZeroState)
             val text = if (shouldShowUnit) "$valueText $unit" else valueText
             Text(
@@ -86,7 +86,9 @@ fun SuperSlider(
     SliderInputDialog(
         showDialog = showInputDialog,
         title = inputTitle,
-        summary = inputHint,
+        summary = inputSummary,
+        label = inputLabel,
+        useLabelAsPlaceholder = useLabelAsPlaceholder,
         initialValue = inputInitialValue,
         inputFilter = inputFilter,
         inputValueRange = inputValueRange ?: valueRange,
@@ -104,6 +106,8 @@ private fun SliderInputDialog(
     showDialog: Boolean,
     title: String,
     summary: String,
+    label: String = "",
+    useLabelAsPlaceholder: Boolean = false,
     initialValue: String,
     inputFilter: (String) -> String,
     inputValueRange: ClosedFloatingPointRange<Float>,
@@ -119,16 +123,18 @@ private fun SliderInputDialog(
         onDismissFinished = onDismissFinished,
         content = {
             var text by remember(initialValue) { mutableStateOf(initialValue) }
-            
-            TextField(
+
+            SuperTextField(
                 modifier = Modifier.padding(bottom = 16.dp),
                 value = text,
+                label = label,
+                useLabelAsPlaceholder = useLabelAsPlaceholder,
                 maxLines = 1,
                 onValueChange = { newValue ->
                     text = inputFilter(newValue)
                 },
             )
-            
+
             Row(horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(
                     text = "取消",

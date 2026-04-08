@@ -6,11 +6,11 @@ import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
+import io.github.miuzarte.scrcpyforandroid.nativecore.PersistentVideoRenderer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
@@ -24,11 +24,11 @@ class NativeCoreFacade private constructor() {
     @Volatile
     var session: Scrcpy.Session? = null
         private set
-    
+
     private val sessionLifecycleMutex = Mutex()
-    private val surfaceMap = ConcurrentHashMap<String, Surface>()
-    private val surfaceIdentityMap = ConcurrentHashMap<String, Int>()
-    private val decoderMap = ConcurrentHashMap<String, AnnexBDecoder>()
+    private val renderer = PersistentVideoRenderer()
+    private var activeSurfaceId: Int? = null
+    private var decoder: AnnexBDecoder? = null
     private val videoSizeListeners = CopyOnWriteArraySet<(Int, Int) -> Unit>()
     private val videoFpsListeners = CopyOnWriteArraySet<(Float) -> Unit>()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -45,71 +45,75 @@ class NativeCoreFacade private constructor() {
     suspend fun close() {
         sessionLifecycleMutex.withLock {
             releaseAllDecoders()
+            renderer.release()
         }
     }
 
     /**
-     * Register a rendering Surface for a given `tag`.
+     * Register the current rendering [surface].
      *
-     * - If the surface is already known and the decoder is active, this is a no-op.
+     * - If the surface is already active and the decoder exists, this is a no-op.
      * - If a decoder exists but cannot switch output surface, a new decoder is created
      *   and bound to the supplied surface.
-     * - This method must be called from the UI thread (it is called by the composable
-     *   that owns the TextureView). Native decoder operations are performed synchronously
-     *   on the UI thread only via the decoder API; heavy work happens inside the decoder.
      */
-    suspend fun registerVideoSurface(tag: String, surface: Surface) {
+    suspend fun attachVideoSurface(surface: Surface) {
         sessionLifecycleMutex.withLock {
             if (!surface.isValid) {
-                Log.w(TAG, "registerVideoSurface(): skip invalid surface for tag=$tag")
+                Log.w(TAG, "attachVideoSurface(): skip invalid surface")
                 return
             }
             val newId = System.identityHashCode(surface)
-            val oldId = surfaceIdentityMap[tag]
-            if (oldId != null && oldId == newId && decoderMap.containsKey(tag)) {
+            if (activeSurfaceId == newId && decoder != null) {
                 return
             }
-            Log.i(TAG, "registerVideoSurface(): tag=$tag surfaceId=$newId oldSurfaceId=$oldId")
-            surfaceMap[tag] = surface
-            surfaceIdentityMap[tag] = newId
+            Log.i(TAG, "attachVideoSurface(): surfaceId=$newId oldSurfaceId=$activeSurfaceId")
+            activeSurfaceId = newId
+            renderer.attachDisplaySurface(surface)
             val session = currentSessionInfo ?: return
-            // ensureVideoConsumerAttached()
-            val decoder = decoderMap[tag]
-            if (decoder != null) {
-                val switched = decoder.switchOutputSurface(surface)
-                Log.i(TAG, "registerVideoSurface(): switchOutputSurface tag=$tag success=$switched")
+            val currentDecoder = decoder
+            if (currentDecoder != null) {
+                Log.i(TAG, "attachVideoSurface(): try switch decoder output to persistent surface")
+                val switched = currentDecoder.switchOutputSurface(renderer.getDecoderSurface())
+                Log.i(TAG, "attachVideoSurface(): switchOutputSurface success=$switched")
                 if (switched) {
                     return
                 }
             }
-            createOrReplaceDecoder(tag, surface, session)
+            createOrReplaceDecoder(session)
         }
     }
 
     /**
-     * Unregister the rendering Surface previously bound to `tag`.
+     * Unregister the active rendering [surface].
      *
      * - If a stale surface reference is supplied (identity mismatch), the request is ignored.
-     * - When there is no active session, the decoder for the tag is released immediately.
-     * - This protects the native decoder from feeding into a released Surface.
+     * - When [releaseDecoder] is false, only the active display target is cleared so a future
+     *   surface can attempt to rebind via `setOutputSurface()`.
+     * - When [releaseDecoder] is true, the current decoder is also released because the backing
+     *   surface is being destroyed for real.
      */
-    suspend fun unregisterVideoSurface(tag: String, surface: Surface? = null) {
+    suspend fun detachVideoSurface(surface: Surface? = null, releaseDecoder: Boolean = false) {
         sessionLifecycleMutex.withLock {
-            val currentId = surfaceIdentityMap[tag]
+            val currentId = activeSurfaceId
             val requestId = surface?.let { System.identityHashCode(it) }
             if (requestId != null && currentId != null && requestId != currentId) {
                 Log.i(
                     TAG,
-                    "unregisterVideoSurface(): skip stale request tag=$tag requestSurfaceId=$requestId currentSurfaceId=$currentId"
+                    "detachVideoSurface(): skip stale request requestSurfaceId=$requestId currentSurfaceId=$currentId"
                 )
                 return
             }
-            Log.i(TAG, "unregisterVideoSurface(): tag=$tag surfaceId=$requestId, releasing decoder")
-            surfaceMap.remove(tag)
-            surfaceIdentityMap.remove(tag)
-            // Always release decoder when surface is unregistered
-            // This ensures clean state when surface is recreated
-            decoderMap.remove(tag)?.release()
+            Log.i(
+                TAG,
+                "detachVideoSurface(): surfaceId=$requestId releaseDecoder=$releaseDecoder"
+            )
+            activeSurfaceId = null
+            renderer.detachDisplaySurface(surface, releaseSurface = false)
+            if (releaseDecoder) {
+                Log.i(TAG, "detachVideoSurface(): releasing decoder with destroyed surface")
+                decoder?.release()
+                decoder = null
+            }
         }
     }
 
@@ -148,46 +152,29 @@ class NativeCoreFacade private constructor() {
             bootstrapPackets.clear()
             latestConfigPacket = null
         }
-
-        surfaceMap.forEach { (tag, surface) ->
-            if (!surface.isValid) {
-                Log.w(TAG, "onScrcpySessionStarted(): skip invalid surface for tag=$tag")
-                return@forEach
-            }
-            Log.i(TAG, "onScrcpySessionStarted(): bind decoder to tag=$tag")
-            createOrReplaceDecoder(tag, surface, session)
+        if (activeSurfaceId != null) {
+            Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
+            createOrReplaceDecoder(session)
         }
         packetCount = 0
-        // if (!request.noVideo) {
-        //     ensureVideoConsumerAttached()
-        // }
         sessionMgr.attachVideoConsumer { packet ->
             cacheBootstrapPacket(packet)
             packetCount += 1
             if (packetCount == 1L || packetCount % 120L == 0L) {
                 Log.i(
                     TAG,
-                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoders=${decoderMap.size}"
+                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
                 )
             }
-            // Snapshot decoders to avoid feeding released decoders during iteration
-            val decoders = decoderMap.toMap()
-            decoders.forEach { (tag, decoder) ->
-                if (!surfaceIdentityMap.containsKey(tag)) {
-                    return@forEach
-                }
-                // Double-check decoder is still in map before feeding
-                if (decoderMap[tag] != decoder) {
-                    return@forEach
-                }
-                runCatching {
-                    decoder.feedAnnexB(
-                        packet.data,
-                        packet.ptsUs,
-                        packet.isKeyFrame,
-                        packet.isConfig
-                    )
-                }
+            val currentDecoder = decoder ?: return@attachVideoConsumer
+            if (activeSurfaceId == null) return@attachVideoConsumer
+            runCatching {
+                currentDecoder.feedAnnexB(
+                    packet.data,
+                    packet.ptsUs,
+                    packet.isKeyFrame,
+                    packet.isConfig
+                )
             }
         }
     }
@@ -251,7 +238,7 @@ class NativeCoreFacade private constructor() {
     }
 
     /**
-     * Create or replace a decoder bound to `surface` for `session`.
+     * Create or replace the active decoder bound to [surface] for [session].
      *
      * - Chooses MIME type from `session.codec` and constructs an [AnnexBDecoder].
      * - The decoder's `onOutputSizeChanged` callback publishes size changes to
@@ -259,17 +246,15 @@ class NativeCoreFacade private constructor() {
      * - Newly created decoders are fed with any cached bootstrap packets to allow
      *   faster playback startup.
      */
-    private fun createOrReplaceDecoder(tag: String, surface: Surface, session: Scrcpy.Session.SessionInfo) {
-        if (!surface.isValid) {
-            Log.w(TAG, "createOrReplaceDecoder(): skip invalid surface for tag=$tag")
-            return
-        }
-        decoderMap.remove(tag)?.release()
+    private fun createOrReplaceDecoder(session: Scrcpy.Session.SessionInfo) {
+        val surface = renderer.getDecoderSurface()
+        decoder?.release()
+        decoder = null
         Log.i(
             TAG,
-            "createOrReplaceDecoder(): tag=$tag codec=${session.codecName} size=${session.width}x${session.height}"
+            "createOrReplaceDecoder(): codec=${session.codecName} size=${session.width}x${session.height} persistent=true"
         )
-        val decoder = AnnexBDecoder(
+        val newDecoder = AnnexBDecoder(
             width = session.width,
             height = session.height,
             outputSurface = surface,
@@ -303,8 +288,8 @@ class NativeCoreFacade private constructor() {
                 }
             },
         )
-        decoderMap[tag] = decoder
-        replayBootstrapPackets(decoder)
+        decoder = newDecoder
+        replayBootstrapPackets(newDecoder)
     }
 
     private fun replayBootstrapPackets(decoder: AnnexBDecoder) {
@@ -355,8 +340,7 @@ class NativeCoreFacade private constructor() {
      *
      * - Called when a session is active and at least one decoder exists. Packets are
      *   cached into [bootstrapPackets] to allow late-attaching decoders to catch up.
-     * - The consumer iterates [decoderMap] and feeds each decoder. Errors are
-     *   isolated with `runCatching` so one codec failure doesn't stop others.
+     * - Kept only for documentation parity with the old multi-decoder design.
      */
     @Deprecated("TODO: Determine if this is really unnecessary")
     private suspend fun ensureVideoConsumerAttached(sessionMgr: Scrcpy.Session) {
@@ -366,35 +350,24 @@ class NativeCoreFacade private constructor() {
             if (packetCount == 1L || packetCount % 120L == 0L) {
                 Log.i(
                     TAG,
-                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoders=${decoderMap.size}"
+                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
                 )
             }
-            // Snapshot decoders to avoid feeding released decoders during iteration
-            val decoders = decoderMap.toMap()
-            decoders.forEach { (tag, decoder) ->
-                if (!surfaceIdentityMap.containsKey(tag)) {
-                    return@forEach
-                }
-                // Double-check decoder is still in map before feeding
-                if (decoderMap[tag] != decoder) {
-                    return@forEach
-                }
-                runCatching {
-                    decoder.feedAnnexB(
-                        packet.data,
-                        packet.ptsUs,
-                        packet.isKeyFrame,
-                        packet.isConfig
-                    )
-                }
+            val currentDecoder = decoder ?: return@attachVideoConsumer
+            if (activeSurfaceId == null) return@attachVideoConsumer
+            runCatching {
+                currentDecoder.feedAnnexB(
+                    packet.data,
+                    packet.ptsUs,
+                    packet.isKeyFrame,
+                    packet.isConfig
+                )
             }
         }
     }
 
     private fun releaseAllDecoders() {
-        decoderMap.values.forEach { decoder ->
-            runCatching { decoder.release() }
-        }
-        decoderMap.clear()
+        runCatching { decoder?.release() }
+        decoder = null
     }
 }

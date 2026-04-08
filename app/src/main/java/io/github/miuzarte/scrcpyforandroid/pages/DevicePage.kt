@@ -4,20 +4,26 @@ import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -26,20 +32,21 @@ import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
-import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
-import io.github.miuzarte.scrcpyforandroid.storage.Storage
+import io.github.miuzarte.scrcpyforandroid.storage.Settings
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceEditorScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTile
-import io.github.miuzarte.scrcpyforandroid.widgets.LogsPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
 import io.github.miuzarte.scrcpyforandroid.widgets.PreviewCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
-import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
@@ -51,9 +58,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.ListPopupDefaults
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.extra.SuperListPopup
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -66,6 +85,71 @@ private const val ADB_TCP_PROBE_TIMEOUT_MS = 500
 
 @Composable
 fun DeviceTabScreen(
+    nativeCore: NativeCoreFacade,
+    adbService: NativeAdbService,
+    scrcpy: Scrcpy,
+    snack: SnackbarHostState,
+    scrollBehavior: ScrollBehavior,
+    onOpenVirtualButtonOrder: () -> Unit,
+    onSessionStartedChange: (Boolean) -> Unit,
+    onOpenReorderDevices: () -> Unit,
+    onOpenAdvancedPage: () -> Unit,
+    onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
+) {
+    var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "设备",
+                actions = {
+                    IconButton(
+                        onClick = { showThreePointMenu = true },
+                        holdDownState = showThreePointMenu,
+                    ) {
+                        Icon(
+                            Icons.Rounded.MoreVert,
+                            contentDescription = "更多"
+                        )
+                    }
+                    DeviceMenuPopup(
+                        show = showThreePointMenu,
+                        onDismissRequest = { showThreePointMenu = false },
+                        onReorderDevices = {
+                            onOpenReorderDevices()
+                            showThreePointMenu = false
+                        },
+                        onOpenVirtualButtonOrder = {
+                            onOpenVirtualButtonOrder()
+                            showThreePointMenu = false
+                        },
+                        canClearLogs = EventLogger.hasLogs(),
+                        onClearLogs = {
+                            EventLogger.clearLogs()
+                            showThreePointMenu = false
+                        },
+                    )
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { pagePadding ->
+        DeviceTabPage(
+            contentPadding = pagePadding,
+            nativeCore = nativeCore,
+            adbService = adbService,
+            scrcpy = scrcpy,
+            snack = snack,
+            scrollBehavior = scrollBehavior,
+            onSessionStartedChange = onSessionStartedChange,
+            onOpenAdvancedPage = onOpenAdvancedPage,
+            onOpenFullscreenPage = onOpenFullscreenPage,
+        )
+    }
+}
+
+@Composable
+fun DeviceTabPage(
     contentPadding: PaddingValues,
     nativeCore: NativeCoreFacade,
     adbService: NativeAdbService,
@@ -73,26 +157,60 @@ fun DeviceTabScreen(
     snack: SnackbarHostState,
     scrollBehavior: ScrollBehavior,
     onSessionStartedChange: (Boolean) -> Unit,
-    onClearLogsActionChange: ((() -> Unit)) -> Unit,
-    onCanClearLogsChange: (Boolean) -> Unit,
-    onOpenReorderDevicesActionChange: ((() -> Unit)) -> Unit,
     onOpenAdvancedPage: () -> Unit,
     onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
 ) {
-    val appSettings = Storage.appSettings
-    val quickDevices = Storage.quickDevices
-    val scrcpyOptions = Storage.scrcpyOptions
-
-    val context = LocalContext.current
-
+    val scope = rememberCoroutineScope()
     val haptics = rememberAppHaptics()
 
-    val virtualButtonsLayout by appSettings.virtualButtonsLayout.asState()
-    val virtualButtonLayout = remember(virtualButtonsLayout) {
-        VirtualButtonActions.splitLayout(VirtualButtonActions.parseStoredLayout(virtualButtonsLayout))
+    val asBundleShared by appSettings.bundleState.collectAsState()
+    val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
+    var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
+    val asBundleLatest by rememberUpdatedState(asBundle)
+    LaunchedEffect(asBundleShared) {
+        if (asBundle != asBundleShared) {
+            asBundle = asBundleShared
+        }
     }
-    // val initialSettings = remember(context) { loadDevicePageSettings(context) }
-    val scope = rememberCoroutineScope()
+    LaunchedEffect(asBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (asBundle != asBundleSharedLatest) {
+            appSettings.saveBundle(asBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            scope.launch {
+                appSettings.saveBundle(asBundleLatest)
+            }
+        }
+    }
+
+    val qdBundleShared by quickDevices.bundleState.collectAsState()
+    val qdBundleSharedLatest by rememberUpdatedState(qdBundleShared)
+    var qdBundle by rememberSaveable(qdBundleShared) { mutableStateOf(qdBundleShared) }
+    val qdBundleLatest by rememberUpdatedState(qdBundle)
+    LaunchedEffect(qdBundleShared) {
+        if (qdBundle != qdBundleShared) {
+            qdBundle = qdBundleShared
+        }
+    }
+    LaunchedEffect(qdBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (qdBundle != qdBundleSharedLatest) {
+            quickDevices.saveBundle(qdBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            scope.launch {
+                quickDevices.saveBundle(qdBundleLatest)
+            }
+        }
+    }
+
+    // read only
+    val soBundleShared by scrcpyOptions.bundleState.collectAsState()
 
     // Run adb operations on a dedicated single thread.
     // Try to avoid blocking UI/recomposition and keeps adb call ordering deterministic.
@@ -138,7 +256,6 @@ fun DeviceTabScreen(
     var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
     var editingDevice by rememberSaveable { mutableStateOf<DeviceShortcut?>(null) }
     var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showReorderSheet by rememberSaveable { mutableStateOf(false) }
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
 
     var audioForwardingSupported by rememberSaveable { mutableStateOf(true) }
@@ -146,33 +263,31 @@ fun DeviceTabScreen(
 
     val currentTarget =
         if (currentTargetHost.isNotBlank())
-            ConnectionTarget(
-                currentTargetHost,
-                currentTargetPort,
-            ) else null
+            ConnectionTarget(currentTargetHost, currentTargetPort)
+        else null
 
     val sessionReconnectBlacklistHosts = remember { mutableSetOf<String>() }
 
-    LaunchedEffect(EventLogger.eventLog.size) {
-        onCanClearLogsChange(EventLogger.hasLogs())
+    val virtualButtonLayout = remember(asBundle.virtualButtonsLayout) {
+        VirtualButtonActions.splitLayout(
+            VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout)
+        )
     }
 
-    var quickDevicesList by quickDevices.quickDevicesList.asMutableState()
-    var savedShortcuts by remember { mutableStateOf(DeviceShortcuts.unmarshalFrom(quickDevicesList)) }
+    var savedShortcuts by remember {
+        mutableStateOf(DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList))
+    }
 
-    LaunchedEffect(quickDevicesList) {
-        savedShortcuts = DeviceShortcuts.unmarshalFrom(quickDevicesList)
+    LaunchedEffect(qdBundle.quickDevicesList) {
+        savedShortcuts = DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList)
     }
     // save changes when [savedShortcuts] was modified
     LaunchedEffect(savedShortcuts) {
         val serialized = savedShortcuts.marshalToString()
-        if (serialized != quickDevicesList) {
-            quickDevicesList = serialized
+        if (serialized != qdBundle.quickDevicesList) {
+            qdBundle = qdBundle.copy(quickDevicesList = serialized)
         }
     }
-
-    var quickConnectInput by quickDevices.quickConnectInput.asMutableState()
-    var quickConnectInputTemp by remember(quickConnectInput) { mutableStateOf(quickConnectInput) }
 
     /**
      * Disconnect the current ADB connection and stop any running scrcpy session.
@@ -236,14 +351,13 @@ fun DeviceTabScreen(
         disconnectAdbConnection(clearQuickOnlineForTarget = current)
     }
 
-    var audio by scrcpyOptions.audio.asMutableState()
-    var videoSource by scrcpyOptions.videoSource.asMutableState()
-
     fun applyConnectedDeviceCapabilities(sdkInt: Int, release: String) {
         val audioSupported = sdkInt !in 0..<30
         audioForwardingSupported = audioSupported
-        if (!audioSupported && audio) {
-            audio = false
+        if (!audioSupported && soBundleShared.audio) {
+            scope.launch {
+                scrcpyOptions.updateBundle { it.copy(audio = false) }
+            }
             logEvent(
                 "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持音频转发，已自动关闭",
                 Log.WARN
@@ -251,8 +365,10 @@ fun DeviceTabScreen(
         }
         val cameraSupported = sdkInt !in 0..<31
         cameraMirroringSupported = cameraSupported
-        if (!cameraSupported && videoSource == "camera") {
-            videoSource = "display"
+        if (!cameraSupported && soBundleShared.videoSource == "camera") {
+            scope.launch {
+                scrcpyOptions.updateBundle { it.copy(videoSource = "display") }
+            }
             logEvent(
                 "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持 camera mirroring，已切换为 display",
                 Log.WARN
@@ -405,20 +521,17 @@ fun DeviceTabScreen(
         }
     }
 
-    var videoEncoder by scrcpyOptions.videoEncoder.asMutableState()
-    var audioEncoder by scrcpyOptions.audioEncoder.asMutableState()
-
     suspend fun refreshEncoderLists() {
         if (!adbConnected) return
         runCatching {
             scrcpy.refreshEncoders()
         }.onSuccess {
             // Validate current selections
-            if (videoEncoder.isNotBlank() && videoEncoder !in scrcpy.videoEncoders) {
-                videoEncoder = ""
+            if (soBundleShared.videoEncoder.isNotBlank() && soBundleShared.videoEncoder !in scrcpy.videoEncoders) {
+                scrcpyOptions.updateBundle { it.copy(videoEncoder = "") }
             }
-            if (audioEncoder.isNotBlank() && audioEncoder !in scrcpy.audioEncoders) {
-                audioEncoder = ""
+            if (soBundleShared.audioEncoder.isNotBlank() && soBundleShared.audioEncoder !in scrcpy.audioEncoders) {
+                scrcpyOptions.updateBundle { it.copy(audioEncoder = "") }
             }
             logEvent("编码器列表已刷新: video=${scrcpy.videoEncoders.size} audio=${scrcpy.audioEncoders.size}")
             if (scrcpy.videoEncoders.isEmpty() && scrcpy.audioEncoders.isEmpty()) {
@@ -436,16 +549,18 @@ fun DeviceTabScreen(
         }
     }
 
-    var cameraSize by scrcpyOptions.cameraSize.asMutableState()
-
     suspend fun refreshCameraSizeLists() {
         if (!adbConnected) return
         runCatching {
             scrcpy.refreshCameraSizes()
         }.onSuccess {
             // Validate current selection
-            if (cameraSize.isNotBlank() && cameraSize != "custom" && cameraSize !in scrcpy.cameraSizes) {
-                cameraSize = ""
+            if (
+                soBundleShared.cameraSize.isNotBlank()
+                && soBundleShared.cameraSize != "custom"
+                && soBundleShared.cameraSize !in scrcpy.cameraSizes
+            ) {
+                scrcpyOptions.updateBundle { it.copy(cameraSize = "") }
             }
             logEvent("camera sizes 已刷新: count=${scrcpy.cameraSizes.size}")
         }.onFailure { e ->
@@ -543,9 +658,9 @@ fun DeviceTabScreen(
         }
     }
 
-    val adbPairingAutoDiscoverOnDialogOpen by appSettings.adbPairingAutoDiscoverOnDialogOpen.asState()
-    val adbAutoReconnectPairedDevice by appSettings.adbAutoReconnectPairedDevice.asState()
-    val adbMdnsLanDiscovery by appSettings.adbMdnsLanDiscovery.asState()
+    val adbPairingAutoDiscoverOnDialogOpen = asBundle.adbPairingAutoDiscoverOnDialogOpen
+    val adbAutoReconnectPairedDevice = asBundle.adbAutoReconnectPairedDevice
+    val adbMdnsLanDiscovery = asBundle.adbMdnsLanDiscovery
     LaunchedEffect(adbConnected, adbAutoReconnectPairedDevice, adbMdnsLanDiscovery) {
         if (adbConnected || !adbAutoReconnectPairedDevice) return@LaunchedEffect
 
@@ -676,44 +791,6 @@ fun DeviceTabScreen(
         onSessionStartedChange(sessionInfo != null)
     }
 
-    DisposableEffect(Unit) {
-        onClearLogsActionChange {
-            EventLogger.clearLogs()
-        }
-        onOpenReorderDevicesActionChange {
-            showReorderSheet = true
-        }
-        onDispose {
-            // canClearLogs 是 DevicePage 特有的状态，需要重置
-            onCanClearLogsChange(false)
-        }
-    }
-
-    SuperBottomSheet(
-        show = showReorderSheet,
-        title = "快速设备排序",
-        onDismissRequest = { showReorderSheet = false },
-    ) {
-        val list = remember {
-            ReorderableList(
-                itemsProvider = {
-                    savedShortcuts.map { device ->
-                        ReorderableList.Item(
-                            id = device.id,
-                            title = device.name.ifBlank { device.host },
-                            subtitle = "${device.host}:${device.port}",
-                        )
-                    }
-                },
-                onSettle = { fromIndex, toIndex ->
-                    savedShortcuts = savedShortcuts.move(fromIndex, toIndex)
-                },
-            )
-        }
-        list()
-        Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
-    }
-
     fun sendVirtualButtonAction(action: VirtualButtonAction) {
         val keycode = action.keycode ?: return
         runBusy("发送 ${action.title}") {
@@ -744,14 +821,14 @@ fun DeviceTabScreen(
         return
     }
 
-    val devicePreviewCardHeightDp by appSettings.devicePreviewCardHeightDp.asState()
-    val previewVirtualButtonShowText by appSettings.previewVirtualButtonShowText.asState()
+    val devicePreviewCardHeightDp = asBundle.devicePreviewCardHeightDp
+    val previewVirtualButtonShowText = asBundle.previewVirtualButtonShowText
 
-    val audioBitRate by scrcpyOptions.audioBitRate.asState()
-    val videoBitRate by scrcpyOptions.videoBitRate.asState()
+    val audioBitRate = soBundleShared.audioBitRate
+    val videoBitRate = soBundleShared.videoBitRate
 
     // 设备
-    AppPageLazyColumn(
+    LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
     ) {
@@ -831,26 +908,27 @@ fun DeviceTabScreen(
         if (!adbConnected) item {
             // "快速连接"
             QuickConnectCard(
-                input = quickConnectInputTemp,
+                input = qdBundle.quickConnectInput,
                 onValueChange = {
-                    quickConnectInputTemp = it
-                    quickConnectInput = quickConnectInputTemp
+                    qdBundle = qdBundle.copy(quickConnectInput = it)
                 },
-                // onFocusChange = { quickConnectInput = quickConnectInputTemp },
                 enabled = !adbConnecting,
                 onAddDevice = {
-                    val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
+                    val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
                         ?: return@QuickConnectCard
                     savedShortcuts = savedShortcuts.upsert(
                         DeviceShortcut(host = target.host, port = target.port)
                     )
-                    Log.d("SavedShortcuts", "size: ${savedShortcuts.size}, list: $quickDevicesList")
+                    Log.d(
+                        "SavedShortcuts",
+                        "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
+                    )
                     scope.launch {
                         snack.showSnackbar("已添加设备: ${target.host}:${target.port}")
                     }
                 },
                 onConnect = {
-                    val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
+                    val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
                         ?: return@QuickConnectCard
                     runAdbConnect(
                         "连接 ADB",
@@ -914,13 +992,15 @@ fun DeviceTabScreen(
             item {
                 ConfigPanel(
                     busy = busy,
+                    snack = snack,
                     audioForwardingSupported = audioForwardingSupported,
                     cameraMirroringSupported = cameraMirroringSupported,
+                    isQuickConnected = isQuickConnected,
                     onOpenAdvanced = onOpenAdvancedPage,
                     onStartStopHaptic = { haptics.contextClick() },
                     onStart = {
                         runBusy("启动 scrcpy") {
-                            val options = scrcpyOptions.toClientOptions()
+                            val options = scrcpyOptions.toClientOptions(soBundleShared)
                             val session = scrcpy.start(options)
                             sessionInfo = session.copy(
                                 host = currentTargetHost,
@@ -928,18 +1008,17 @@ fun DeviceTabScreen(
                             )
                             statusLine = "scrcpy 运行中"
                             @SuppressLint("DefaultLocale")
-                            val videoDetail = if (!options.video) {
-                                "off"
-                            } else {
-                                "${session.codecName} ${session.width}x${session.height} " +
+                            val videoDetail =
+                                if (!options.video) "off"
+                                else if (videoBitRate <= 0) "${session.codecName} ${session.width}x${session.height} @default"
+                                else "${session.codecName} ${session.width}x${session.height} " +
                                         "@${String.format("%.1f", videoBitRate / 1_000_000f)}Mbps"
-                            }
-                            val audioDetail = if (!audio) {
-                                "off"
-                            } else {
-                                val playback = if (!options.audioPlayback) "(no-playback)" else ""
-                                "${options.audioCodec} ${videoBitRate / 1_000f}Kbps source=${options.audioSource}$playback"
-                            }
+
+                            val audioDetail =
+                                if (!soBundleShared.audio) "off"
+                                else if (audioBitRate <= 0) "${options.audioCodec} default source=${options.audioSource}"
+                                else "${options.audioCodec} ${audioBitRate / 1_000f}Kbps source=${options.audioSource}${if (!options.audioPlayback) "(no-playback)" else ""}"
+
                             logEvent(
                                 "scrcpy 已启动: device=${session.deviceName}" +
                                         ", video=$videoDetail, audio=$audioDetail" +
@@ -1017,9 +1096,91 @@ fun DeviceTabScreen(
 
         if (EventLogger.hasLogs()) item {
             Spacer(Modifier.height(UiSpacing.PageItem))
-            LogsPanel(lines = EventLogger.eventLog)
+            Card {
+                TextField(
+                    value = EventLogger.eventLog.joinToString(separator = "\n"),
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
     }
+}
+
+@Composable
+private fun DeviceMenuPopup(
+    show: Boolean,
+    onDismissRequest: () -> Unit,
+    onReorderDevices: () -> Unit,
+    onOpenVirtualButtonOrder: () -> Unit,
+    canClearLogs: Boolean,
+    onClearLogs: () -> Unit,
+) {
+    SuperListPopup(
+        show = show,
+        popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+        alignment = PopupPositionProvider.Align.TopEnd,
+        onDismissRequest = onDismissRequest,
+        enableWindowDim = false,
+    ) {
+        ListPopupColumn {
+            DeviceMenuPopupItem(
+                text = "快速设备排序",
+                optionSize = 3,
+                index = 0,
+                onClick = onReorderDevices,
+            )
+            DeviceMenuPopupItem(
+                text = "虚拟按钮排序",
+                optionSize = 3,
+                index = 1,
+                onClick = onOpenVirtualButtonOrder,
+            )
+            DeviceMenuPopupItem(
+                text = "清空日志",
+                optionSize = 3,
+                index = 2,
+                enabled = canClearLogs,
+                onClick = onClearLogs,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeviceMenuPopupItem(
+    text: String,
+    optionSize: Int,
+    index: Int,
+    enabled: Boolean = true,
+    // TODO: (Int) -> Unit
+    onClick: () -> Unit,
+) {
+    if (enabled) {
+        DropdownImpl(
+            text = text,
+            optionSize = optionSize,
+            isSelected = false,
+            index = index,
+            onSelectedIndexChange = { onClick() },
+        )
+        return
+    }
+
+    val additionalTopPadding = if (index == 0) UiSpacing.PopupHorizontal else UiSpacing.PageItem
+    val additionalBottomPadding =
+        if (index == optionSize - 1) UiSpacing.PopupHorizontal else UiSpacing.PageItem
+    Text(
+        text = text,
+        fontSize = MiuixTheme.textStyles.body1.fontSize,
+        fontWeight = FontWeight.Medium,
+        color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = UiSpacing.PopupHorizontal)
+            .padding(top = additionalTopPadding, bottom = additionalBottomPadding),
+    )
 }

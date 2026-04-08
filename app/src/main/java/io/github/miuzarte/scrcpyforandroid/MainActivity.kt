@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import io.github.miuzarte.scrcpyforandroid.pages.MainPage
+import io.github.miuzarte.scrcpyforandroid.pages.MainScreen
 import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            MainPage()
+            MainScreen()
         }
     }
 }

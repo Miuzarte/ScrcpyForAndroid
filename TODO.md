@@ -4,10 +4,6 @@
 
 - Refactoring
 
-## BUGS
-
-- Figure out is virtual display destroyed at the end of scrcpy session
-
 ## WIDGETS
 
 - `SuperTextField` Click to pop a dialog with custom notes/summary

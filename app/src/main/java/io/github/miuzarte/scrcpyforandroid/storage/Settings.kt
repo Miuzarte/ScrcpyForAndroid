@@ -18,10 +18,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KProperty
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val TAG = "Settings"
 
@@ -34,12 +39,32 @@ abstract class Settings(
             emptyPreferences()
         }
 ) {
+    private val settingsScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     data class Pair<T>(
         val key: Preferences.Key<T>,
         val defaultValue: T,
     ) {
         val name: String get() = key.name
     }
+
+    protected fun <T> Preferences.read(pair: Pair<T>): T =
+        this[pair.key] ?: pair.defaultValue
+
+    protected interface BundleField<B> {
+        suspend fun persist(settings: Settings, current: B, new: B)
+    }
+
+    protected fun <B, T> bundleField(pair: Pair<T>, selector: (B) -> T): BundleField<B> =
+        object : BundleField<B> {
+            override suspend fun persist(settings: Settings, current: B, new: B) {
+                val currentValue = selector(current)
+                val newValue = selector(new)
+                if (currentValue != newValue) {
+                    settings.setValue(pair, newValue)
+                }
+            }
+        }
 
     /**
      * 设置项委托类，自动提供 get/set/observe/asState/asMutableState 方法
@@ -90,6 +115,28 @@ abstract class Settings(
 
     protected fun <T> setting(pair: Pair<T>) = SettingProperty(pair)
 
+    protected fun <B> createBundleState(reader: (Preferences) -> B): StateFlow<B> =
+        dataStore.data
+            .map(reader)
+            .stateIn(
+                scope = settingsScope,
+                started = SharingStarted.Eagerly,
+                initialValue = runBlocking { loadBundle(reader) }
+            )
+
+    protected suspend fun <B> loadBundle(reader: (Preferences) -> B): B =
+        reader(dataStore.data.first())
+
+    protected suspend fun <B> saveBundle(
+        current: B,
+        new: B,
+        fields: Array<out BundleField<B>>,
+    ) {
+        for (field in fields) {
+            field.persist(this, current, new)
+        }
+    }
+
     protected suspend fun <T> getValue(pair: Pair<T>): T =
         dataStore.data.first()[pair.key] ?: pair.defaultValue
 
@@ -122,5 +169,9 @@ abstract class Settings(
                 override fun component2(): (T) -> Unit = { value = it }
             }
         }
+    }
+
+    companion object {
+        val BUNDLE_SAVE_DELAY = 100.milliseconds
     }
 }

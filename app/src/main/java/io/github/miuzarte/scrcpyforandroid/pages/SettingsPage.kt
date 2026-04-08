@@ -13,11 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,23 +28,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
-import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
+import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
@@ -75,11 +80,39 @@ private fun resolveThemeLabel(baseIndex: Int, monetEnabled: Boolean): String {
 
 @Composable
 fun SettingsScreen(
-    contentPadding: PaddingValues,
+    scrollBehavior: ScrollBehavior,
+    snack: SnackbarHostState,
     onOpenReorderDevices: () -> Unit,
     onOpenVirtualButtonOrder: () -> Unit,
     onPickServer: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "设置",
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { pagePadding ->
+        SettingsPage(
+            contentPadding = pagePadding,
+            scrollBehavior = scrollBehavior,
+            snack = snack,
+            onOpenReorderDevices = onOpenReorderDevices,
+            onOpenVirtualButtonOrder = onOpenVirtualButtonOrder,
+            onPickServer = onPickServer,
+        )
+    }
+}
+
+@Composable
+fun SettingsPage(
+    contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
+    snack: SnackbarHostState,
+    onOpenReorderDevices: () -> Unit,
+    onOpenVirtualButtonOrder: () -> Unit,
+    onPickServer: () -> Unit,
 ) {
     val appContext = LocalContext.current.applicationContext
     val appSettings = Storage.appSettings
@@ -91,44 +124,57 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
-    val snackHostState = remember { SnackbarHostState() }
+
+    val asBundleShared by appSettings.bundleState.collectAsState()
+    val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
+    var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
+    val asBundleLatest by rememberUpdatedState(asBundle)
+    LaunchedEffect(asBundleShared) {
+        if (asBundle != asBundleShared) {
+            asBundle = asBundleShared
+        }
+    }
+    LaunchedEffect(asBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (asBundle != asBundleSharedLatest) {
+            appSettings.saveBundle(asBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            scope.launch {
+                appSettings.saveBundle(asBundleLatest)
+            }
+        }
+    }
 
     val baseModeItems = THEME_BASE_OPTIONS.map { it.label }
-
-    // 主题
-    var themeBaseIndex by appSettings.themeBaseIndex.asMutableState()
-    var monet by appSettings.monet.asMutableState()
-
-    // 投屏
-    var fullscreenDebugInfo by appSettings.fullscreenDebugInfo.asMutableState()
-    var keepScreenOnWhenStreaming by appSettings.keepScreenOnWhenStreaming.asMutableState()
-    var devicePreviewCardHeightDp by appSettings.devicePreviewCardHeightDp.asMutableState()
-    var showFullscreenVirtualButtons by appSettings.showFullscreenVirtualButtons.asMutableState()
-
-    // scrcpy-server
-    var customServerUri by appSettings.customServerUri.asMutableState()
-    var serverRemotePath by appSettings.serverRemotePath.asMutableState()
     var serverRemotePathInput by rememberSaveable {
         mutableStateOf(
-            // 默认值留空显示为 hint
-            if (runBlocking { appSettings.serverRemotePath.isDefaultValue() }) ""
-            else serverRemotePath
+            if (asBundleShared.serverRemotePath == AppSettings.SERVER_REMOTE_PATH.defaultValue) ""
+            else asBundleShared.serverRemotePath
         )
     }
+    LaunchedEffect(asBundleShared.serverRemotePath) {
+        serverRemotePathInput =
+            if (asBundleShared.serverRemotePath == AppSettings.SERVER_REMOTE_PATH.defaultValue) ""
+            else asBundleShared.serverRemotePath
+    }
 
-    // ADB
-    var adbKeyName by appSettings.adbKeyName.asMutableState()
     var adbKeyNameInput by rememberSaveable {
         mutableStateOf(
-            if (runBlocking { appSettings.adbKeyName.isDefaultValue() }) ""
-            else adbKeyName
+            if (asBundleShared.adbKeyName == AppSettings.ADB_KEY_NAME.defaultValue) ""
+            else asBundleShared.adbKeyName
         )
     }
-    var adbPairingAutoDiscoverOnDialogOpen by appSettings.adbPairingAutoDiscoverOnDialogOpen.asMutableState()
-    var adbAutoReconnectPairedDevice by appSettings.adbAutoReconnectPairedDevice.asMutableState()
+    LaunchedEffect(asBundleShared.adbKeyName) {
+        adbKeyNameInput =
+            if (asBundleShared.adbKeyName == AppSettings.ADB_KEY_NAME.defaultValue) ""
+            else asBundleShared.adbKeyName
+    }
 
     // 设置
-    AppPageLazyColumn(
+    LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
     ) {
@@ -137,16 +183,20 @@ fun SettingsScreen(
             Card {
                 SuperDropdown(
                     title = "外观模式",
-                    summary = resolveThemeLabel(themeBaseIndex, monet),
+                    summary = resolveThemeLabel(asBundle.themeBaseIndex, asBundle.monet),
                     items = baseModeItems,
-                    selectedIndex = themeBaseIndex.coerceIn(0, baseModeItems.lastIndex),
-                    onSelectedIndexChange = { themeBaseIndex = it },
+                    selectedIndex = asBundle.themeBaseIndex.coerceIn(0, baseModeItems.lastIndex),
+                    onSelectedIndexChange = {
+                        asBundle = asBundle.copy(themeBaseIndex = it)
+                    },
                 )
                 SuperSwitch(
                     title = "Monet",
                     summary = "开启后使用 Monet 动态配色",
-                    checked = monet,
-                    onCheckedChange = { monet = it },
+                    checked = asBundle.monet,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(monet = it)
+                    },
                 )
             }
 
@@ -155,32 +205,40 @@ fun SettingsScreen(
                 SuperSwitch(
                     title = "启用调试信息",
                     summary = "在全屏界面显示触点数量、设备分辨率和实时 FPS",
-                    checked = fullscreenDebugInfo,
-                    onCheckedChange = { fullscreenDebugInfo = it },
+                    checked = asBundle.fullscreenDebugInfo,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(fullscreenDebugInfo = it)
+                    },
                 )
                 SuperSwitch(
                     title = "投屏时保持屏幕常亮",
                     summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
-                    checked = keepScreenOnWhenStreaming,
-                    onCheckedChange = { keepScreenOnWhenStreaming = it },
+                    checked = asBundle.keepScreenOnWhenStreaming,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(keepScreenOnWhenStreaming = it)
+                    },
                 )
                 SuperSlider(
                     title = "预览卡高度",
                     summary = "设备页预览卡高度",
-                    value = devicePreviewCardHeightDp.toFloat(),
+                    value = asBundle.devicePreviewCardHeightDp.toFloat(),
                     onValueChange = {
-                        devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
+                        asBundle = asBundle.copy(
+                            devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
+                        )
                     },
                     valueRange = 160f..600f,
-                    steps = 600-160-1,
+                    steps = 600-160-2,
                     unit = "dp",
                     displayFormatter = { it.roundToInt().toString() },
-                    inputInitialValue = devicePreviewCardHeightDp.toString(),
+                    inputInitialValue = asBundle.devicePreviewCardHeightDp.toString(),
                     inputFilter = { it.filter(Char::isDigit) },
                     inputValueRange = 120f..UShort.MAX_VALUE.toFloat(),
                     onInputConfirm = { input ->
                         input.toIntOrNull()?.let {
-                            devicePreviewCardHeightDp = it.coerceAtLeast(120)
+                            asBundle = asBundle.copy(
+                                devicePreviewCardHeightDp = it.coerceAtLeast(120)
+                            )
                         }
                     },
                 )
@@ -197,8 +255,10 @@ fun SettingsScreen(
                 SuperSwitch(
                     title = "全屏显示虚拟按钮",
                     summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
-                    checked = showFullscreenVirtualButtons,
-                    onCheckedChange = { showFullscreenVirtualButtons = it },
+                    checked = asBundle.showFullscreenVirtualButtons,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(showFullscreenVirtualButtons = it)
+                    },
                 )
             }
 
@@ -213,19 +273,21 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                 )
                 TextField(
-                    value = customServerUri,
+                    value = asBundle.customServerUri,
                     onValueChange = {},
                     readOnly = true,
                     label = "scrcpy-server-v3.3.4",
-                    useLabelAsPlaceholder = customServerUri.isBlank(),
+                    useLabelAsPlaceholder = asBundle.customServerUri.isBlank(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = UiSpacing.CardContent)
                         .padding(bottom = UiSpacing.CardContent),
                     trailingIcon = {
                         Row(modifier = Modifier.padding(end = UiSpacing.SectionTitleLeadingGap)) {
-                            if (customServerUri.isNotBlank())
-                                IconButton(onClick = { customServerUri = "" }) {
+                            if (asBundle.customServerUri.isNotBlank())
+                                IconButton(onClick = {
+                                    asBundle = asBundle.copy(customServerUri = "")
+                                }) {
                                     Icon(Icons.Rounded.Clear, contentDescription = "清空")
                                 }
                             IconButton(onClick = onPickServer) {
@@ -247,6 +309,11 @@ fun SettingsScreen(
                     onFocusLost = {
                         if (serverRemotePathInput == AppSettings.SERVER_REMOTE_PATH.defaultValue)
                             serverRemotePathInput = ""
+                        asBundle = asBundle.copy(
+                            serverRemotePath = serverRemotePathInput.ifBlank {
+                                AppSettings.SERVER_REMOTE_PATH.defaultValue
+                            }
+                        )
                     },
                     label = AppSettings.SERVER_REMOTE_PATH.defaultValue,
                     useLabelAsPlaceholder = true,
@@ -273,6 +340,9 @@ fun SettingsScreen(
                     onFocusLost = {
                         if (adbKeyNameInput == AppSettings.ADB_KEY_NAME.defaultValue)
                             adbKeyNameInput = ""
+                        asBundle = asBundle.copy(
+                            adbKeyName = adbKeyNameInput.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue }
+                        )
                     },
                     label = AppSettings.ADB_KEY_NAME.defaultValue,
                     useLabelAsPlaceholder = true,
@@ -285,14 +355,22 @@ fun SettingsScreen(
                 SuperSwitch(
                     title = "配对时自动启用发现服务",
                     summary = "打开配对弹窗后自动搜索可用配对端口",
-                    checked = adbPairingAutoDiscoverOnDialogOpen,
-                    onCheckedChange = { adbPairingAutoDiscoverOnDialogOpen = it },
+                    checked = asBundle.adbPairingAutoDiscoverOnDialogOpen,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            adbPairingAutoDiscoverOnDialogOpen = it
+                        )
+                    },
                 )
                 SuperSwitch(
                     title = "自动重连已配对设备",
                     summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
-                    checked = adbAutoReconnectPairedDevice,
-                    onCheckedChange = { adbAutoReconnectPairedDevice = it },
+                    checked = asBundle.adbAutoReconnectPairedDevice,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            adbAutoReconnectPairedDevice = it
+                        )
+                    },
                 )
             }
 
@@ -310,7 +388,7 @@ fun SettingsScreen(
                             scope.launch {
                                 val migration = PreferenceMigration(appContext)
                                 migration.migrate(clearSharedPrefs = false)
-                                snackHostState.showSnackbar("迁移完成，应用将重启")
+                                snack.showSnackbar("迁移完成，应用将重启")
 
                                 delay(1000)
 

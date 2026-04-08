@@ -2,8 +2,6 @@ package io.github.miuzarte.scrcpyforandroid.widgets
 
 import android.annotation.SuppressLint
 import android.graphics.SurfaceTexture
-import android.util.Log
-import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
@@ -38,12 +36,15 @@ import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,7 +55,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -70,14 +70,16 @@ import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
-import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
+import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
-import kotlinx.coroutines.CoroutineScope
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
@@ -86,6 +88,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -98,17 +101,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.math.roundToInt
 
-private object UiMotionActions {
-    const val DOWN = 0
-    const val UP = 1
-    const val MOVE = 2
-    const val CANCEL = 3
-    const val POINTER_DOWN = 5
-    const val POINTER_UP = 6
-}
-
-private const val FULLSCREEN_TOUCH_LOG_TAG = "FullscreenTouch"
-
 @Composable
 internal fun StatusCard(
     statusLine: String,
@@ -119,10 +111,8 @@ internal fun StatusCard(
     connectedDeviceLabel: String,
 ) {
     val appSettings = Storage.appSettings
-
-    val context = LocalContext.current
-
-    val themeBaseIndex by appSettings.themeBaseIndex.asState()
+    val appSettingsBundle by appSettings.bundleState.collectAsState()
+    val themeBaseIndex = appSettingsBundle.themeBaseIndex
 
     val cleanStatusLine = normalizeStatusLine(statusLine)
 
@@ -359,8 +349,10 @@ internal fun VirtualButtonCard(
 @Composable
 internal fun ConfigPanel(
     busy: Boolean,
+    snack: SnackbarHostState,
     audioForwardingSupported: Boolean,
     cameraMirroringSupported: Boolean,
+    isQuickConnected: Boolean,
     onOpenAdvanced: () -> Unit,
     onStartStopHaptic: (() -> Unit)? = null,
     onStart: () -> Unit,
@@ -368,49 +360,60 @@ internal fun ConfigPanel(
     sessionInfo: Scrcpy.Session.SessionInfo?,
     onDisconnect: () -> Unit = {},
 ) {
-    val scrcpyOptions = Storage.scrcpyOptions
-    val quickDevices = Storage.quickDevices
-
-    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val sessionStarted = sessionInfo != null
-    
-    // Check if device exists in shortcuts
-    var quickDevicesList by quickDevices.quickDevicesList.asMutableState()
-    val savedShortcuts = remember(quickDevicesList) {
-        DeviceShortcuts.unmarshalFrom(quickDevicesList)
+
+    val soBundleShared by scrcpyOptions.bundleState.collectAsState()
+    val soBundleSharedLatest by rememberUpdatedState(soBundleShared)
+    var soBundle by rememberSaveable(soBundleShared) { mutableStateOf(soBundleShared) }
+    val soBundleLatest by rememberUpdatedState(soBundle)
+    LaunchedEffect(soBundleShared) {
+        if (soBundle != soBundleShared) {
+            soBundle = soBundleShared
+        }
     }
-    val isQuickConnected = remember(sessionInfo, savedShortcuts) {
-        sessionInfo?.let { info ->
-            savedShortcuts.get(info.host, info.port) == null
-        } ?: false
+    LaunchedEffect(soBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (soBundle != soBundleSharedLatest) {
+            scrcpyOptions.saveBundle(soBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            scope.launch {
+                scrcpyOptions.saveBundle(soBundleLatest)
+            }
+        }
     }
 
-    var audio by scrcpyOptions.audio.asMutableState()
+    val audioBitRateVisibility = rememberSaveable(soBundle) {
+        soBundle.audio && (soBundle.audioCodec == "opus" || soBundle.audioCodec == "aac")
+    }
 
-    var audioCodec by scrcpyOptions.audioCodec.asMutableState()
-    val audioCodecItems = remember { Codec.AUDIO.map { it.displayName } }
-    val audioCodecIndex = Codec.AUDIO.indexOfFirst {
-        it.string == audioCodec
-    }.coerceAtLeast(0)
-    var audioBitRate by scrcpyOptions.audioBitRate.asMutableState()
+    val audioCodecItems = rememberSaveable { Codec.AUDIO.map { it.displayName } }
+    val audioCodecIndex = rememberSaveable(soBundle) {
+        Codec.AUDIO
+            .indexOfFirst { it.string == soBundle.audioCodec }
+            .coerceAtLeast(0)
+    }
 
-    var videoCodec by scrcpyOptions.videoCodec.asMutableState()
-    val videoCodecItems = remember { Codec.VIDEO.map { it.displayName } }
-    val videoCodecIndex = Codec.VIDEO.indexOfFirst {
-        it.string == videoCodec
-    }.coerceAtLeast(0)
-    var videoBitRate by scrcpyOptions.videoBitRate.asMutableState()
-    val videoBitRateMbps = videoBitRate / 1_000_000f
+    val videoCodecItems = rememberSaveable { Codec.VIDEO.map { it.displayName } }
+    val videoCodecIndex = rememberSaveable(soBundle) {
+        Codec.VIDEO
+            .indexOfFirst { it.string == soBundle.videoCodec }
+            .coerceAtLeast(0)
+    }
 
     SectionSmallTitle("Scrcpy")
     Card {
         SuperSwitch(
             title = "音频转发",
             summary = "转发设备音频到本机 (Android 11+)",
-            checked = audio,
-            onCheckedChange = { audio = it },
-            enabled = !sessionStarted && audioForwardingSupported,
+            checked = soBundle.audio,
+            onCheckedChange = { soBundle = soBundle.copy(audio = it) },
+            enabled = !sessionStarted
+                    && audioForwardingSupported,
         )
 
         SuperDropdown(
@@ -418,28 +421,47 @@ internal fun ConfigPanel(
             summary = "--audio-codec",
             items = audioCodecItems,
             selectedIndex = audioCodecIndex,
-            onSelectedIndexChange = { audioCodec = Codec.AUDIO[it].string },
-            enabled = !sessionStarted && audio,
+            onSelectedIndexChange = {
+                val codec = Codec.AUDIO[it]
+                soBundle = soBundle.copy(audioCodec = codec.string)
+                if (codec == Codec.FLAC) {
+                    scope.launch {
+                        snack.showSnackbar("注意：FLAC编解码会引入较大的延迟")
+                    }
+                }
+            },
+            enabled = !sessionStarted && soBundle.audio,
         )
-        AnimatedVisibility(audio && (audioCodec == "opus" || audioCodec == "aac")) {
+        AnimatedVisibility(audioBitRateVisibility) {
             SuperSlider(
                 title = "音频码率",
                 summary = "--audio-bit-rate",
-                value = ScrcpyPresets.AudioBitRate.indexOfOrNearest(audioBitRate / 1000).toFloat(),
+                value = if (soBundle.audioBitRate <= 0) 0f
+                else (ScrcpyPresets.AudioBitRate
+                    .indexOfOrNearest(soBundle.audioBitRate / 1000) + 1
+                        ).toFloat(),
                 onValueChange = { value ->
-                    val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.AudioBitRate.lastIndex)
-                    audioBitRate = ScrcpyPresets.AudioBitRate[idx] * 1000
+                    val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.AudioBitRate.size)
+                    soBundle = soBundle.copy(
+                        audioBitRate =
+                            if (idx == 0) 0
+                            else ScrcpyPresets.AudioBitRate[idx - 1] * 1000
+                    )
                 },
-                valueRange = 0f..ScrcpyPresets.AudioBitRate.lastIndex.toFloat(),
-                steps = (ScrcpyPresets.AudioBitRate.size - 2).coerceAtLeast(0),
-                enabled = !sessionStarted,
+                valueRange = 0f..ScrcpyPresets.AudioBitRate.size.toFloat(),
+                steps = (ScrcpyPresets.AudioBitRate.size - 1).coerceAtLeast(0),
                 unit = "Kbps",
-                displayText = (audioBitRate / 1000).toString(),
-                inputInitialValue = (audioBitRate / 1000).toString(),
+                zeroStateText = "默认",
+                displayText = (soBundle.audioBitRate / 1_000).toString(),
+                inputInitialValue =
+                    if (soBundle.audioBitRate <= 0) ""
+                    else (soBundle.audioBitRate / 1_000).toString(),
                 inputFilter = { it.filter(Char::isDigit) },
-                inputValueRange = 1f..UShort.MAX_VALUE.toFloat(),
+                inputValueRange = 0f..UShort.MAX_VALUE.toFloat(),
                 onInputConfirm = { raw ->
-                    raw.toIntOrNull()?.takeIf { it > 0 }?.let { audioBitRate = it * 1000 }
+                    raw.toIntOrNull()
+                        ?.takeIf { it >= 0 }
+                        ?.let { soBundle = soBundle.copy(audioBitRate = it * 1000) }
                 },
             )
         }
@@ -449,22 +471,35 @@ internal fun ConfigPanel(
             summary = "--video-codec",
             items = videoCodecItems,
             selectedIndex = videoCodecIndex,
-            onSelectedIndexChange = { videoCodec = Codec.VIDEO[it].string },
+            onSelectedIndexChange = {
+                val codec = Codec.VIDEO[it]
+                soBundle = soBundle.copy(videoCodec = codec.string)
+                if (codec == Codec.AV1) {
+                    scope.launch {
+                        snack.showSnackbar("注意：绝大部分设备不支持AV1硬件编码")
+                    }
+                }
+            },
             enabled = !sessionStarted,
         )
+        @SuppressLint("DefaultLocale")
         SuperSlider(
             title = "视频码率",
             summary = "--video-bit-rate",
-            value = videoBitRateMbps,
+            value = soBundle.videoBitRate / 1_000_000f,
             onValueChange = { mbps ->
-                videoBitRate = (mbps * 1_000_000).toInt()
+                soBundle = soBundle.copy(
+                    videoBitRate = (mbps * 10).roundToInt() * (1_000_000 / 10)
+                )
             },
-            valueRange = 0.1f..40f,
-            steps = 399,
-            enabled = !sessionStarted,
+            valueRange = 0f..40f,
+            steps = 400 - 1,
             unit = "Mbps",
-            displayFormatter = { formatBitRate(it) },
-            inputInitialValue = formatBitRate(videoBitRateMbps),
+            zeroStateText = "默认",
+            displayFormatter = { String.format("%.1f", it) },
+            inputInitialValue =
+                if (soBundle.videoBitRate <= 0) ""
+                else String.format("%.1f", soBundle.videoBitRate / 1_000_000f),
             inputFilter = { text ->
                 var dotUsed = false
                 text.filter { ch ->
@@ -479,14 +514,17 @@ internal fun ConfigPanel(
                     }
                 }
             },
-            inputValueRange = 0.1f..UInt.MAX_VALUE.toFloat(),
+            inputValueRange = 0f..UInt.MAX_VALUE.toFloat(),
             onInputConfirm = { raw ->
                 raw.toFloatOrNull()?.let { parsed ->
-                    if (parsed >= 0.1f) {
-                        videoBitRate = (parsed * 1_000_000).toInt()
+                    if (parsed >= 0f) {
+                        soBundle = soBundle.copy(
+                            videoBitRate = (parsed * 1_000_000f).roundToInt()
+                        )
                     }
                 }
             },
+            enabled = !sessionStarted,
         )
 
         SuperArrow(
@@ -503,53 +541,34 @@ internal fun ConfigPanel(
                 .padding(bottom = UiSpacing.CardContent),
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
         ) {
-            AnimatedVisibility(!isQuickConnected) {
-                AnimatedVisibility(!sessionStarted) {
-                    TextButton(
-                        text = "启动",
-                        onClick = {
-                            onStartStopHaptic?.invoke()
-                            onStart()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-                AnimatedVisibility(sessionStarted) {
-                    TextButton(
-                        text = "停止",
-                        onClick = {
-                            onStartStopHaptic?.invoke()
-                            onStop()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    )
-                }
-            }
-            // display them at the same time in quick connection
-            AnimatedVisibility(isQuickConnected) {
-                TextButton(
-                    text = "断开",
-                    onClick = {
-                        onStartStopHaptic?.invoke()
-                        onDisconnect()
-                    },
-                    modifier = Modifier.weight(1f/4f),
-                    enabled = !busy,
-                )
-                TextButton(
-                    text = "启动",
-                    onClick = {
-                        onStartStopHaptic?.invoke()
-                        onStart()
-                    },
-                    modifier = Modifier.weight(3f/4f),
-                    enabled = !busy,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
+            if (isQuickConnected) TextButton(
+                text = "断开",
+                onClick = {
+                    onStartStopHaptic?.invoke()
+                    onDisconnect()
+                },
+                modifier = Modifier.weight(1f / 4f),
+                enabled = !busy,
+            )
+            if (!sessionStarted) TextButton(
+                text = "启动",
+                onClick = {
+                    onStartStopHaptic?.invoke()
+                    onStart()
+                },
+                modifier = Modifier.weight(if (isQuickConnected) 3f / 4f else 1f),
+                enabled = !busy,
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+            )
+            if (sessionStarted) TextButton(
+                text = "停止",
+                onClick = {
+                    onStartStopHaptic?.invoke()
+                    onStop()
+                },
+                modifier = Modifier.weight(if (isQuickConnected) 3f / 4f else 1f),
+                enabled = !busy,
+            )
         }
     }
 }
@@ -694,21 +713,6 @@ private fun PairingDialog(
     )
 }
 
-@SuppressLint("DefaultLocale")
-private fun formatBitRate(value: Float): String = String.format("%.1f", value)
-
-@Composable
-internal fun LogsPanel(lines: List<String>) {
-    Card {
-        TextField(
-            value = lines.joinToString(separator = "\n"),
-            onValueChange = {},
-            readOnly = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
 /**
  * TouchEventHandler
  *
@@ -716,256 +720,6 @@ internal fun LogsPanel(lines: List<String>) {
  * - Handles touch event processing for fullscreen control screen
  * - Manages pointer tracking, coordinate mapping, and touch injection
  */
-class TouchEventHandler(
-    private val coroutineScope: CoroutineScope,
-    private val session: Scrcpy.Session.SessionInfo,
-    private val touchAreaSize: IntSize,
-    private val activePointerIds: LinkedHashSet<Int>,
-    private val activePointerPositions: LinkedHashMap<Int, Offset>,
-    private val activePointerDevicePositions: LinkedHashMap<Int, Pair<Int, Int>>,
-    private val pointerLabels: LinkedHashMap<Int, Int>,
-    private var nextPointerLabel: Int,
-    private val onInjectTouch: suspend (action: Int, pointerId: Long, x: Int, y: Int, pressure: Float, buttons: Int) -> Unit,
-    private val onActiveTouchCountChanged: (Int) -> Unit,
-    private val onActiveTouchDebugChanged: (String) -> Unit,
-    private val onNextPointerLabelChanged: (Int) -> Unit,
-) {
-    private val eventPointerIds = HashSet<Int>(10)
-    private val eventPositions = HashMap<Int, Offset>(10)
-    private val eventPressures = HashMap<Int, Float>(10)
-    private val justPressedPointerIds = HashSet<Int>(10)
-
-    fun handleMotionEvent(event: MotionEvent): Boolean {
-        if (touchAreaSize.width == 0 || touchAreaSize.height == 0) {
-            return true
-        }
-
-        val bounds = calculateContentBounds()
-
-        if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
-            return handleCancelAction(bounds)
-        }
-
-        extractEventData(event)
-        handleDisappearedPointers(eventPointerIds, bounds)
-
-        val endedPointerId = getEndedPointerId(event)
-        handlePointerDown(event, endedPointerId, bounds)
-        handlePointerMove(event, endedPointerId, bounds)
-        handlePointerUp(endedPointerId, bounds)
-
-        onActiveTouchCountChanged(activePointerIds.size)
-        refreshTouchDebug()
-        return true
-    }
-
-    private data class ContentBounds(
-        val width: Float,
-        val height: Float,
-        val left: Float,
-        val top: Float,
-    )
-
-    private fun calculateContentBounds(): ContentBounds {
-        val sessionAspect = if (session.height == 0) {
-            16f / 9f
-        } else {
-            session.width.toFloat() / session.height.toFloat()
-        }
-        val containerWidth = touchAreaSize.width.toFloat()
-        val containerHeight = touchAreaSize.height.toFloat()
-        val containerAspect = containerWidth / containerHeight
-
-        val contentWidth: Float
-        val contentHeight: Float
-        if (sessionAspect > containerAspect) {
-            contentWidth = containerWidth
-            contentHeight = containerWidth / sessionAspect
-        } else {
-            contentHeight = containerHeight
-            contentWidth = containerHeight * sessionAspect
-        }
-        val contentLeft = (containerWidth - contentWidth) / 2f
-        val contentTop = (containerHeight - contentHeight) / 2f
-
-        return ContentBounds(contentWidth, contentHeight, contentLeft, contentTop)
-    }
-
-    private fun isInsideContent(rawX: Float, rawY: Float, bounds: ContentBounds): Boolean {
-        return rawX in bounds.left..(bounds.left + bounds.width) &&
-                rawY in bounds.top..(bounds.top + bounds.height)
-    }
-
-    private fun mapToDevice(rawX: Float, rawY: Float, bounds: ContentBounds): Pair<Int, Int> {
-        val normalizedX = ((rawX - bounds.left) / bounds.width).coerceIn(0f, 1f)
-        val normalizedY = ((rawY - bounds.top) / bounds.height).coerceIn(0f, 1f)
-        val x = (normalizedX * (session.width - 1).coerceAtLeast(0)).roundToInt()
-            .coerceIn(0, (session.width - 1).coerceAtLeast(0))
-        val y = (normalizedY * (session.height - 1).coerceAtLeast(0)).roundToInt()
-            .coerceIn(0, (session.height - 1).coerceAtLeast(0))
-        return x to y
-    }
-
-    private fun getPointerLabel(pointerId: Int): Int {
-        val existing = pointerLabels[pointerId]
-        if (existing != null) {
-            return existing
-        }
-        val assigned = nextPointerLabel
-        nextPointerLabel += 1
-        onNextPointerLabelChanged(nextPointerLabel)
-        pointerLabels[pointerId] = assigned
-        return assigned
-    }
-
-    private fun refreshTouchDebug() {
-        if (activePointerIds.isEmpty()) {
-            onActiveTouchDebugChanged("")
-            return
-        }
-        val debug = activePointerIds
-            .sortedBy { getPointerLabel(it) }
-            .joinToString(separator = "\n") { pointerId ->
-                val label = getPointerLabel(pointerId)
-                val pos = activePointerDevicePositions[pointerId]
-                if (pos == null) {
-                    "#$label(id=$pointerId):?"
-                } else {
-                    "#$label(id=$pointerId):${pos.first},${pos.second}"
-                }
-            }
-        onActiveTouchDebugChanged(debug)
-    }
-
-    private fun releasePointer(pointerId: Int, bounds: ContentBounds) {
-        if (!activePointerIds.contains(pointerId)) return
-        val pos = activePointerPositions[pointerId] ?: Offset.Zero
-        val (x, y) = mapToDevice(pos.x, pos.y, bounds)
-        coroutineScope.launch {
-            runCatching {
-                onInjectTouch(UiMotionActions.UP, pointerId.toLong(), x, y, 0f, 0)
-            }.onFailure { e ->
-                Log.w(FULLSCREEN_TOUCH_LOG_TAG, "releasePointer failed for pointerId=$pointerId", e)
-            }
-        }
-        activePointerIds -= pointerId
-        activePointerPositions.remove(pointerId)
-        activePointerDevicePositions.remove(pointerId)
-        pointerLabels.remove(pointerId)
-    }
-
-    private fun handleCancelAction(bounds: ContentBounds): Boolean {
-        val toCancel = activePointerIds.toList()
-        for (pointerId in toCancel) {
-            releasePointer(pointerId, bounds)
-        }
-        onActiveTouchCountChanged(activePointerIds.size)
-        refreshTouchDebug()
-        return true
-    }
-
-    private fun extractEventData(event: MotionEvent) {
-        eventPointerIds.clear()
-        eventPositions.clear()
-        eventPressures.clear()
-        for (i in 0 until event.pointerCount) {
-            val pointerId = event.getPointerId(i)
-            eventPointerIds += pointerId
-            eventPositions[pointerId] = Offset(event.getX(i), event.getY(i))
-            eventPressures[pointerId] = event.getPressure(i).coerceIn(0f, 1f)
-        }
-    }
-
-    private fun handleDisappearedPointers(eventPointerIds: Set<Int>, bounds: ContentBounds) {
-        val disappearedPointers = activePointerIds.filter { it !in eventPointerIds }
-        for (pointerId in disappearedPointers) {
-            releasePointer(pointerId, bounds)
-        }
-    }
-
-    private fun getEndedPointerId(event: MotionEvent): Int? {
-        return when (event.actionMasked) {
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> event.getPointerId(event.actionIndex)
-            else -> null
-        }
-    }
-
-    private fun handlePointerDown(
-        event: MotionEvent,
-        endedPointerId: Int?,
-        bounds: ContentBounds,
-    ) {
-        justPressedPointerIds.clear()
-        for (i in 0 until event.pointerCount) {
-            val pointerId = event.getPointerId(i)
-            if (pointerId == endedPointerId) continue
-            val raw = eventPositions[pointerId] ?: continue
-            val pressure = eventPressures[pointerId] ?: 0f
-            if (!activePointerIds.contains(pointerId)) {
-                if (!isInsideContent(raw.x, raw.y, bounds)) continue
-                val (x, y) = mapToDevice(raw.x, raw.y, bounds)
-                activePointerIds += pointerId
-                activePointerPositions[pointerId] = raw
-                activePointerDevicePositions[pointerId] = x to y
-                justPressedPointerIds += pointerId
-                coroutineScope.launch {
-                    runCatching {
-                        onInjectTouch(UiMotionActions.DOWN, pointerId.toLong(), x, y, pressure, 0)
-                    }.onFailure { e ->
-                        Log.w(
-                            FULLSCREEN_TOUCH_LOG_TAG,
-                            "handlePointerDown failed for pointerId=$pointerId",
-                            e
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    private fun handlePointerMove(
-        event: MotionEvent,
-        endedPointerId: Int?,
-        bounds: ContentBounds,
-    ) {
-        for (i in 0 until event.pointerCount) {
-            val pointerId = event.getPointerId(i)
-            if (!activePointerIds.contains(pointerId)) continue
-            if (pointerId == endedPointerId) continue
-            if (pointerId in justPressedPointerIds) continue
-            val raw = eventPositions[pointerId] ?: continue
-            val pressure = eventPressures[pointerId] ?: 0f
-            activePointerPositions[pointerId] = raw
-            val (x, y) = mapToDevice(raw.x, raw.y, bounds)
-            activePointerDevicePositions[pointerId] = x to y
-            coroutineScope.launch {
-                runCatching {
-                    onInjectTouch(UiMotionActions.MOVE, pointerId.toLong(), x, y, pressure, 0)
-                }.onFailure { e ->
-                    Log.w(
-                        FULLSCREEN_TOUCH_LOG_TAG,
-                        "handlePointerMove failed for pointerId=$pointerId",
-                        e
-                    )
-                }
-            }
-        }
-    }
-
-    private fun handlePointerUp(
-        endedPointerId: Int?,
-        bounds: ContentBounds,
-    ) {
-        if (endedPointerId != null) {
-            val endPos = eventPositions[endedPointerId]
-            if (endPos != null) {
-                activePointerPositions[endedPointerId] = endPos
-            }
-            releasePointer(endedPointerId, bounds)
-        }
-    }
-
-}
 
 /**
  * FullscreenControlScreen
@@ -1121,14 +875,22 @@ private fun ScrcpyVideoSurface(
     nativeCore: NativeCoreFacade,
     session: Scrcpy.Session.SessionInfo?,
 ) {
-    val surfaceTag = "video-main"
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(session, currentSurface) {
         val surface = currentSurface
         if (session != null && surface != null && surface.isValid) {
-            nativeCore.registerVideoSurface(surfaceTag, surface)
+            nativeCore.attachVideoSurface(surface)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            val surface = currentSurface
+            if (surface != null) {
+                scope.launch { nativeCore.detachVideoSurface(surface, releaseDecoder = false) }
+            }
         }
     }
 
@@ -1148,7 +910,7 @@ private fun ScrcpyVideoSurface(
                         // Register immediately when surface becomes available
                         if (session != null) {
                             scope.launch {
-                                nativeCore.registerVideoSurface(surfaceTag, newSurface)
+                                nativeCore.attachVideoSurface(newSurface)
                             }
                         }
                     }
@@ -1160,9 +922,15 @@ private fun ScrcpyVideoSurface(
                     ) = Unit
 
                     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
-                        // Return false to keep the SurfaceTexture alive
-                        // This prevents the surface from being destroyed when the view is detached
-                        return false
+                        val surface = currentSurface
+                        if (surface != null) {
+                            scope.launch {
+                                nativeCore.detachVideoSurface(surface, releaseDecoder = false)
+                            }
+                            surface.release()
+                            currentSurface = null
+                        }
+                        return true
                     }
 
                     override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit

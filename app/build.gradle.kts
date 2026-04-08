@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    id("kotlin-parcelize")
 }
 
 val defaultAbiList = listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")

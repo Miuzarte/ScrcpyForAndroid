@@ -1,9 +1,13 @@
 package io.github.miuzarte.scrcpyforandroid.storage
 
 import android.content.Context
+import android.os.Parcelable
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.parcelize.Parcelize
 
 class AppSettings(context: Context) : Settings(context, "AppSettings") {
     companion object {
@@ -86,6 +90,71 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     val adbPairingAutoDiscoverOnDialogOpen by setting(ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN)
     val adbAutoReconnectPairedDevice by setting(ADB_AUTO_RECONNECT_PAIRED_DEVICE)
     val adbMdnsLanDiscovery by setting(ADB_MDNS_LAN_DISCOVERY)
+
+    @Parcelize
+    data class Bundle(
+        val themeBaseIndex: Int,
+        val monet: Boolean,
+        val fullscreenDebugInfo: Boolean,
+        val showFullscreenVirtualButtons: Boolean,
+        val keepScreenOnWhenStreaming: Boolean,
+        val devicePreviewCardHeightDp: Int,
+        val previewVirtualButtonShowText: Boolean,
+        val virtualButtonsLayout: String,
+        val customServerUri: String,
+        val serverRemotePath: String,
+        val adbKeyName: String,
+        val adbPairingAutoDiscoverOnDialogOpen: Boolean,
+        val adbAutoReconnectPairedDevice: Boolean,
+        val adbMdnsLanDiscovery: Boolean,
+    ) : Parcelable {
+    }
+
+    private val bundleFields = arrayOf(
+        bundleField(THEME_BASE_INDEX) { bundle: Bundle -> bundle.themeBaseIndex },
+        bundleField(MONET) { bundle: Bundle -> bundle.monet },
+        bundleField(FULLSCREEN_DEBUG_INFO) { bundle: Bundle -> bundle.fullscreenDebugInfo },
+        bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { bundle: Bundle -> bundle.showFullscreenVirtualButtons },
+        bundleField(KEEP_SCREEN_ON_WHEN_STREAMING) { bundle: Bundle -> bundle.keepScreenOnWhenStreaming },
+        bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { bundle: Bundle -> bundle.devicePreviewCardHeightDp },
+        bundleField(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT) { bundle: Bundle -> bundle.previewVirtualButtonShowText },
+        bundleField(VIRTUAL_BUTTONS_LAYOUT) { bundle: Bundle -> bundle.virtualButtonsLayout },
+        bundleField(CUSTOM_SERVER_URI) { bundle: Bundle -> bundle.customServerUri },
+        bundleField(SERVER_REMOTE_PATH) { bundle: Bundle -> bundle.serverRemotePath },
+        bundleField(ADB_KEY_NAME) { bundle: Bundle -> bundle.adbKeyName },
+        bundleField(ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN) { bundle: Bundle -> bundle.adbPairingAutoDiscoverOnDialogOpen },
+        bundleField(ADB_AUTO_RECONNECT_PAIRED_DEVICE) { bundle: Bundle -> bundle.adbAutoReconnectPairedDevice },
+        bundleField(ADB_MDNS_LAN_DISCOVERY) { bundle: Bundle -> bundle.adbMdnsLanDiscovery },
+    )
+
+    val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)
+
+    private fun bundleFromPreferences(preferences: Preferences) = Bundle(
+        themeBaseIndex = preferences.read(THEME_BASE_INDEX),
+        monet = preferences.read(MONET),
+        fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
+        showFullscreenVirtualButtons = preferences.read(SHOW_FULLSCREEN_VIRTUAL_BUTTONS),
+        keepScreenOnWhenStreaming = preferences.read(KEEP_SCREEN_ON_WHEN_STREAMING),
+        devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
+        previewVirtualButtonShowText = preferences.read(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT),
+        virtualButtonsLayout = preferences.read(VIRTUAL_BUTTONS_LAYOUT),
+        customServerUri = preferences.read(CUSTOM_SERVER_URI),
+        serverRemotePath = preferences.read(SERVER_REMOTE_PATH),
+        adbKeyName = preferences.read(ADB_KEY_NAME),
+        adbPairingAutoDiscoverOnDialogOpen = preferences.read(
+            ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN
+        ),
+        adbAutoReconnectPairedDevice = preferences.read(ADB_AUTO_RECONNECT_PAIRED_DEVICE),
+        adbMdnsLanDiscovery = preferences.read(ADB_MDNS_LAN_DISCOVERY),
+    )
+
+    suspend fun loadBundle() = loadBundle(::bundleFromPreferences)
+
+    suspend fun saveBundle(new: Bundle) = saveBundle(bundleState.value, new, bundleFields)
+
+    suspend fun updateBundle(transform: (Bundle) -> Bundle) {
+        saveBundle(transform(bundleState.value))
+    }
 
     // TODO?
     // fun validate(): Boolean = true
