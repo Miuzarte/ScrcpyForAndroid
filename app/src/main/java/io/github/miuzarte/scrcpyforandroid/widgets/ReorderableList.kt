@@ -78,44 +78,40 @@ class ReorderableList(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small)
                                     ) {
-                                        if (item.icon != null) {
-                                            Icon(
-                                                item.icon,
-                                                contentDescription = item.title
-                                            )
-                                            Spacer(Modifier.padding(horizontal = 4.dp))
-                                        }
+                                        if (item.icon != null) Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = item.title
+                                        )
                                         Column {
                                             Text(
                                                 text = item.title,
                                                 color = MiuixTheme.colorScheme.onSurface,
                                                 fontWeight = FontWeight.SemiBold,
                                             )
-                                            if (item.subtitle.isNotBlank()) {
-                                                Text(
-                                                    text = item.subtitle,
-                                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                                    fontSize = 13.sp,
-                                                )
-                                            }
+                                            if (item.subtitle.isNotBlank()) Text(
+                                                text = item.subtitle,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                fontSize = 13.sp,
+                                            )
                                         }
                                     }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small)
                                     ) {
-                                        if (showCheckbox) {
-                                            Checkbox(
-                                                state = if (item.checked) ToggleableState.On else ToggleableState.Off,
-                                                onClick = {
-                                                    onCheckboxChange?.invoke(item.id, !item.checked)
-                                                },
-                                                enabled = item.checkboxEnabled
-                                            )
-                                            Spacer(Modifier.padding(horizontal = 4.dp))
-                                        }
+                                        if (showCheckbox) Checkbox(
+                                            state = if (item.checked) ToggleableState.On else ToggleableState.Off,
+                                            onClick = {
+                                                onCheckboxChange?.invoke(item.id, !item.checked)
+                                            },
+                                            enabled = item.checkboxEnabled
+                                        )
                                         IconButton(
-                                            onClick = {},
+                                            onClick = {
+                                                haptics.contextClick()
+                                            },
                                             modifier = Modifier
                                                 .draggableHandle(
                                                     onDragStarted = {
@@ -193,7 +189,7 @@ class ReorderableList(
                                             )
                                         }
                                     }
-                                    Spacer(Modifier.padding(UiSpacing.CardContent))
+                                    Spacer(Modifier.padding(UiSpacing.ContentVertical))
                                     Text(
                                         text = item.title,
                                         color = MiuixTheme.colorScheme.onSurface,

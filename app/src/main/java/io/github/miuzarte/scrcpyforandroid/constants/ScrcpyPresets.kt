@@ -58,6 +58,6 @@ fun Preset<Int>.indexOfOrNearest(raw: String): Int {
 object ScrcpyPresets {
     val MaxSize = Preset(listOf(0, 720, 1080, 1280, 1600, 1920, 2160, 2560, 3200, 3840)) // px
     val MaxFPS = Preset(listOf(0, 24, 30, 45, 60, 90, 120)) // fps
-    val AudioBitRate = Preset(listOf(32, 64, 96, 128, 160, 192, 256, 320, 384, 512)) // Kbps
+    val AudioBitRate = Preset(listOf(0, 32, 64, 96, 128, 160, 192, 256, 320, 384, 512)) // Kbps
     val CameraFps = Preset(listOf(0, 10, 15, 24, 30, 60, 120, 240, 480, 960)) // fps
 }

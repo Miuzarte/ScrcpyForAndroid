@@ -11,15 +11,7 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.OrientationLock
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 
-// TODO: 修改配置项时, validate() 判断是否合法, 非法则回退修改
-
-// TODO: 管理冲突配置项的关系, 在更多参数页中隐藏冲突项
-
-// TODO: 禁用配置项验证, 包括不隐藏冲突配置项
-
 // TODO: 配置切换
-
-// TODO: 参数预览框可编辑
 
 data class ClientOptions(
     // var serial: String = "", // to server
@@ -27,7 +19,7 @@ data class ClientOptions(
     // --crop=width:height:x:y
     var crop: String = "", // to server
 
-    // TODO
+    // TODO: implement
     // --record
     var recordFilename: String = "",
 
@@ -236,7 +228,28 @@ data class ClientOptions(
         }
     }
 
-    fun validate() {
+    fun fix(): ClientOptions {
+        when(videoSource) {
+            VideoSource.DISPLAY -> {
+                cameraId = ""
+                cameraFacing = CameraFacing.ANY
+                cameraSize = ""
+                cameraAr = ""
+                cameraFps = 0u
+                cameraHighSpeed = false
+            }
+            VideoSource.CAMERA -> {
+                displayId = 0
+                maxSize = 0u
+                maxFps = ""
+                newDisplay = ""
+                crop = ""
+            }
+        }
+        return this
+    }
+
+    fun validate(): ClientOptions {
         if (!video) {
             videoPlayback = false
             powerOn = false
@@ -494,6 +507,8 @@ data class ClientOptions(
                 )
             }
         }
+
+        return this
     }
 
     fun toServerParams(scid: UInt): ServerParams {

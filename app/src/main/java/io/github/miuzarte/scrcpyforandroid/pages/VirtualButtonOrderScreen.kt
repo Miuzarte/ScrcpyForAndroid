@@ -22,6 +22,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
@@ -67,6 +70,7 @@ internal fun VirtualButtonOrderPage(
     scrollBehavior: ScrollBehavior,
 ) {
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val asBundleShared by appSettings.bundleState.collectAsState()
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
@@ -85,7 +89,7 @@ internal fun VirtualButtonOrderPage(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 appSettings.saveBundle(asBundleLatest)
             }
         }

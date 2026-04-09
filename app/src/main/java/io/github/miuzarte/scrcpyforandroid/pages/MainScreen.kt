@@ -12,9 +12,11 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Devices
@@ -42,16 +44,20 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.ui.NavDisplay
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +67,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 
@@ -84,6 +91,7 @@ fun MainScreen() {
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val activity = remember(context) { context as? Activity }
     val initialOrientation = remember(activity) {
@@ -101,11 +109,14 @@ fun MainScreen() {
     val adbService = remember(appContext) {
         NativeAdbService(appContext)
     }
-    val scrcpy = remember(appContext, adbService) {
-        Scrcpy(appContext, adbService)
-    }
 
     val snackHostState = remember { SnackbarHostState() }
+    val snackbarController = remember(scope, snackHostState) {
+        SnackbarController(
+            scope = scope,
+            hostState = snackHostState,
+        )
+    }
     val saveableStateHolder = rememberSaveableStateHolder()
     val tabs = remember { MainBottomTabDestination.entries }
     val pagerState = rememberPagerState(
@@ -137,6 +148,75 @@ fun MainScreen() {
     // 2) switch tab back to Device
     // 3) double-back to exit and disconnect adb/scrcpy
     var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
+
+    val asBundleShared by appSettings.bundleState.collectAsState()
+    val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
+    var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
+    val asBundleLatest by rememberUpdatedState(asBundle)
+    LaunchedEffect(asBundleShared) {
+        if (asBundle != asBundleShared) {
+            asBundle = asBundleShared
+        }
+    }
+    LaunchedEffect(asBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (asBundle != asBundleSharedLatest) {
+            appSettings.saveBundle(asBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            taskScope.launch {
+                appSettings.saveBundle(asBundleLatest)
+            }
+        }
+    }
+
+    val qdBundleShared by quickDevices.bundleState.collectAsState()
+    val qdBundleSharedLatest by rememberUpdatedState(qdBundleShared)
+    var qdBundle by rememberSaveable(qdBundleShared) { mutableStateOf(qdBundleShared) }
+    val qdBundleLatest by rememberUpdatedState(qdBundle)
+    LaunchedEffect(qdBundleShared) {
+        if (qdBundle != qdBundleShared) {
+            qdBundle = qdBundleShared
+        }
+    }
+    LaunchedEffect(qdBundle) {
+        delay(Settings.BUNDLE_SAVE_DELAY)
+        if (qdBundle != qdBundleSharedLatest) {
+            quickDevices.saveBundle(qdBundle)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            taskScope.launch {
+                quickDevices.saveBundle(qdBundleLatest)
+            }
+        }
+    }
+
+    val customServerUri = asBundle.customServerUri
+        .ifBlank { null }
+    val customServerVersion = asBundle.customServerVersion
+        .ifBlank { Scrcpy.DEFAULT_SERVER_VERSION }
+    val serverRemotePath = asBundle.serverRemotePath
+        .ifBlank { AppSettings.SERVER_REMOTE_PATH.defaultValue }
+    val scrcpy = remember(
+        appContext,
+        adbService,
+        customServerUri,
+        customServerVersion,
+        serverRemotePath,
+    ) {
+        Scrcpy(
+            appContext = appContext,
+            adbService = adbService,
+            customServerUri = customServerUri,
+            serverVersion = customServerVersion,
+            serverRemotePath = serverRemotePath,
+        )
+    }
+
     fun handleBackNavigation() {
         if (rootBackStack.size > 1) {
             popRoot()
@@ -186,74 +266,11 @@ fun MainScreen() {
         }
     }
 
-    val asBundleShared by appSettings.bundleState.collectAsState()
-    val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
-    var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
-    val asBundleLatest by rememberUpdatedState(asBundle)
-    LaunchedEffect(asBundleShared) {
-        if (asBundle != asBundleShared) {
-            asBundle = asBundleShared
-        }
-    }
-    LaunchedEffect(asBundle) {
-        delay(Settings.BUNDLE_SAVE_DELAY)
-        if (asBundle != asBundleSharedLatest) {
-            appSettings.saveBundle(asBundle)
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            scope.launch {
-                appSettings.saveBundle(asBundleLatest)
-            }
-        }
-    }
-
-    val qdBundleShared by quickDevices.bundleState.collectAsState()
-    val qdBundleSharedLatest by rememberUpdatedState(qdBundleShared)
-    var qdBundle by rememberSaveable(qdBundleShared) { mutableStateOf(qdBundleShared) }
-    val qdBundleLatest by rememberUpdatedState(qdBundle)
-    LaunchedEffect(qdBundleShared) {
-        if (qdBundle != qdBundleShared) {
-            qdBundle = qdBundleShared
-        }
-    }
-    LaunchedEffect(qdBundle) {
-        delay(Settings.BUNDLE_SAVE_DELAY)
-        if (qdBundle != qdBundleSharedLatest) {
-            quickDevices.saveBundle(qdBundle)
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            scope.launch {
-                quickDevices.saveBundle(qdBundleLatest)
-            }
-        }
-    }
-
     var sessionStarted by remember { mutableStateOf(false) }
     var showReorderDevices by rememberSaveable { mutableStateOf(false) }
     var fullscreenOrientation by rememberSaveable {
         mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
     }
-
-    var savedShortcuts by remember {
-        mutableStateOf(DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList))
-    }
-
-    LaunchedEffect(qdBundle.quickDevicesList) {
-        savedShortcuts = DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList)
-    }
-    LaunchedEffect(savedShortcuts) {
-        val serialized = savedShortcuts.marshalToString()
-        if (serialized != qdBundle.quickDevicesList) {
-            qdBundle = qdBundle.copy(quickDevicesList = serialized)
-        }
-    }
-
-    val themeMode = resolveThemeMode(asBundle.themeBaseIndex, asBundle.monet)
-    val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
     val keepScreenOnWhenStreamingEnabled = asBundle.keepScreenOnWhenStreaming
     // Keep-screen-on is controlled globally, so fullscreen and preview share the same behavior.
@@ -336,7 +353,7 @@ fun MainScreen() {
                                 nativeCore = nativeCore,
                                 adbService = adbService,
                                 scrcpy = scrcpy,
-                                snack = snackHostState,
+                                snackbar = snackbarController,
                                 scrollBehavior = devicesPageScrollBehavior,
                                 onOpenVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
                                 onSessionStartedChange = { sessionStarted = it },
@@ -357,7 +374,7 @@ fun MainScreen() {
 
                             MainBottomTabDestination.Settings -> SettingsScreen(
                                 scrollBehavior = settingsPageScrollBehavior,
-                                snack = snackHostState,
+                                snackbar = snackbarController,
                                 onOpenReorderDevices = { showReorderDevices = true },
                                 onOpenVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
                                 onPickServer = {
@@ -382,10 +399,10 @@ fun MainScreen() {
         }
 
         entry(RootScreen.Advanced) {
-            AdvancedConfigScreen(
+            ScrcpyAllOptionsScreen(
                 onBack = ::popRoot,
                 scrollBehavior = advancedPageScrollBehavior,
-                snack = snackHostState,
+                snackbar = snackbarController,
                 scrcpy = scrcpy,
             )
         }
@@ -415,6 +432,13 @@ fun MainScreen() {
         backStack = rootBackStack,
         entryProvider = rootEntryProvider,
     )
+
+    val themeMode = when (asBundle.themeBaseIndex.coerceIn(0, ThemeModes.baseOptions.lastIndex)) {
+        1 -> if (!asBundle.monet) ColorSchemeMode.Light else ColorSchemeMode.MonetLight
+        2 -> if (!asBundle.monet) ColorSchemeMode.Dark else ColorSchemeMode.MonetDark
+        else -> if (!asBundle.monet) ColorSchemeMode.System else ColorSchemeMode.MonetSystem
+    }
+    val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
     MiuixTheme(controller = themeController) {
         NavDisplay(

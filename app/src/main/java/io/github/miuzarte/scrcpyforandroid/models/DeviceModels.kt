@@ -38,7 +38,6 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         host: String? = null,
         port: Int? = null,
         name: String? = null,
-        online: Boolean? = null,
         newPort: Int? = null,
         updateNameOnlyWhenEmpty: Boolean = false,
     ): DeviceShortcuts {
@@ -48,6 +47,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
 
         if (idx < 0) return this
         val old = devices[idx]
+        val updateById = id != null
 
         // 确定最终的属性值
         val finalName = when {
@@ -55,23 +55,24 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
             updateNameOnlyWhenEmpty && old.name.isNotBlank() -> old.name
             else -> name
         }
-        val finalPort = newPort ?: old.port
-        val finalOnline = online ?: old.online
+        val finalHost = if (updateById) host ?: old.host else old.host
+        val finalPort = if (updateById) port ?: old.port else newPort ?: old.port
 
         // 若无任何变化，返回原实例
-        if (finalName == old.name && finalPort == old.port && finalOnline == old.online)
+        if (finalName == old.name && finalHost == old.host && finalPort == old.port)
             return this
 
         val newList = devices.toMutableList().apply {
             this[idx] = DeviceShortcut(
                 name = finalName,
-                host = old.host,
+                host = finalHost,
                 port = finalPort,
-                online = finalOnline
             )
         }
         return DeviceShortcuts(
-            if (newPort != null && newPort != old.port)
+            if ((updateById && (finalHost != old.host || finalPort != old.port))
+                || (newPort != null && newPort != old.port)
+            )
                 newList.distinctBy { it.id }
             else newList
         )
@@ -118,7 +119,6 @@ data class DeviceShortcut(
     val name: String = "",
     val host: String,
     val port: Int = Defaults.ADB_PORT,
-    val online: Boolean = false,
 ) {
     val id: String get() = "$host:$port"
 

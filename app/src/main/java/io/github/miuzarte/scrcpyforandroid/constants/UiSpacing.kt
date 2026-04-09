@@ -16,8 +16,10 @@ object UiSpacing {
     val SectionTitleTop = 12.dp
     val SectionTitleBottom = 6.dp
     val FieldLabelBottom = 4.dp
-    val CardContent = 12.dp
+    val Content = 12.dp
+    val ContentVertical = 12.dp
+    val ContentHorizontal = 12.dp
     val CardTitle = 16.dp
-    val BottomContent = 64.dp
-    val BottomSheetBottom = 16.dp
+    val PageBottom = 64.dp
+    val SheetBottom = 16.dp
 }

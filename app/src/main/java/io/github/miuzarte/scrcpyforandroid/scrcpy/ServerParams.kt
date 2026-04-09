@@ -125,7 +125,7 @@ data class ServerParams(
             cmd.add("audio=false")
         }
         if (audioBitRate > 0) {
-            if (audioCodec.isLossyAudio()!!) {
+            if (!audioCodec.isLossless) {
                 // 比官方实现多个判断编解码器类型
                 cmd.add("audio_bit_rate=$audioBitRate")
             }

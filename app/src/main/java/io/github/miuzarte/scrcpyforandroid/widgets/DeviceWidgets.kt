@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,10 +76,13 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
+import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,7 +92,6 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -157,7 +160,7 @@ internal fun StatusCard(
                 ),
                 secondSmall = StatusSmallCardSpec(
                     "编解码器",
-                    sessionInfo.codecName,
+                    sessionInfo.codec?.displayName ?: "null",
                 ),
             )
         }
@@ -295,7 +298,7 @@ internal fun PreviewCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(UiSpacing.CardContent),
+                        .padding(UiSpacing.ContentVertical),
                 ) {
                     Button(
                         onClick = {
@@ -341,7 +344,7 @@ internal fun VirtualButtonCard(
             onAction = onAction,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(UiSpacing.CardContent),
+                .padding(UiSpacing.ContentVertical),
         )
     }
 }
@@ -349,9 +352,10 @@ internal fun VirtualButtonCard(
 @Composable
 internal fun ConfigPanel(
     busy: Boolean,
-    snack: SnackbarHostState,
+    snackbar: SnackbarController,
     audioForwardingSupported: Boolean,
     cameraMirroringSupported: Boolean,
+    adbConnecting: Boolean,
     isQuickConnected: Boolean,
     onOpenAdvanced: () -> Unit,
     onStartStopHaptic: (() -> Unit)? = null,
@@ -360,7 +364,7 @@ internal fun ConfigPanel(
     sessionInfo: Scrcpy.Session.SessionInfo?,
     onDisconnect: () -> Unit = {},
 ) {
-    val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val sessionStarted = sessionInfo != null
 
@@ -381,7 +385,7 @@ internal fun ConfigPanel(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 scrcpyOptions.saveBundle(soBundleLatest)
             }
         }
@@ -405,7 +409,6 @@ internal fun ConfigPanel(
             .coerceAtLeast(0)
     }
 
-    SectionSmallTitle("Scrcpy")
     Card {
         SuperSwitch(
             title = "音频转发",
@@ -425,33 +428,29 @@ internal fun ConfigPanel(
                 val codec = Codec.AUDIO[it]
                 soBundle = soBundle.copy(audioCodec = codec.string)
                 if (codec == Codec.FLAC) {
-                    scope.launch {
-                        snack.showSnackbar("注意：FLAC编解码会引入较大的延迟")
-                    }
+                    snackbar.show("注意：FLAC编解码会引入较大的延迟")
                 }
             },
             enabled = !sessionStarted && soBundle.audio,
         )
         AnimatedVisibility(audioBitRateVisibility) {
-            SuperSlider(
-                title = "音频码率",
-                summary = "--audio-bit-rate",
-                value = if (soBundle.audioBitRate <= 0) 0f
-                else (ScrcpyPresets.AudioBitRate
-                    .indexOfOrNearest(soBundle.audioBitRate / 1000) + 1
-                        ).toFloat(),
-                onValueChange = { value ->
-                    val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.AudioBitRate.size)
-                    soBundle = soBundle.copy(
-                        audioBitRate =
-                            if (idx == 0) 0
-                            else ScrcpyPresets.AudioBitRate[idx - 1] * 1000
-                    )
-                },
-                valueRange = 0f..ScrcpyPresets.AudioBitRate.size.toFloat(),
-                steps = (ScrcpyPresets.AudioBitRate.size - 1).coerceAtLeast(0),
-                unit = "Kbps",
-                zeroStateText = "默认",
+                SuperSlider(
+                    title = "音频码率",
+                    summary = "--audio-bit-rate",
+                    value = ScrcpyPresets.AudioBitRate
+                        .indexOfOrNearest(soBundle.audioBitRate / 1000)
+                        .toFloat(),
+                    onValueChange = { value ->
+                        val idx = value.roundToInt()
+                            .coerceIn(0, ScrcpyPresets.AudioBitRate.lastIndex)
+                        soBundle = soBundle.copy(
+                            audioBitRate = ScrcpyPresets.AudioBitRate[idx] * 1000
+                        )
+                    },
+                    valueRange = 0f..ScrcpyPresets.AudioBitRate.lastIndex.toFloat(),
+                    steps = (ScrcpyPresets.AudioBitRate.size - 2).coerceAtLeast(0),
+                    unit = "Kbps",
+                    zeroStateText = "默认",
                 displayText = (soBundle.audioBitRate / 1_000).toString(),
                 inputInitialValue =
                     if (soBundle.audioBitRate <= 0) ""
@@ -475,9 +474,7 @@ internal fun ConfigPanel(
                 val codec = Codec.VIDEO[it]
                 soBundle = soBundle.copy(videoCodec = codec.string)
                 if (codec == Codec.AV1) {
-                    scope.launch {
-                        snack.showSnackbar("注意：绝大部分设备不支持AV1硬件编码")
-                    }
+                    snackbar.show("注意：绝大部分设备不支持AV1硬件编码")
                 }
             },
             enabled = !sessionStarted,
@@ -528,8 +525,8 @@ internal fun ConfigPanel(
         )
 
         SuperArrow(
-            title = "高级参数",
-            summary = "更多 scrcpy 启动参数",
+            title = "更多参数",
+            summary = "所有 scrcpy 参数",
             onClick = onOpenAdvanced,
             enabled = !sessionStarted,
         )
@@ -537,8 +534,8 @@ internal fun ConfigPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = UiSpacing.CardContent)
-                .padding(bottom = UiSpacing.CardContent),
+                .padding(horizontal = UiSpacing.ContentVertical)
+                .padding(bottom = UiSpacing.ContentVertical),
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
         ) {
             if (isQuickConnected) TextButton(
@@ -601,9 +598,10 @@ private fun PairingDialog(
     var code by rememberSaveable(showDialog) { mutableStateOf("") }
     var discoveringPort by rememberSaveable(showDialog) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     suspend fun doDiscover() {
-        if (onDiscoverTarget == null || discoveringPort || !enabled) return
+        if (!(enabled && onDiscoverTarget != null && !discoveringPort)) return
         discoveringPort = true
         val found = withContext(Dispatchers.IO) { onDiscoverTarget.invoke() }
         if (found != null) {
@@ -619,13 +617,6 @@ private fun PairingDialog(
         }
     }
 
-    fun clearInputs() {
-        host = ""
-        port = ""
-        code = ""
-        discoveringPort = false
-    }
-
     SuperDialog(
         show = showDialog,
         title = "使用配对码配对设备",
@@ -634,80 +625,94 @@ private fun PairingDialog(
             onDismissRequest()
         },
         onDismissFinished = {
-            clearInputs()
             onDismissFinished()
         },
         content = {
-            TextField(
-                value = host,
-                onValueChange = { host = it },
-                label = "IP 地址",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = UiSpacing.CardContent),
-            )
-            TextField(
-                value = port,
-                onValueChange = { port = it.filter(Char::isDigit) },
-                label = "端口",
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = UiSpacing.CardContent),
-            )
-            TextField(
-                value = code,
-                onValueChange = { code = it },
-                label = "WLAN 配对码",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = UiSpacing.CardContent),
-            )
-
-            TextButton(
-                text = if (discoveringPort) "发现中..." else "自动发现",
-                onClick = {
-                    if (onDiscoverTarget == null || discoveringPort || !enabled) return@TextButton
-                    scope.launch {
-                        doDiscover()
-                    }
-                },
-                enabled = enabled && onDiscoverTarget != null && !discoveringPort,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        top = UiSpacing.Medium,
-                        bottom = UiSpacing.CardContent,
+            Column(
+                verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+            ) {
+                TextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = "IP 地址",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Next,
                     ),
-            )
-            Row(
-                modifier = Modifier
-                    .padding(bottom = UiSpacing.PopupHorizontal),
-                horizontalArrangement = Arrangement.spacedBy(UiSpacing.PopupHorizontal),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit) },
+                    label = "端口",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Next,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextField(
+                    value = code,
+                    onValueChange = { code = it },
+                    label = "WLAN 配对码",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() },
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(UiSpacing.ContentVertical * 2))
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
             ) {
                 TextButton(
-                    text = "取消",
+                    text = if (!discoveringPort) "自动发现" else "发现中...",
                     onClick = {
-                        onDismissRequest()
+                        if (enabled && onDiscoverTarget != null && !discoveringPort)
+                            scope.launch { doDiscover() }
                     },
-                    modifier = Modifier.weight(1f),
+                    enabled = enabled && onDiscoverTarget != null && !discoveringPort,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                TextButton(
-                    text = "配对",
-                    onClick = {
-                        onConfirm(host.trim(), port.trim(), code.trim())
-                        onDismissRequest()
-                    },
-                    enabled = enabled &&
-                            host.trim().isNotBlank() &&
-                            port.trim().isNotBlank() &&
-                            code.trim().isNotBlank(),
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
+                ) {
+                    TextButton(
+                        text = "取消",
+                        onClick = {
+                            onDismissRequest()
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = "配对",
+                        onClick = {
+                            onConfirm(host.trim(), port.trim(), code.trim())
+                            onDismissRequest()
+                        },
+                        enabled = enabled &&
+                                host.trim().isNotBlank() &&
+                                port.trim().isNotBlank() &&
+                                code.trim().isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                    )
+                }
             }
         },
     )
@@ -816,9 +821,9 @@ fun FullscreenControlScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = UiSpacing.CardContent, top = UiSpacing.CardContent)
+                    .padding(start = UiSpacing.ContentVertical, top = UiSpacing.ContentVertical)
                     .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(horizontal = UiSpacing.CardContent, vertical = UiSpacing.Medium),
+                    .padding(horizontal = UiSpacing.ContentVertical, vertical = UiSpacing.Medium),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.Tiny)) {
                     Text(
@@ -877,6 +882,7 @@ private fun ScrcpyVideoSurface(
 ) {
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     LaunchedEffect(session, currentSurface) {
         val surface = currentSurface
@@ -889,7 +895,7 @@ private fun ScrcpyVideoSurface(
         onDispose {
             val surface = currentSurface
             if (surface != null) {
-                scope.launch { nativeCore.detachVideoSurface(surface, releaseDecoder = false) }
+                taskScope.launch { nativeCore.detachVideoSurface(surface, releaseDecoder = false) }
             }
         }
     }
@@ -924,7 +930,7 @@ private fun ScrcpyVideoSurface(
                     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
                         val surface = currentSurface
                         if (surface != null) {
-                            scope.launch {
+                            taskScope.launch {
                                 nativeCore.detachVideoSurface(surface, releaseDecoder = false)
                             }
                             surface.release()
@@ -944,48 +950,70 @@ private fun ScrcpyVideoSurface(
 @Composable
 internal fun DeviceTile(
     device: DeviceShortcut,
-    actionText: String,
+    isConnected: Boolean,
     actionEnabled: Boolean,
     actionInProgress: Boolean,
-    onLongPress: () -> Unit,
-    onContentClick: () -> Unit,
+    editing: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onAction: () -> Unit,
+    onEditorSave: (DeviceShortcut) -> Unit,
+    onEditorDelete: () -> Unit,
+    onEditorCancel: () -> Unit,
 ) {
     val haptics = rememberAppHaptics()
+    var name by rememberSaveable(device.id) { mutableStateOf(device.name) }
+    var host by rememberSaveable(device.id) { mutableStateOf(device.host) }
+    var port by rememberSaveable(device.id) { mutableStateOf(device.port.toString()) }
+
+    LaunchedEffect(device) {
+        name = device.name
+        host = device.host
+        port = device.port.toString()
+    }
+
     Card(
         colors = CardDefaults.defaultColors(
-            color = if (device.online) MiuixTheme.colorScheme.surfaceContainer
-            else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+            color =
+                if (isConnected) MiuixTheme.colorScheme.surfaceContainer
+                else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
         ),
-        pressFeedbackType = PressFeedbackType.Sink,
+        pressFeedbackType = if (!editing) PressFeedbackType.Sink else PressFeedbackType.None,
         onClick = haptics.contextClick,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onContentClick,
-                    onLongClick = onLongPress,
+                .then(
+                    if (!isConnected)
+                        Modifier.combinedClickable(
+                            onClick = onClick,
+                            onLongClick = onLongClick,
+                        )
+                    else Modifier
                 )
                 .padding(UiSpacing.PageItem),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(end = UiSpacing.CardContent),
+                    .weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // statu dot
                 Box(
                     modifier = Modifier
                         .size(8.dp)
                         .background(
-                            color = if (device.online) Color(0xFF44C74F) else MiuixTheme.colorScheme.outline,
+                            color =
+                                if (isConnected) Color(0xFF44C74F)
+                                else MiuixTheme.colorScheme.outline,
                             shape = CircleShape,
                         ),
                 )
                 Spacer(modifier = Modifier.width(UiSpacing.PageItem))
-                Column(modifier = Modifier.weight(1f)) {
+                // device name/address
+                Column {
                     Text(
                         device.name.ifBlank { device.host },
                         fontWeight = FontWeight.SemiBold,
@@ -1003,19 +1031,120 @@ internal fun DeviceTile(
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (actionInProgress) {
                     CircularProgressIndicator(progress = null)
                     Spacer(Modifier.width(UiSpacing.Medium))
                 }
                 TextButton(
-                    text = actionText,
+                    text = if (!isConnected) "连接" else "断开",
                     onClick = onAction,
                     enabled = actionEnabled && !actionInProgress,
                 )
             }
+        }
+
+        AnimatedVisibility(editing) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiSpacing.ContentVertical)
+                    .padding(bottom = UiSpacing.ContentVertical),
+                verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical)
+            ) {
+                SuperTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "设备名称",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SuperTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = "IP 地址",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SuperTextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit) },
+                    label = "端口",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+                ) {
+                    TextButton(
+                        text = "取消",
+                        onClick = onEditorCancel,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = "删除",
+                        onClick = onEditorDelete,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = "保存",
+                        onClick = {
+                            val trimmedHost = host.trim()
+                            if (trimmedHost.isNotBlank()) {
+                                onEditorSave(
+                                    DeviceShortcut(
+                                        name = name.trim(),
+                                        host = trimmedHost,
+                                        port = port.toIntOrNull() ?: Defaults.ADB_PORT,
+                                    ),
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DeviceTileList(
+    devices: List<DeviceShortcut>,
+    isConnected: (DeviceShortcut) -> Boolean,
+    actionEnabled: Boolean,
+    actionInProgress: (DeviceShortcut) -> Boolean,
+    editingDeviceId: String?,
+    onClick: (DeviceShortcut) -> Unit,
+    onLongClick: (DeviceShortcut) -> Unit,
+    onAction: (DeviceShortcut) -> Unit,
+    onEditorSave: (DeviceShortcut, DeviceShortcut) -> Unit,
+    onEditorDelete: (DeviceShortcut) -> Unit,
+    onEditorCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+    ) {
+        devices.forEach { device ->
+            DeviceTile(
+                device = device,
+                isConnected = isConnected(device),
+                actionEnabled = actionEnabled,
+                actionInProgress = actionInProgress(device),
+                editing = editingDeviceId == device.id,
+                onClick = { onClick(device) },
+                onLongClick = { onLongClick(device) },
+                onAction = { onAction(device) },
+                onEditorSave = { updated -> onEditorSave(device, updated) },
+                onEditorDelete = { onEditorDelete(device) },
+                onEditorCancel = onEditorCancel,
+            )
         }
     }
 }
@@ -1029,161 +1158,58 @@ internal fun QuickConnectCard(
     onAddDevice: () -> Unit,
     enabled: Boolean = true,
 ) {
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
     Card(
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.primaryContainer),
-        pressFeedbackType = if (enabled) PressFeedbackType.Tilt else PressFeedbackType.None,
+        pressFeedbackType =
+            if (enabled) PressFeedbackType.Tilt
+            else PressFeedbackType.None,
+        insideMargin = PaddingValues(UiSpacing.Content),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = UiSpacing.Large,
-                    end = UiSpacing.Large,
-                    top = UiSpacing.PageItem,
-                    bottom = UiSpacing.Small,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Rounded.AddLink,
-                contentDescription = "快速连接",
-                tint = MiuixTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(modifier = Modifier.width(UiSpacing.Medium))
-            Text(
-                "快速连接",
-                fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        SuperTextField(
-            value = input,
-            onValueChange = onValueChange,
-            label = "IP:PORT",
-            enabled = enabled,
-            useLabelAsPlaceholder = true,
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = UiSpacing.CardContent)
-                .padding(bottom = UiSpacing.SectionTitleLeadingGap),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            onFocusLost = onFocusChange,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = UiSpacing.CardContent)
-                .padding(bottom = UiSpacing.CardContent),
-            horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
-        ) {
-            TextButton(
-                text = "添加设备",
-                onClick = onAddDevice,
-                modifier = Modifier.weight(1f),
-                enabled = enabled,
-            )
-            TextButton(
-                text = "连接",
-                onClick = onConnect,
-                modifier = Modifier.weight(1f),
-                enabled = enabled,
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun DeviceEditorScreen(
-    contentPadding: PaddingValues,
-    device: DeviceShortcut,
-    onSave: (DeviceShortcut) -> Unit,
-    onDelete: () -> Unit,
-    onBack: () -> Unit,
-) {
-    var name by rememberSaveable(device.id) { mutableStateOf(device.name) }
-    var host by rememberSaveable(device.id) { mutableStateOf(device.host) }
-    var port by rememberSaveable(device.id) { mutableStateOf(device.port.toString()) }
-
-    BackHandler(enabled = true, onBack = onBack)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .padding(UiSpacing.PageHorizontal),
-    ) {
-        SectionSmallTitle("编辑设备")
-        Card {
-            TextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "设备名称",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
-            TextField(
-                value = host,
-                onValueChange = { host = it },
-                label = "IP 地址",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
-            TextField(
-                value = port,
-                onValueChange = { port = it.filter(Char::isDigit) },
-                label = "端口",
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(UiSpacing.CardContent),
+                modifier = Modifier.padding(horizontal = UiSpacing.Small),
                 horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
             ) {
+                Icon(
+                    Icons.Rounded.AddLink,
+                    contentDescription = "快速连接",
+                    tint = MiuixTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    "快速连接",
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            SuperTextField(
+                value = input,
+                onValueChange = onValueChange,
+                label = "IP:PORT",
+                enabled = enabled,
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                onFocusLost = onFocusChange,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
+            ) {
                 TextButton(
-                    text = "返回",
-                    onClick = onBack,
+                    text = "添加设备",
+                    onClick = onAddDevice,
                     modifier = Modifier.weight(1f),
+                    enabled = enabled,
                 )
                 TextButton(
-                    text = "删除",
-                    onClick = onDelete,
+                    text = "连接",
+                    onClick = onConnect,
                     modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    text = "保存",
-                    onClick = {
-                        val p = port.toIntOrNull() ?: Defaults.ADB_PORT
-                        val h = host.trim()
-                        if (h.isNotBlank()) {
-                            onSave(
-                                DeviceShortcut(
-                                    name = name.trim(),
-                                    host = h,
-                                    port = p,
-                                    online = device.online,
-                                ),
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
             }

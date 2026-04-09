@@ -302,7 +302,7 @@ class VirtualButtonBar(
                             action.icon,
                             contentDescription = action.title,
                             modifier = Modifier
-                                .padding(end = UiSpacing.CardContent),
+                                .padding(end = UiSpacing.ContentVertical),
                         )
                     },
                     title = action.title,

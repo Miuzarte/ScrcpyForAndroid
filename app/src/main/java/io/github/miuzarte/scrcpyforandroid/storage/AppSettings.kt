@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 
@@ -47,9 +48,13 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             stringPreferencesKey("custom_server_uri"),
             ""
         )
+        val CUSTOM_SERVER_VERSION = Pair(
+            stringPreferencesKey("custom_server_version"),
+            ""
+        )
         val SERVER_REMOTE_PATH = Pair(
             stringPreferencesKey("server_remote_path"),
-            "/data/local/tmp/scrcpy-server.jar"
+            Scrcpy.DEFAULT_REMOTE_PATH,
         )
         val ADB_KEY_NAME = Pair(
             stringPreferencesKey("adb_key_name"),
@@ -83,6 +88,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
 
     // Scrcpy Server Settings
     val customServerUri by setting(CUSTOM_SERVER_URI)
+    val customServerVersion by setting(CUSTOM_SERVER_VERSION)
     val serverRemotePath by setting(SERVER_REMOTE_PATH)
 
     // ADB Settings
@@ -102,6 +108,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val previewVirtualButtonShowText: Boolean,
         val virtualButtonsLayout: String,
         val customServerUri: String,
+        val customServerVersion: String,
         val serverRemotePath: String,
         val adbKeyName: String,
         val adbPairingAutoDiscoverOnDialogOpen: Boolean,
@@ -120,6 +127,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT) { bundle: Bundle -> bundle.previewVirtualButtonShowText },
         bundleField(VIRTUAL_BUTTONS_LAYOUT) { bundle: Bundle -> bundle.virtualButtonsLayout },
         bundleField(CUSTOM_SERVER_URI) { bundle: Bundle -> bundle.customServerUri },
+        bundleField(CUSTOM_SERVER_VERSION) { bundle: Bundle -> bundle.customServerVersion },
         bundleField(SERVER_REMOTE_PATH) { bundle: Bundle -> bundle.serverRemotePath },
         bundleField(ADB_KEY_NAME) { bundle: Bundle -> bundle.adbKeyName },
         bundleField(ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN) { bundle: Bundle -> bundle.adbPairingAutoDiscoverOnDialogOpen },
@@ -139,6 +147,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         previewVirtualButtonShowText = preferences.read(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT),
         virtualButtonsLayout = preferences.read(VIRTUAL_BUTTONS_LAYOUT),
         customServerUri = preferences.read(CUSTOM_SERVER_URI),
+        customServerVersion = preferences.read(CUSTOM_SERVER_VERSION),
         serverRemotePath = preferences.read(SERVER_REMOTE_PATH),
         adbKeyName = preferences.read(ADB_KEY_NAME),
         adbPairingAutoDiscoverOnDialogOpen = preferences.read(

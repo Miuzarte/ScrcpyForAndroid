@@ -19,6 +19,9 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.extra.SuperBottomSheet
@@ -29,6 +32,7 @@ fun ReorderDevicesScreen(
     onDismissRequest: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val qdBundleShared by quickDevices.bundleState.collectAsState()
     val qdBundleSharedLatest by rememberUpdatedState(qdBundleShared)
@@ -47,7 +51,7 @@ fun ReorderDevicesScreen(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 quickDevices.saveBundle(qdBundleLatest)
             }
         }
@@ -85,6 +89,6 @@ fun ReorderDevicesScreen(
                 savedShortcuts = savedShortcuts.move(fromIndex, toIndex)
             },
         ).invoke()
-        Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
+        Spacer(Modifier.height(UiSpacing.SheetBottom))
     }
 }

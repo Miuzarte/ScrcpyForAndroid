@@ -10,6 +10,9 @@ import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.nativecore.ScrcpyAudioPlayer
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.EncoderType
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +52,7 @@ class Scrcpy(
     private val adbService: NativeAdbService,
     private val serverAsset: String = DEFAULT_SERVER_ASSET,
     private val customServerUri: String? = null,
-    private val serverVersion: String = "3.3.4",
+    private val serverVersion: String = DEFAULT_SERVER_VERSION,
     private val serverRemotePath: String = DEFAULT_REMOTE_PATH,
 ) {
     private val session = Session(adbService)
@@ -64,36 +67,29 @@ class Scrcpy(
     @Volatile
     private var audioPlayer: ScrcpyAudioPlayer? = null
 
-    // Cached encoder and camera size data
-    private val _videoEncoders = mutableListOf<String>()
-    private val _audioEncoders = mutableListOf<String>()
-    private val _videoEncoderTypes = mutableMapOf<String, String>()
-    private val _audioEncoderTypes = mutableMapOf<String, String>()
-    private val _cameraSizes = mutableListOf<String>()
-
-    val videoEncoders: List<String> get() = _videoEncoders.toList()
-    val audioEncoders: List<String> get() = _audioEncoders.toList()
-    val videoEncoderTypes: Map<String, String> get() = _videoEncoderTypes.toMap()
-    val audioEncoderTypes: Map<String, String> get() = _audioEncoderTypes.toMap()
-    val cameraSizes: List<String> get() = _cameraSizes.toList()
+    val listings = Listings()
 
     companion object {
         private const val TAG = "Scrcpy"
-        const val DEFAULT_REMOTE_PATH = "/data/local/tmp/scrcpy-server.jar"
+
         const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v3.3.4"
+        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v3.3.4"
+        const val DEFAULT_SERVER_VERSION = "3.3.4"
+        const val DEFAULT_REMOTE_PATH = "/data/local/tmp/scrcpy-server.jar"
 
         // Regex patterns for parsing server output
-        private val VIDEO_ENCODER_REGEX = Regex("--video-encoder=([\\w.\\-]+)")
-        private val AUDIO_ENCODER_REGEX = Regex("--audio-encoder=([\\w.\\-]+)")
-        private val VIDEO_ENCODER_FALLBACK_REGEX = Regex("""--video-encoder=['"]?([^'"\s]+)""")
-        private val AUDIO_ENCODER_FALLBACK_REGEX = Regex("""--audio-encoder=['"]?([^'"\s]+)""")
-        private val VIDEO_ENCODER_TYPE_REGEX =
-            Regex("""--video-codec=\S+\s+--video-encoder=(\S+).*?\((hw|sw)\)""")
-        private val AUDIO_ENCODER_TYPE_REGEX =
-            Regex("""--audio-codec=\S+\s+--audio-encoder=(\S+).*?\((hw|sw)\)""")
-        private val CAMERA_SIZE_REGEX = Regex("--camera-size=([0-9]+x[0-9]+)")
-        private val CAMERA_SIZE_FALLBACK_REGEX = Regex("\\b([1-9][0-9]{1,4}x[1-9][0-9]{1,4})\\b")
-        private const val PREVIEW_LINES = 32
+        private val VIDEO_ENCODER_INFO_REGEX =
+            Regex("""--video-codec=(\S+)\s+--video-encoder=(\S+)\s+\((hw|sw)\)(\s+\[vendor])?(?:\s+\(alias for (\S+)\))?""")
+        private val AUDIO_ENCODER_INFO_REGEX =
+            Regex("""--audio-codec=(\S+)\s+--audio-encoder=(\S+)\s+\((hw|sw)\)(\s+\[vendor])?(?:\s+\(alias for (\S+)\))?""")
+        private val DISPLAY_REGEX =
+            Regex("""--display-id=(\d+)\s+\((\d+)x(\d+)\)""")
+        private val CAMERA_SIZE_REGEX =
+            Regex("""\b([1-9][0-9]{1,4}x[1-9][0-9]{1,4})\b""")
+        private val CAMERA_INFO_REGEX =
+            Regex("""--camera-id=(\S+)\s+\(([^,]+),\s*([0-9]+x[0-9]+),\s*fps=\[([0-9,\s]+)\]\)""")
+        private val APP_REGEX =
+            Regex("""^\s*([*-])\s+(.+?)\s{2,}([A-Za-z0-9._]+)\s*$""", RegexOption.MULTILINE)
 
         fun generateScid(): UInt {
             // Only use 31 bits to avoid issues with signed values on the Java-side
@@ -169,7 +165,7 @@ class Scrcpy(
 
             Log.i(
                 TAG, "start(): Session started successfully - device=${info.deviceName}, " +
-                        "video=${if (options.video) "${info.codecName} ${info.width}x${info.height}" else "off"}, " +
+                        "video=${if (options.video) "${info.codec?.string ?: "null"} ${info.width}x${info.height}" else "off"}, " +
                         "audio=${if (options.audio) options.audioCodec.string else "off"}, " +
                         "control=${options.control}"
             )
@@ -218,8 +214,6 @@ class Scrcpy(
 
     fun getCurrentSession(): Session.SessionInfo? = currentSession
 
-    fun getLastServerCommand(): String? = session.getLastServerCommand()
-
     sealed class ListResult {
         data class Encoders(
             val videoEncoders: List<String>,
@@ -229,67 +223,176 @@ class Scrcpy(
             val rawOutput: String = "",
         ) : ListResult()
 
+        data class Displays(
+            val displays: List<DisplayInfo>,
+            val rawOutput: String = "",
+        ) : ListResult()
+
+        data class Cameras(
+            val cameras: List<CameraInfo>,
+            val rawOutput: String = "",
+        ) : ListResult()
+
         data class CameraSizes(
             val sizes: List<String>,
             val rawOutput: String = "",
         ) : ListResult()
+
+        data class Apps(
+            val apps: List<AppInfo>,
+            val rawOutput: String = "",
+        ) : ListResult()
     }
 
-    /**
-     * Refresh encoder lists from the device.
-     * Results are cached and can be accessed via videoEncoders, audioEncoders, etc.
-     * 
-     * @throws Exception if the operation fails
-     */
-    suspend fun refreshEncoders() {
-        val result = listOptions(ListOptions.ENCODERS) as ListResult.Encoders
-        _videoEncoders.clear()
-        _videoEncoders.addAll(result.videoEncoders)
-        _audioEncoders.clear()
-        _audioEncoders.addAll(result.audioEncoders)
-        _videoEncoderTypes.clear()
-        _videoEncoderTypes.putAll(result.videoEncoderTypes)
-        _audioEncoderTypes.clear()
-        _audioEncoderTypes.putAll(result.audioEncoderTypes)
+    inner class Listings {
+        private val encodersMutex = Mutex()
+        private val displaysMutex = Mutex()
+        private val camerasMutex = Mutex()
+        private val cameraSizesMutex = Mutex()
+        private val appsMutex = Mutex()
 
-        Log.i(TAG, "refreshEncoders(): video=${_videoEncoders.size}, audio=${_audioEncoders.size}")
+        @Volatile
+        private var cachedVideoEncoders: List<EncoderInfo>? = null
+
+        @Volatile
+        private var cachedAudioEncoders: List<EncoderInfo>? = null
+
+        @Volatile
+        private var cachedDisplays: List<DisplayInfo>? = null
+
+        @Volatile
+        private var cachedCameras: List<CameraInfo>? = null
+
+        @Volatile
+        private var cachedCameraSizes: List<String>? = null
+
+        @Volatile
+        private var cachedApps: List<AppInfo>? = null
+
+        val videoEncoders: List<EncoderInfo> get() = cachedVideoEncoders.orEmpty()
+        val audioEncoders: List<EncoderInfo> get() = cachedAudioEncoders.orEmpty()
+        val displays: List<DisplayInfo> get() = cachedDisplays.orEmpty()
+        val cameras: List<CameraInfo> get() = cachedCameras.orEmpty()
+        val cameraSizes: List<String> get() = cachedCameraSizes.orEmpty()
+        val apps: List<AppInfo> get() = cachedApps.orEmpty()
+
+        suspend fun getVideoEncoders(forceRefresh: Boolean = false): List<EncoderInfo> {
+            cachedVideoEncoders?.takeUnless { forceRefresh }?.let { return it }
+            return getEncoders(forceRefresh).first
+        }
+
+        suspend fun getAudioEncoders(forceRefresh: Boolean = false): List<EncoderInfo> {
+            cachedAudioEncoders?.takeUnless { forceRefresh }?.let { return it }
+            return getEncoders(forceRefresh).second
+        }
+
+        private suspend fun getEncoders(forceRefresh: Boolean = false)
+                : Pair<List<EncoderInfo>, List<EncoderInfo>> {
+            if (!forceRefresh && cachedVideoEncoders != null && cachedAudioEncoders != null)
+                return cachedVideoEncoders.orEmpty() to cachedAudioEncoders.orEmpty()
+
+            return encodersMutex.withLock {
+                if (!forceRefresh && cachedVideoEncoders != null && cachedAudioEncoders != null)
+                    return@withLock cachedVideoEncoders.orEmpty() to cachedAudioEncoders.orEmpty()
+
+                val output = executeList(ListOptions.ENCODERS)
+                val (video, audio) = parseEncoders(output)
+                cachedVideoEncoders = video
+                cachedAudioEncoders = audio
+                logListPreview(
+                    list = ListOptions.ENCODERS,
+                    countSummary = "video=${video.size} audio=${audio.size}",
+                    output = output,
+                )
+                video to audio
+            }
+        }
+
+        suspend fun getDisplays(forceRefresh: Boolean = false): List<DisplayInfo> {
+            cachedDisplays?.takeUnless { forceRefresh }?.let { return it }
+            return displaysMutex.withLock {
+                cachedDisplays?.takeUnless { forceRefresh } ?: run {
+                    val output = executeList(ListOptions.DISPLAYS)
+                    val parsed = parseDisplays(output)
+                    cachedDisplays = parsed
+                    logListPreview(
+                        list = ListOptions.DISPLAYS,
+                        countSummary = "displays=${parsed.size}",
+                        output = output,
+                    )
+                    parsed
+                }
+            }
+        }
+
+        suspend fun getCameras(forceRefresh: Boolean = false): List<CameraInfo> {
+            cachedCameras?.takeUnless { forceRefresh }?.let { return it }
+            return camerasMutex.withLock {
+                cachedCameras?.takeUnless { forceRefresh } ?: run {
+                    val output = executeList(ListOptions.CAMERAS)
+                    val parsed = parseCameras(output)
+                    cachedCameras = parsed
+                    logListPreview(
+                        list = ListOptions.CAMERAS,
+                        countSummary = "cameras=${parsed.size}",
+                        output = output,
+                    )
+                    parsed
+                }
+            }
+        }
+
+        suspend fun getCameraSizes(forceRefresh: Boolean = false): List<String> {
+            cachedCameraSizes?.takeUnless { forceRefresh }?.let { return it }
+            return cameraSizesMutex.withLock {
+                cachedCameraSizes?.takeUnless { forceRefresh } ?: run {
+                    val output = executeList(ListOptions.CAMERA_SIZES)
+                    val parsed = parseCameraSizes(output)
+                        .sortedWith(compareByDescending { size ->
+                            size.substringBefore('x').toIntOrNull() ?: 0
+                        })
+                    cachedCameraSizes = parsed
+                    logListPreview(
+                        list = ListOptions.CAMERA_SIZES,
+                        countSummary = "sizes=${parsed.size}",
+                        output = output,
+                    )
+                    parsed
+                }
+            }
+        }
+
+        suspend fun getApps(forceRefresh: Boolean = false): List<AppInfo> {
+            cachedApps?.takeUnless { forceRefresh }?.let { return it }
+            return appsMutex.withLock {
+                cachedApps?.takeUnless { forceRefresh } ?: run {
+                    val output = executeList(ListOptions.APPS)
+                    val parsed = parseApps(output)
+                    cachedApps = parsed
+                    logListPreview(
+                        list = ListOptions.APPS,
+                        countSummary = "apps=${parsed.size}",
+                        output = output,
+                    )
+                    parsed
+                }
+            }
+        }
+
     }
 
-    /**
-     * Refresh camera sizes from the device.
-     * Results are cached and can be accessed via cameraSizes.
-     * 
-     * @throws Exception if the operation fails
-     */
-    suspend fun refreshCameraSizes() {
-        val result = listOptions(ListOptions.CAMERA_SIZES) as ListResult.CameraSizes
-        _cameraSizes.clear()
-        _cameraSizes.addAll(result.sizes.sortedWith(compareByDescending { size ->
-            size.substringBefore('x').toIntOrNull() ?: 0
-        }))
+    private suspend fun executeList(list: ListOptions): String = withContext(Dispatchers.IO) {
+        require(list != ListOptions.NULL) { "Nothing to do with ListOptions.NULL" }
 
-        Log.i(TAG, "refreshCameraSizes(): sizes=${_cameraSizes.size}")
-    }
-
-    /**
-     * List various options from the scrcpy server.
-     * 
-     * @param list The type of list to retrieve (ENCODERS, CAMERA_SIZES, etc.)
-     * @return ListResult containing the requested information
-     */
-    suspend fun listOptions(list: ListOptions): ListResult = withContext(Dispatchers.IO) {
         val serverJar = if (customServerUri.isNullOrBlank()) {
             extractAssetToCache(serverAsset)
         } else {
             extractUriToCache(customServerUri.toUri())
         }
 
-        // Push server jar to device
         adbService.push(serverJar.toPath(), serverRemotePath)
 
         val scid = generateScid()
-
-        // Create ClientOptions for listing
         val options = ClientOptions(
             video = false,
             audio = false,
@@ -297,10 +400,7 @@ class Scrcpy(
             cleanUp = false,
             list = list,
         )
-
         val serverParams = options.toServerParams(scid)
-
-        // Build server command
         val serverCommand = serverParams.build(
             "CLASSPATH=$serverRemotePath",
             "app_process",
@@ -310,121 +410,133 @@ class Scrcpy(
         )
 
         Log.i(TAG, "listOptions(): cmd=$serverCommand")
-
-        // Execute shell command and capture output (merge stderr into stdout)
-        val output = adbService.shell("$serverCommand 2>&1")
-
-        // Parse output based on list option
-        return@withContext when (list) {
-            ListOptions.NULL -> {
-                throw IllegalArgumentException("Nothing to do with ListOptions.NULL")
-            }
-
-            ListOptions.ENCODERS -> {
-                val parsed = parseEncoderLists(output)
-                val preview = output.lineSequence().take(PREVIEW_LINES).joinToString("\n")
-                Log.i(
-                    TAG,
-                    "listOptions(ENCODERS): parsed video=${parsed.videoEncoders.size} audio=${parsed.audioEncoders.size}, outputPreview=\n$preview",
-                )
-                ListResult.Encoders(
-                    videoEncoders = parsed.videoEncoders,
-                    audioEncoders = parsed.audioEncoders,
-                    videoEncoderTypes = parsed.videoEncoderTypes,
-                    audioEncoderTypes = parsed.audioEncoderTypes,
-                    rawOutput = output,
-                )
-            }
-
-            ListOptions.DISPLAYS -> {
-                throw Exception("TODO")
-            }
-
-            ListOptions.CAMERAS -> {
-                throw Exception("TODO")
-            }
-
-            ListOptions.CAMERA_SIZES -> {
-                val parsed = parseCameraSizeLists(output)
-                val preview = output.lineSequence().take(PREVIEW_LINES).joinToString("\n")
-                Log.i(
-                    TAG,
-                    "listOptions(CAMERA_SIZES): parsed sizes=${parsed.sizes.size}, outputPreview=\n$preview",
-                )
-                ListResult.CameraSizes(
-                    sizes = parsed.sizes,
-                    rawOutput = output,
-                )
-            }
-
-            else -> {
-                throw IllegalArgumentException("Unsupported list option: $list")
-            }
-        }
+        adbService.shell("$serverCommand 2>&1")
     }
 
-    private fun parseEncoderLists(output: String): ParsedEncoders {
-        val video = LinkedHashSet<String>()
-        val audio = LinkedHashSet<String>()
-        val videoTypes = linkedMapOf<String, String>()
-        val audioTypes = linkedMapOf<String, String>()
-
-        VIDEO_ENCODER_REGEX.findAll(output).forEach { match ->
-            video.add(match.groupValues[1])
-        }
-        AUDIO_ENCODER_REGEX.findAll(output).forEach { match ->
-            audio.add(match.groupValues[1])
-        }
-        // Fallback for log formats that include codec+encoder in one line.
-        VIDEO_ENCODER_FALLBACK_REGEX.findAll(output).forEach { match ->
-            video.add(match.groupValues[1])
-        }
-        AUDIO_ENCODER_FALLBACK_REGEX.findAll(output).forEach { match ->
-            audio.add(match.groupValues[1])
-        }
-        VIDEO_ENCODER_TYPE_REGEX.findAll(output).forEach { match ->
-            val name = match.groupValues[1]
-            val type = match.groupValues[2]
-            if (name.isNotBlank() && type.isNotBlank() && !videoTypes.containsKey(name)) {
-                videoTypes[name] = type
-            }
-        }
-        AUDIO_ENCODER_TYPE_REGEX.findAll(output).forEach { match ->
-            val name = match.groupValues[1]
-            val type = match.groupValues[2]
-            if (name.isNotBlank() && type.isNotBlank() && !audioTypes.containsKey(name)) {
-                audioTypes[name] = type
-            }
-        }
-
-        return ParsedEncoders(
-            videoEncoders = video.toList(),
-            audioEncoders = audio.toList(),
-            videoEncoderTypes = videoTypes,
-            audioEncoderTypes = audioTypes,
-        )
+    private fun logListPreview(list: ListOptions, countSummary: String, output: String) {
+        val preview = output.lineSequence().take(32).joinToString("\n")
+        Log.i(TAG, "listOptions($list): parsed $countSummary, outputPreview=\n$preview")
     }
 
-    private fun parseCameraSizeLists(output: String): ParsedCameraSizes {
+    private fun parseEncoders(output: String): Pair<List<EncoderInfo>, List<EncoderInfo>> {
+        val videoInfos = linkedMapOf<String, EncoderInfo>()
+        val audioInfos = linkedMapOf<String, EncoderInfo>()
+
+        VIDEO_ENCODER_INFO_REGEX.findAll(output).forEach { match ->
+            val info = EncoderInfo(
+                codec = Codec.fromString(match.groupValues[1], Codec.Type.VIDEO),
+                id = match.groupValues[2],
+                type = if (match.groupValues[3] == EncoderType.HARDWARE.s) {
+                    EncoderType.HARDWARE
+                } else {
+                    EncoderType.SOFTWARE
+                },
+                isVendor = match.groupValues[4].isNotBlank(),
+                aliasOf = match.groupValues[5].ifBlank { null },
+            )
+            videoInfos.putIfAbsent(info.id, info)
+        }
+
+        AUDIO_ENCODER_INFO_REGEX.findAll(output).forEach { match ->
+            val info = EncoderInfo(
+                codec = Codec.fromString(match.groupValues[1], Codec.Type.AUDIO),
+                id = match.groupValues[2],
+                type = if (match.groupValues[3] == EncoderType.HARDWARE.s) {
+                    EncoderType.HARDWARE
+                } else {
+                    EncoderType.SOFTWARE
+                },
+                isVendor = match.groupValues[4].isNotBlank(),
+                aliasOf = match.groupValues[5].ifBlank { null },
+            )
+            audioInfos.putIfAbsent(info.id, info)
+        }
+
+        return videoInfos.values.toList() to audioInfos.values.toList()
+    }
+
+    private fun parseDisplays(output: String): List<DisplayInfo> {
+        val displays = LinkedHashSet<DisplayInfo>()
+        DISPLAY_REGEX.findAll(output).forEach { match ->
+            displays.add(
+                DisplayInfo(
+                    id = match.groupValues[1].toInt(),
+                    width = match.groupValues[2].toInt(),
+                    height = match.groupValues[3].toInt(),
+                )
+            )
+        }
+        return displays.toList()
+    }
+
+    private fun parseCameras(output: String): List<CameraInfo> {
+        val cameras = LinkedHashSet<CameraInfo>()
+        CAMERA_INFO_REGEX.findAll(output).forEach { match ->
+            val facing = match.groupValues[2]
+            val activeSize = match.groupValues[3]
+            val fpsValues = match.groupValues[4]
+                .split(',')
+                .mapNotNull { it.trim().toIntOrNull() }
+
+            cameras.add(
+                CameraInfo(
+                    id = match.groupValues[1],
+                    facing = CameraFacing.fromString(facing),
+                    activeSize = activeSize,
+                    fps = fpsValues.map(Int::toUShort),
+                )
+            )
+        }
+        return cameras.toList()
+    }
+
+    private fun parseCameraSizes(output: String): List<String> {
         val sizes = LinkedHashSet<String>()
         CAMERA_SIZE_REGEX.findAll(output).forEach { match ->
             sizes.add(match.groupValues[1])
         }
-        CAMERA_SIZE_FALLBACK_REGEX.findAll(output).forEach { match ->
-            sizes.add(match.groupValues[1])
-        }
-        return ParsedCameraSizes(sizes = sizes.toList())
+        return sizes.toList()
     }
 
-    private data class ParsedEncoders(
-        val videoEncoders: List<String>,
-        val audioEncoders: List<String>,
-        val videoEncoderTypes: Map<String, String>,
-        val audioEncoderTypes: Map<String, String>,
+    private fun parseApps(output: String): List<AppInfo> {
+        val apps = LinkedHashSet<AppInfo>()
+        APP_REGEX.findAll(output).forEach { match ->
+            apps.add(
+                AppInfo(
+                    system = match.groupValues[1] == "*",
+                    label = match.groupValues[2].trim(),
+                    packageName = match.groupValues[3].trim(),
+                )
+            )
+        }
+        return apps.toList()
+    }
+
+    data class EncoderInfo(
+        val codec: Codec,
+        val id: String,
+        val type: EncoderType,
+        val isVendor: Boolean,
+        val aliasOf: String? = null,
     )
 
-    private data class ParsedCameraSizes(
-        val sizes: List<String>,
+    data class CameraInfo(
+        val id: String,
+        val facing: CameraFacing,
+        val activeSize: String,
+        val fps: List<UShort>,
+    )
+
+    data class DisplayInfo(
+        val id: Int,
+        val width: Int,
+        val height: Int,
+    )
+
+    data class AppInfo(
+        val system: Boolean,
+        val label: String,
+        val packageName: String,
     )
 
     private suspend fun executeServer(
@@ -502,8 +614,6 @@ class Scrcpy(
         @Volatile
         private var audioReaderThread: Thread? = null
 
-        @Volatile
-        private var lastServerCommand: String? = null
         private val serverLogBuffer = ArrayDeque<String>()
 
         suspend fun start(
@@ -516,7 +626,6 @@ class Scrcpy(
             val socketName = socketNameFor(scid.toInt())
 
             try {
-                lastServerCommand = serverCommand
                 val serverStream = adbService.openShellStream(serverCommand)
                 val serverLogThread = startServerLogThread(serverStream, socketName)
                 Thread.sleep(SERVER_BOOT_DELAY_MS)
@@ -567,27 +676,58 @@ class Scrcpy(
                 }
 
                 val deviceName = readDeviceName(firstInput)
-                val audioCodecId =
-                    if (options.audio) audioCodecIdFromName(options.audioCodec.string)
-                    else 0
-                val codecId: Int
+                val audioCodecId = if (options.audio) {
+                    val aInput = checkNotNull(audioInput)
+                    when (val streamCodecId = aInput.readInt()) {
+                        AUDIO_DISABLED -> {
+                            Log.w(TAG, "audio disabled by server")
+                            if (options.requireAudio) {
+                                throw IllegalStateException(
+                                    "Audio is required but was disabled by the server"
+                                )
+                            }
+                            0
+                        }
+
+                        AUDIO_ERROR -> {
+                            Log.e(TAG, "audio stream configuration error from server")
+                            if (options.requireAudio) {
+                                throw IllegalStateException(
+                                    "Audio is required but the server failed to configure audio capture"
+                                )
+                            }
+                            0
+                        }
+
+                        else -> {
+                            Log.i(
+                                TAG,
+                                "audio stream codec=0x${streamCodecId.toUInt().toString(16)}"
+                            )
+                            streamCodecId
+                        }
+                    }
+                } else {
+                    0
+                }
+                val videoCodecId: Int
                 val width: Int
                 val height: Int
                 if (options.video) {
                     val vInput = checkNotNull(videoInput)
-                    codecId = vInput.readInt()
+                    videoCodecId = vInput.readInt()
                     width = vInput.readInt()
                     height = vInput.readInt()
                 } else {
-                    codecId = 0
+                    videoCodecId = 0
                     width = 0
                     height = 0
                 }
 
                 val sessionInfo = SessionInfo(
                     deviceName = deviceName,
-                    codecId = codecId,
-                    codecName = codecName(codecId),
+                    codecId = videoCodecId,
+                    codec = Codec.fromId(videoCodecId, Codec.Type.VIDEO),
                     width = width,
                     height = height,
                     audioCodecId = audioCodecId,
@@ -669,9 +809,7 @@ class Scrcpy(
             }
         }
 
-        suspend fun clearVideoConsumer() = mutex.withLock {
-            videoConsumer = null
-        }
+        suspend fun clearVideoConsumer() = mutex.withLock { videoConsumer = null }
 
         suspend fun attachAudioConsumer(consumer: (AudioPacket) -> Unit): Unit = mutex.withLock {
             val session = activeSession ?: throw IllegalStateException("scrcpy session not started")
@@ -682,31 +820,6 @@ class Scrcpy(
 
             audioReaderThread = thread(start = true, name = "scrcpy-audio-reader") {
                 try {
-                    val streamCodecId = try {
-                        aInput.readInt()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "audio codec header read failed", e)
-                        return@thread
-                    }
-                    when (streamCodecId) {
-                        AUDIO_DISABLED -> {
-                            Log.w(TAG, "audio disabled by server")
-                            return@thread
-                        }
-
-                        AUDIO_ERROR -> {
-                            Log.e(TAG, "audio stream configuration error from server")
-                            return@thread
-                        }
-
-                        else -> {
-                            Log.i(
-                                TAG,
-                                "audio stream codec=0x${streamCodecId.toUInt().toString(16)}"
-                            )
-                        }
-                    }
-
                     while (activeSession === session && !aStream.closed) {
                         try {
                             val ptsAndFlags = aInput.readLong()
@@ -742,18 +855,20 @@ class Scrcpy(
             }
         }
 
-        suspend fun clearAudioConsumer() = mutex.withLock {
-            audioConsumer = null
-        }
+        suspend fun clearAudioConsumer() = mutex.withLock { audioConsumer = null }
 
-        suspend fun injectKeycode(action: Int, keycode: Int, repeat: Int = 0, metaState: Int = 0) =
-            mutex.withLock {
-                try {
-                    requireControlWriter().injectKeycode(action, keycode, repeat, metaState)
-                } catch (e: IllegalStateException) {
-                    Log.w(TAG, "injectKeycode(): control channel not available", e)
-                }
+        suspend fun injectKeycode(
+            action: Int,
+            keycode: Int,
+            repeat: Int = 0,
+            metaState: Int = 0,
+        ) = mutex.withLock {
+            try {
+                requireControlWriter().injectKeycode(action, keycode, repeat, metaState)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "injectKeycode(): control channel not available", e)
             }
+        }
 
         suspend fun injectText(text: String) = mutex.withLock {
             try {
@@ -798,7 +913,7 @@ class Scrcpy(
             screenHeight: Int,
             hScroll: Float,
             vScroll: Float,
-            buttons: Int
+            buttons: Int,
         ) = mutex.withLock {
             try {
                 requireControlWriter().injectScroll(
@@ -815,9 +930,9 @@ class Scrcpy(
             }
         }
 
-        suspend fun pressBackOrScreenOn(action: Int = KeyEvent.ACTION_DOWN) = mutex.withLock {
+        suspend fun pressBackOrTurnScreenOn(action: Int = KeyEvent.ACTION_DOWN) = mutex.withLock {
             try {
-                requireControlWriter().pressBackOrScreenOn(action)
+                requireControlWriter().pressBackOrTurnScreenOn(action)
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "pressBackOrScreenOn(): control channel not available", e)
             }
@@ -864,8 +979,6 @@ class Scrcpy(
         }
 
         fun isStarted(): Boolean = activeSession != null
-
-        fun getLastServerCommand(): String? = lastServerCommand
 
         private fun requireControlWriter(): ControlWriter {
             val session = activeSession
@@ -948,27 +1061,10 @@ class Scrcpy(
             return buffer.copyOf(length).toString(Charsets.UTF_8)
         }
 
-        private fun codecName(codecId: Int) =
-            when (codecId) {
-                VIDEO_CODEC_H264 -> "h264"
-                VIDEO_CODEC_H265 -> "h265"
-                VIDEO_CODEC_AV1 -> "av1"
-                else -> "unknown"
-            }
-
-        private fun audioCodecIdFromName(name: String) =
-            when (name.lowercase()) {
-                "opus" -> AUDIO_CODEC_OPUS
-                "aac" -> AUDIO_CODEC_AAC
-                "raw" -> AUDIO_CODEC_RAW
-                "flac" -> AUDIO_CODEC_FLAC
-                else -> 0
-            }
-
         data class SessionInfo(
             val deviceName: String,
             val codecId: Int,
-            val codecName: String,
+            val codec: Codec?,
             val width: Int,
             val height: Int,
             val audioCodecId: Int = 0,
@@ -1100,7 +1196,7 @@ class Scrcpy(
             }
 
             @Synchronized
-            fun pressBackOrScreenOn(action: Int) {
+            fun pressBackOrTurnScreenOn(action: Int) {
                 output.writeByte(TYPE_BACK_OR_SCREEN_ON)
                 output.writeByte(action)
                 output.flush()
@@ -1150,14 +1246,6 @@ class Scrcpy(
             private const val PACKET_FLAG_CONFIG = 1L shl 63
             private const val PACKET_FLAG_KEY_FRAME = 1L shl 62
             private const val PACKET_PTS_MASK = (1L shl 62) - 1
-
-            private const val VIDEO_CODEC_H264 = 0x68323634
-            private const val VIDEO_CODEC_H265 = 0x68323635
-            private const val VIDEO_CODEC_AV1 = 0x00617631
-            private const val AUDIO_CODEC_OPUS = 0x6f707573
-            private const val AUDIO_CODEC_AAC = 0x00616163
-            private const val AUDIO_CODEC_FLAC = 0x666c6163
-            private const val AUDIO_CODEC_RAW = 0x00726177
 
             private const val AUDIO_DISABLED = 0
             private const val AUDIO_ERROR = 1

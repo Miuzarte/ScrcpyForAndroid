@@ -9,6 +9,7 @@ import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -42,9 +43,9 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
                 }"
             )
             when (codecId) {
-                AUDIO_CODEC_OPUS -> prepareOpus(data)
-                AUDIO_CODEC_AAC -> prepareAac(data)
-                AUDIO_CODEC_FLAC -> prepareFlac(data)
+                Codec.OPUS.id -> prepareOpus(data)
+                Codec.AAC.id -> prepareAac(data)
+                Codec.FLAC.id -> prepareFlac(data)
                 // RAW has no config packet
             }
             return
@@ -55,7 +56,7 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
             Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
         }
 
-        if (codecId == AUDIO_CODEC_RAW) {
+        if (codecId == Codec.RAW.id) {
             ensureRawAudioTrack()?.write(data, 0, data.size, AudioTrack.WRITE_NON_BLOCKING)
             return
         }
@@ -212,10 +213,6 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
 
     companion object {
         private const val TAG = "ScrcpyAudioPlayer"
-        const val AUDIO_CODEC_OPUS = 0x6f707573
-        const val AUDIO_CODEC_AAC = 0x00616163
-        const val AUDIO_CODEC_FLAC = 0x666c6163
-        const val AUDIO_CODEC_RAW = 0x00726177
         private const val SAMPLE_RATE = 48000
         private const val CHANNELS = 2
         private const val CODEC_TIMEOUT_US = 10_000L

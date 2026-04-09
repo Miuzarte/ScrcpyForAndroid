@@ -32,7 +32,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,6 +55,7 @@ fun FullscreenControlScreen(
 
     val haptics = rememberAppHaptics()
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val activity = remember(context) { context as? Activity }
 
@@ -73,7 +76,7 @@ fun FullscreenControlScreen(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 appSettings.saveBundle(asBundleLatest)
             }
         }

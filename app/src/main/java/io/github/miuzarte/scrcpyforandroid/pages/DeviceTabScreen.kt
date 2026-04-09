@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
@@ -34,16 +33,17 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
+import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
-import io.github.miuzarte.scrcpyforandroid.widgets.DeviceEditorScreen
-import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTile
+import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTileList
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
 import io.github.miuzarte.scrcpyforandroid.widgets.PreviewCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
@@ -52,7 +52,9 @@ import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonCard
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -67,7 +69,6 @@ import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -88,7 +89,7 @@ fun DeviceTabScreen(
     nativeCore: NativeCoreFacade,
     adbService: NativeAdbService,
     scrcpy: Scrcpy,
-    snack: SnackbarHostState,
+    snackbar: SnackbarController,
     scrollBehavior: ScrollBehavior,
     onOpenVirtualButtonOrder: () -> Unit,
     onSessionStartedChange: (Boolean) -> Unit,
@@ -139,7 +140,7 @@ fun DeviceTabScreen(
             nativeCore = nativeCore,
             adbService = adbService,
             scrcpy = scrcpy,
-            snack = snack,
+            snackbar = snackbar,
             scrollBehavior = scrollBehavior,
             onSessionStartedChange = onSessionStartedChange,
             onOpenAdvancedPage = onOpenAdvancedPage,
@@ -154,13 +155,14 @@ fun DeviceTabPage(
     nativeCore: NativeCoreFacade,
     adbService: NativeAdbService,
     scrcpy: Scrcpy,
-    snack: SnackbarHostState,
+    snackbar: SnackbarController,
     scrollBehavior: ScrollBehavior,
     onSessionStartedChange: (Boolean) -> Unit,
     onOpenAdvancedPage: () -> Unit,
     onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val taskScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
     val haptics = rememberAppHaptics()
 
     val asBundleShared by appSettings.bundleState.collectAsState()
@@ -180,7 +182,7 @@ fun DeviceTabPage(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 appSettings.saveBundle(asBundleLatest)
             }
         }
@@ -203,7 +205,7 @@ fun DeviceTabPage(
     }
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch {
+            taskScope.launch {
                 quickDevices.saveBundle(qdBundleLatest)
             }
         }
@@ -225,7 +227,7 @@ fun DeviceTabPage(
     var sessionInfoWidth by rememberSaveable { mutableIntStateOf(0) }
     var sessionInfoHeight by rememberSaveable { mutableIntStateOf(0) }
     var sessionInfoDeviceName by rememberSaveable { mutableStateOf("") }
-    var sessionInfoCodec by rememberSaveable { mutableStateOf("") }
+    var sessionInfoCodec by rememberSaveable { mutableStateOf<Codec?>(null) }
     var sessionInfoControlEnabled by rememberSaveable { mutableStateOf(false) }
     var sessionInfo by remember {
         mutableStateOf<Scrcpy.Session.SessionInfo?>(null)
@@ -243,7 +245,7 @@ fun DeviceTabPage(
                 height = sessionInfoHeight,
                 deviceName = sessionInfoDeviceName,
                 codecId = 0,
-                codecName = sessionInfoCodec,
+                codec = sessionInfoCodec,
                 audioCodecId = 0,
                 controlEnabled = sessionInfoControlEnabled,
                 host = currentTargetHost,
@@ -254,7 +256,7 @@ fun DeviceTabPage(
         }
     }
     var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
-    var editingDevice by rememberSaveable { mutableStateOf<DeviceShortcut?>(null) }
+    var editingDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
     var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
 
@@ -287,6 +289,9 @@ fun DeviceTabPage(
         if (serialized != qdBundle.quickDevicesList) {
             qdBundle = qdBundle.copy(quickDevicesList = serialized)
         }
+    }
+    val editingDevice = remember(savedShortcuts, editingDeviceId) {
+        editingDeviceId?.let(savedShortcuts::get)
     }
 
     /**
@@ -330,14 +335,12 @@ fun DeviceTabPage(
         clearQuickOnlineForTarget?.let { target ->
             if (target.host.isNotBlank())
                 savedShortcuts = savedShortcuts.update(
-                    host = target.host, port = target.port, online = false
+                    host = target.host, port = target.port
                 )
         }
         logMessage?.let { logEvent(it) }
         if (!showSnackMessage.isNullOrBlank()) {
-            scope.launch {
-                snack.showSnackbar(showSnackMessage)
-            }
+            snackbar.show(showSnackMessage)
         }
     }
 
@@ -447,7 +450,7 @@ fun DeviceTabPage(
     fun runBusy(label: String, onFinished: (() -> Unit)? = null, block: suspend () -> Unit) {
         // For non-adb actions (start/stop/pair/list refresh...).
         if (busy) return
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        taskScope.launch {
             busy = true
             try {
                 block()
@@ -456,9 +459,7 @@ fun DeviceTabPage(
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 参数错误: $detail", Log.WARN, e)
-                scope.launch {
-                    snack.showSnackbar("$label 参数错误: $detail")
-                }
+                snackbar.show("$label 参数错误: $detail")
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 失败: $detail", Log.ERROR, e)
@@ -489,7 +490,7 @@ fun DeviceTabPage(
     ) {
         // For manual adb operations from user actions.
         if (adbConnecting) return
-        scope.launch {
+        taskScope.launch {
             onStarted?.invoke()
             adbConnecting = true
             try {
@@ -499,9 +500,7 @@ fun DeviceTabPage(
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 参数错误: $detail", Log.WARN, e)
-                scope.launch {
-                    snack.showSnackbar("$label 参数错误: $detail")
-                }
+                snackbar.show("$label 参数错误: $detail")
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 logEvent("$label 失败: $detail", Log.ERROR, e)
@@ -521,57 +520,6 @@ fun DeviceTabPage(
         }
     }
 
-    suspend fun refreshEncoderLists() {
-        if (!adbConnected) return
-        runCatching {
-            scrcpy.refreshEncoders()
-        }.onSuccess {
-            // Validate current selections
-            if (soBundleShared.videoEncoder.isNotBlank() && soBundleShared.videoEncoder !in scrcpy.videoEncoders) {
-                scrcpyOptions.updateBundle { it.copy(videoEncoder = "") }
-            }
-            if (soBundleShared.audioEncoder.isNotBlank() && soBundleShared.audioEncoder !in scrcpy.audioEncoders) {
-                scrcpyOptions.updateBundle { it.copy(audioEncoder = "") }
-            }
-            logEvent("编码器列表已刷新: video=${scrcpy.videoEncoders.size} audio=${scrcpy.audioEncoders.size}")
-            if (scrcpy.videoEncoders.isEmpty() && scrcpy.audioEncoders.isEmpty()) {
-                logEvent(
-                    "提示: 编码器为空，请检查 server 路径/版本与设备系统日志",
-                    Log.WARN
-                )
-            }
-        }.onFailure { e ->
-            logEvent(
-                "读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}",
-                Log.ERROR,
-                e
-            )
-        }
-    }
-
-    suspend fun refreshCameraSizeLists() {
-        if (!adbConnected) return
-        runCatching {
-            scrcpy.refreshCameraSizes()
-        }.onSuccess {
-            // Validate current selection
-            if (
-                soBundleShared.cameraSize.isNotBlank()
-                && soBundleShared.cameraSize != "custom"
-                && soBundleShared.cameraSize !in scrcpy.cameraSizes
-            ) {
-                scrcpyOptions.updateBundle { it.copy(cameraSize = "") }
-            }
-            logEvent("camera sizes 已刷新: count=${scrcpy.cameraSizes.size}")
-        }.onFailure { e ->
-            logEvent(
-                "读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}",
-                Log.ERROR,
-                e
-            )
-        }
-    }
-
     suspend fun handleAdbConnected(host: String, port: Int) {
         currentTargetHost = host
         currentTargetPort = port
@@ -586,8 +534,7 @@ fun DeviceTabPage(
         connectedDeviceLabel = info.model
         applyConnectedDeviceCapabilities(info.sdkInt, info.androidRelease)
         savedShortcuts = savedShortcuts.update(
-            host = host,
-            port = port,
+            host = host, port = port,
             name = fullLabel,
             updateNameOnlyWhenEmpty = true
         )
@@ -603,26 +550,7 @@ fun DeviceTabPage(
                     "android=${info.androidRelease.ifBlank { "unknown" }}, " +
                     "sdk=${info.sdkInt}"
         )
-        scope.launch {
-            snack.showSnackbar("ADB 已连接")
-        }
-        refreshEncoderLists()
-        refreshCameraSizeLists()
-    }
-
-    LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort, savedShortcuts.size) {
-        val activeId = if (adbConnected && currentTargetHost.isNotBlank()) {
-            "$currentTargetHost:$currentTargetPort"
-        } else {
-            null
-        }
-        for (index in savedShortcuts.indices) {
-            val item = savedShortcuts[index]
-            val shouldOnline = activeId != null && item.id == activeId
-            if (item.online != shouldOnline) {
-                savedShortcuts = savedShortcuts.update(id = item.id, online = shouldOnline)
-            }
-        }
+        snackbar.show("ADB 已连接")
     }
 
     LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort) {
@@ -643,16 +571,12 @@ fun DeviceTabPage(
                 adbConnected = true
                 statusLine = "$host:$port"
                 logEvent("ADB 自动重连成功: $host:$port")
-                scope.launch {
-                    snack.showSnackbar("ADB 自动重连成功")
-                }
+                snackbar.show("ADB 自动重连成功")
             } catch (e: Exception) {
                 disconnectAdbConnection()
                 statusLine = "ADB 连接断开"
                 logEvent("ADB 自动重连失败: $e", Log.ERROR)
-                scope.launch {
-                    snack.showSnackbar("ADB 自动重连失败")
-                }
+                snackbar.show("ADB 自动重连失败")
                 break
             }
         }
@@ -690,9 +614,7 @@ fun DeviceTabPage(
                         runAutoAdbConnect(target.host, target.port)
                         adbConnected = true
                         savedShortcuts = savedShortcuts.update(
-                            host = target.host,
-                            port = target.port,
-                            online = true
+                            host = target.host, port = target.port,
                         )
                         handleAdbConnected(target.host, target.port)
                         logEvent("ADB 快速探测连接成功: ${target.host}:${target.port}")
@@ -732,10 +654,8 @@ fun DeviceTabPage(
             }?.port
             if (portToReplace != null) {
                 savedShortcuts = savedShortcuts.update(
-                    host = discoveredHost,
-                    port = portToReplace,
+                    host = discoveredHost, port = portToReplace,
                     newPort = discoveredPort,
-                    online = false
                 )
                 logEvent(
                     "mDNS 发现新端口，已更新快速设备: $discoveredHost:$portToReplace -> $discoveredHost:$discoveredPort"
@@ -751,9 +671,7 @@ fun DeviceTabPage(
                 runAutoAdbConnect(discoveredHost, discoveredPort)
                 adbConnected = true
                 savedShortcuts = savedShortcuts.update(
-                    host = discoveredHost,
-                    port = discoveredPort,
-                    online = true
+                    host = discoveredHost, port = discoveredPort,
                 )
                 handleAdbConnected(discoveredHost, discoveredPort)
                 logEvent("ADB 自动重连成功: $discoveredHost:$discoveredPort")
@@ -779,13 +697,13 @@ fun DeviceTabPage(
             sessionInfoWidth = sessionInfo?.width ?: 0
             sessionInfoHeight = sessionInfo?.height ?: 0
             sessionInfoDeviceName = sessionInfo?.deviceName.orEmpty()
-            sessionInfoCodec = sessionInfo?.codecName.orEmpty()
+            sessionInfoCodec = sessionInfo?.codec
             sessionInfoControlEnabled = sessionInfo?.controlEnabled == true
         } else {
             sessionInfoWidth = 0
             sessionInfoHeight = 0
             sessionInfoDeviceName = ""
-            sessionInfoCodec = ""
+            sessionInfoCodec = null
             sessionInfoControlEnabled = false
         }
         onSessionStartedChange(sessionInfo != null)
@@ -797,28 +715,6 @@ fun DeviceTabPage(
             nativeCore.session?.injectKeycode(0, keycode)
             nativeCore.session?.injectKeycode(1, keycode)
         }
-    }
-
-    if (editingDevice != null) {
-        DeviceEditorScreen(
-            contentPadding = contentPadding,
-            device = editingDevice!!,
-            onSave = { updated ->
-                savedShortcuts = savedShortcuts.update(
-                    id = editingDevice!!.id,
-                    host = updated.host,
-                    port = updated.port,
-                    online = updated.online,
-                )
-                editingDevice = null
-            },
-            onDelete = {
-                savedShortcuts = savedShortcuts.remove(id = editingDevice!!.id)
-                editingDevice = null
-            },
-            onBack = { editingDevice = null },
-        )
-        return
     }
 
     val devicePreviewCardHeightDp = asBundle.devicePreviewCardHeightDp
@@ -843,27 +739,38 @@ fun DeviceTabPage(
             )
         }
 
-        itemsIndexed(savedShortcuts, key = { _, device -> device.id }) { _, device ->
-            val host = device.host
-            val port = device.port
-            val isConnectedTarget = adbConnected
-                    && currentTarget?.host == host
-                    && currentTarget.port == port
-
-            DeviceTile(
-                device = device,
-                actionText = if (!isConnectedTarget) "连接" else "断开",
+        item {
+            DeviceTileList(
+                devices = savedShortcuts,
+                isConnected = { device ->
+                    adbConnected
+                            && currentTarget?.host == device.host
+                            && currentTarget.port == device.port
+                },
                 actionEnabled = !busy && !adbConnecting,
-                actionInProgress = adbConnecting && activeDeviceActionId == device.id,
-                onLongPress = { editingDevice = device },
-                onContentClick = {
-                    scope.launch {
-                        snack.showSnackbar("长按可编辑设备")
+                actionInProgress = { device ->
+                    adbConnecting && activeDeviceActionId == device.id
+                },
+                editingDeviceId = editingDeviceId,
+                onClick = {},
+                onLongClick = { device ->
+                    val connected = adbConnected
+                            && currentTarget?.host == device.host
+                            && currentTarget.port == device.port
+                    if (connected) {
+                        snackbar.show("无法修改已连接的设备")
+                    } else {
+                        editingDeviceId = device.id
                     }
                 },
-                onAction = {
+                onAction = { device ->
                     haptics.contextClick()
-                    if (!isConnectedTarget) {
+                    val host = device.host
+                    val port = device.port
+                    val connected = adbConnected
+                            && currentTarget?.host == host
+                            && currentTarget.port == port
+                    if (!connected) {
                         runAdbConnect(
                             "连接 ADB",
                             onStarted = { activeDeviceActionId = device.id },
@@ -873,17 +780,15 @@ fun DeviceTabPage(
                             try {
                                 connectWithTimeout(host, port)
                                 adbConnected = true
-                                isQuickConnected = false // 标记为快速设备连接
+                                isQuickConnected = false
                                 savedShortcuts = savedShortcuts.update(
-                                    host = host, port = port, online = true
+                                    host = host, port = port,
                                 )
                                 handleAdbConnected(host, port)
                             } catch (e: Exception) {
                                 statusLine = "ADB 连接失败"
                                 logEvent("ADB 连接失败: $e", Log.ERROR)
-                                scope.launch {
-                                    snack.showSnackbar("ADB 连接失败")
-                                }
+                                snackbar.show("ADB 连接失败")
                             }
                         }
                     } else {
@@ -902,105 +807,118 @@ fun DeviceTabPage(
                         }
                     }
                 },
+                onEditorSave = { device, updated ->
+                    savedShortcuts = savedShortcuts.update(
+                        id = device.id,
+                        name = updated.name,
+                        host = updated.host,
+                        port = updated.port,
+                    )
+                    editingDeviceId = null
+                },
+                onEditorDelete = { device ->
+                    savedShortcuts = savedShortcuts.remove(id = device.id)
+                    editingDeviceId = null
+                },
+                onEditorCancel = { editingDeviceId = null },
             )
         }
 
-        if (!adbConnected) item {
+        if (!adbConnected) {
             // "快速连接"
-            QuickConnectCard(
-                input = qdBundle.quickConnectInput,
-                onValueChange = {
-                    qdBundle = qdBundle.copy(quickConnectInput = it)
-                },
-                enabled = !adbConnecting,
-                onAddDevice = {
-                    val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
-                        ?: return@QuickConnectCard
-                    savedShortcuts = savedShortcuts.upsert(
-                        DeviceShortcut(host = target.host, port = target.port)
-                    )
-                    Log.d(
-                        "SavedShortcuts",
-                        "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
-                    )
-                    scope.launch {
-                        snack.showSnackbar("已添加设备: ${target.host}:${target.port}")
-                    }
-                },
-                onConnect = {
-                    val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
-                        ?: return@QuickConnectCard
-                    runAdbConnect(
-                        "连接 ADB",
-                        onStarted = { activeDeviceActionId = target.toString() },
-                        onFinished = { activeDeviceActionId = null },
-                    ) {
-                        disconnectCurrentTargetBeforeConnecting(target.host, target.port)
-                        try {
-                            connectWithTimeout(target.host, target.port)
-                            adbConnected = true
-                            isQuickConnected = true // 标记为快速连接
-                            savedShortcuts = savedShortcuts.update(
-                                host = target.host,
-                                port = target.port,
-                                online = true
-                            )
-                            handleAdbConnected(target.host, target.port)
-                        } catch (e: Exception) {
-                            statusLine = "ADB 连接失败"
-                            logEvent("ADB 连接失败: $e", Log.ERROR)
-                            scope.launch {
-                                snack.showSnackbar("ADB 连接失败")
+            item {
+                QuickConnectCard(
+                    input = qdBundle.quickConnectInput,
+                    onValueChange = {
+                        qdBundle = qdBundle.copy(quickConnectInput = it)
+                    },
+                    enabled = !adbConnecting,
+                    onAddDevice = {
+                        val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
+                            ?: return@QuickConnectCard
+                        savedShortcuts = savedShortcuts.upsert(
+                            DeviceShortcut(host = target.host, port = target.port)
+                        )
+                        Log.d(
+                            "SavedShortcuts",
+                            "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
+                        )
+                        snackbar.show("已添加设备: ${target.host}:${target.port}")
+                    },
+                    onConnect = {
+                        val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
+                            ?: return@QuickConnectCard
+                        runAdbConnect(
+                            "连接 ADB",
+                            onStarted = { activeDeviceActionId = target.toString() },
+                            onFinished = { activeDeviceActionId = null },
+                        ) {
+                            disconnectCurrentTargetBeforeConnecting(target.host, target.port)
+                            try {
+                                connectWithTimeout(target.host, target.port)
+                                adbConnected = true
+                                isQuickConnected = true // 标记为快速连接
+                                savedShortcuts = savedShortcuts.update(
+                                    host = target.host, port = target.port,
+                                )
+                                handleAdbConnected(target.host, target.port)
+                            } catch (e: Exception) {
+                                statusLine = "ADB 连接失败"
+                                logEvent("ADB 连接失败: $e", Log.ERROR)
+                                snackbar.show("ADB 连接失败")
                             }
                         }
-                    }
-                },
-            )
-            SectionSmallTitle("无线配对")
-            // "使用配对码配对设备"
-            PairingCard(
-                busy = busy,
-                autoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
-                onDiscoverTarget = {
-                    adbService.discoverPairingService(
-                        includeLanDevices = adbMdnsLanDiscovery,
-                    )
-                },
-                onPair = { host, port, code ->
-                    runBusy("执行配对") {
-                        val resolvedHost = host.trim()
-                        val resolvedPort = port.trim().toIntOrNull() ?: return@runBusy
-                        val resolvedCode = code.trim()
-                        val ok = adbService.pair(
-                            resolvedHost,
-                            resolvedPort,
-                            resolvedCode,
+                    },
+                )
+            }
+
+            item {
+                SectionSmallTitle("无线配对", showLeadingSpacer = false)
+                // "使用配对码配对设备"
+                PairingCard(
+                    busy = busy,
+                    autoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
+                    onDiscoverTarget = {
+                        adbService.discoverPairingService(
+                            includeLanDevices = adbMdnsLanDiscovery,
                         )
-                        logEvent(
-                            if (ok) "配对成功" else "配对失败",
-                            if (ok) Log.INFO else Log.ERROR
-                        )
-                        scope.launch {
-                            snack.showSnackbar(if (ok) "配对成功" else "配对失败")
+                    },
+                    onPair = { host, port, code ->
+                        runBusy("执行配对") {
+                            val resolvedHost = host.trim()
+                            val resolvedPort = port.trim().toIntOrNull() ?: return@runBusy
+                            val resolvedCode = code.trim()
+                            val ok = adbService.pair(
+                                resolvedHost,
+                                resolvedPort,
+                                resolvedCode,
+                            )
+                            logEvent(
+                                if (ok) "配对成功" else "配对失败",
+                                if (ok) Log.INFO else Log.ERROR
+                            )
+                            snackbar.show(if (ok) "配对成功" else "配对失败")
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
 
         if (adbConnected) {
             item {
+                SectionSmallTitle("Scrcpy", showLeadingSpacer = false)
                 ConfigPanel(
                     busy = busy,
-                    snack = snack,
+                    snackbar = snackbar,
                     audioForwardingSupported = audioForwardingSupported,
                     cameraMirroringSupported = cameraMirroringSupported,
+                    adbConnecting = adbConnecting,
                     isQuickConnected = isQuickConnected,
                     onOpenAdvanced = onOpenAdvancedPage,
                     onStartStopHaptic = { haptics.contextClick() },
                     onStart = {
                         runBusy("启动 scrcpy") {
-                            val options = scrcpyOptions.toClientOptions(soBundleShared)
+                            val options = scrcpyOptions.toClientOptions(soBundleShared).fix()
                             val session = scrcpy.start(options)
                             sessionInfo = session.copy(
                                 host = currentTargetHost,
@@ -1010,8 +928,8 @@ fun DeviceTabPage(
                             @SuppressLint("DefaultLocale")
                             val videoDetail =
                                 if (!options.video) "off"
-                                else if (videoBitRate <= 0) "${session.codecName} ${session.width}x${session.height} @default"
-                                else "${session.codecName} ${session.width}x${session.height} " +
+                                else if (videoBitRate <= 0) "${session.codec?.string ?: "null"} ${session.width}x${session.height} @default"
+                                else "${session.codec?.string ?: "null"} ${session.width}x${session.height} " +
                                         "@${String.format("%.1f", videoBitRate / 1_000_000f)}Mbps"
 
                             val audioDetail =
@@ -1025,9 +943,7 @@ fun DeviceTabPage(
                                         ", control=${options.control}, turnScreenOff=${options.turnScreenOff}" +
                                         ", maxSize=${options.maxSize}, maxFps=${options.maxFps}"
                             )
-                            scope.launch {
-                                snack.showSnackbar("scrcpy 已启动")
-                            }
+                            snackbar.show("scrcpy 已启动")
                         }
                     },
                     onStop = {
@@ -1036,9 +952,7 @@ fun DeviceTabPage(
                             sessionInfo = null
                             statusLine = "${currentTarget!!.host}:${currentTarget.port}"
                             logEvent("scrcpy 已停止")
-                            scope.launch {
-                                snack.showSnackbar("scrcpy 已停止")
-                            }
+                            snackbar.show("scrcpy 已停止")
                         }
                     },
                     sessionInfo = sessionInfo,
@@ -1094,19 +1008,21 @@ fun DeviceTabPage(
             }
         }
 
-        if (EventLogger.hasLogs()) item {
-            Spacer(Modifier.height(UiSpacing.PageItem))
-            Card {
-                TextField(
-                    value = EventLogger.eventLog.joinToString(separator = "\n"),
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        if (EventLogger.hasLogs()) {
+            item {
+                SectionSmallTitle("日志", showLeadingSpacer = false)
+                Card {
+                    TextField(
+                        value = EventLogger.eventLog.joinToString(separator = "\n"),
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
 
-        item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+        item { Spacer(Modifier.height(UiSpacing.PageBottom)) }
     }
 }
 
@@ -1131,20 +1047,20 @@ private fun DeviceMenuPopup(
                 text = "快速设备排序",
                 optionSize = 3,
                 index = 0,
-                onClick = onReorderDevices,
+                onSelectedIndexChange = { onReorderDevices() },
             )
             DeviceMenuPopupItem(
                 text = "虚拟按钮排序",
                 optionSize = 3,
                 index = 1,
-                onClick = onOpenVirtualButtonOrder,
+                onSelectedIndexChange = { onOpenVirtualButtonOrder() },
             )
             DeviceMenuPopupItem(
                 text = "清空日志",
                 optionSize = 3,
                 index = 2,
                 enabled = canClearLogs,
-                onClick = onClearLogs,
+                onSelectedIndexChange = { onClearLogs() },
             )
         }
     }
@@ -1156,8 +1072,7 @@ private fun DeviceMenuPopupItem(
     optionSize: Int,
     index: Int,
     enabled: Boolean = true,
-    // TODO: (Int) -> Unit
-    onClick: () -> Unit,
+    onSelectedIndexChange: (Int) -> Unit,
 ) {
     if (enabled) {
         DropdownImpl(
@@ -1165,7 +1080,7 @@ private fun DeviceMenuPopupItem(
             optionSize = optionSize,
             isSelected = false,
             index = index,
-            onSelectedIndexChange = { onClick() },
+            onSelectedIndexChange = onSelectedIndexChange,
         )
         return
     }

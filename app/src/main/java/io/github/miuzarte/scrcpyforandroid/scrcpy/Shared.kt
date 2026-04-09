@@ -38,7 +38,6 @@ class Shared {
         fun Duration.toTick(): Tick = Tick(this.inWholeMicroseconds)
     }
 
-
     enum class ListOptions(val value: Int) {
         NULL(0x0),
         ENCODERS(0x1),     // --list-encoders
@@ -52,6 +51,11 @@ class Shared {
         infix fun has(other: ListOptions) = this and other != 0
     }
 
+    enum class EncoderType(val s: String) {
+        HARDWARE("hw"),
+        SOFTWARE("sw"),
+    }
+
     enum class LogLevel(val string: String) {
         VERBOSE("verbose"),
         DEBUG("debug"),
@@ -60,26 +64,27 @@ class Shared {
         ERROR("error");
     }
 
-    enum class Codec(val string: String, val displayName: String) {
-        H264("h264", "H.264"), // default, ignore when passing
-        H265("h265", "H.265"),
-        AV1("av1", "AV1"),
-        OPUS("opus", "Opus"), // default, ignore when passing
-        AAC("aac", "AAC"),
-        FLAC("flac", "FLAC"),
-        RAW("raw", "RAW"); // wav raw
+    enum class Codec(
+        val string: String,
+        val displayName: String,
+        val type: Type,
+        val id: Int,
+        val isLossless: Boolean,
+    ) {
+        H264("h264", "H.264", Type.VIDEO, 0x68323634, false), // default, ignore when passing
+        H265("h265", "H.265", Type.VIDEO, 0x68323635, false),
+        AV1("av1", "AV1", Type.VIDEO, 0x00617631, false),
 
-        fun isLossyAudio(): Boolean? = when (this) {
-            OPUS, AAC -> true
-            FLAC, RAW -> false
-            else -> null
-        }
+        OPUS("opus", "Opus", Type.AUDIO, 0x6f707573, false), // default, ignore when passing
+        AAC("aac", "AAC", Type.AUDIO, 0x00616163, false),
+        FLAC("flac", "FLAC", Type.AUDIO, 0x666c6163, true),
+        RAW("raw", "RAW", Type.AUDIO, 0x00726177, true); // wav raw
 
         enum class Type { VIDEO, AUDIO }
 
         companion object {
-            val VIDEO = listOf(H264, H265, AV1)
-            val AUDIO = listOf(OPUS, AAC, FLAC, RAW)
+            val VIDEO = entries.filter { it.type == Type.VIDEO }
+            val AUDIO = entries.filter { it.type == Type.AUDIO }
 
             fun fromString(value: String, type: Type = Type.VIDEO) =
                 entries.find { it.string.equals(value, ignoreCase = true) }
@@ -87,6 +92,9 @@ class Shared {
                         Type.VIDEO -> H264
                         Type.AUDIO -> OPUS
                     }
+
+            fun fromId(value: Int, type: Type? = null): Codec? =
+                entries.find { it.id == value && (type == null || it.type == type) }
         }
     }
 

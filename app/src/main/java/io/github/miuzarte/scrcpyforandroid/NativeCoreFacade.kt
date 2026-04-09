@@ -8,6 +8,7 @@ import android.view.Surface
 import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
 import io.github.miuzarte.scrcpyforandroid.nativecore.PersistentVideoRenderer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
@@ -133,8 +134,8 @@ class NativeCoreFacade private constructor() {
         videoFpsListeners.remove(listener)
     }
 
-    suspend fun scrcpyBackOrScreenOn(action: Int = 0) {
-        session?.pressBackOrScreenOn(action)
+    suspend fun scrcpyBackOrTurnScreenOn(action: Int = 0) {
+        session?.pressBackOrTurnScreenOn(action)
     }
 
     /**
@@ -200,6 +201,7 @@ class NativeCoreFacade private constructor() {
         @Volatile
         private var instance: NativeCoreFacade? = null
 
+        // TODO ???
         fun get(context: Context): NativeCoreFacade {
             return instance ?: synchronized(this) {
                 instance ?: NativeCoreFacade().also { instance = it }
@@ -252,16 +254,19 @@ class NativeCoreFacade private constructor() {
         decoder = null
         Log.i(
             TAG,
-            "createOrReplaceDecoder(): codec=${session.codecName} size=${session.width}x${session.height} persistent=true"
+            "createOrReplaceDecoder(): " +
+                    "codec=${session.codec?.string ?: "null"}, " +
+                    "size=${session.width}x${session.height}, " +
+                    "persistent=true"
         )
         val newDecoder = AnnexBDecoder(
             width = session.width,
             height = session.height,
             outputSurface = surface,
-            mimeType = when (session.codecName.lowercase()) {
-                "h264" -> "video/avc"
-                "h265" -> "video/hevc"
-                "av1" -> "video/av01"
+            mimeType = when (session.codec) {
+                Codec.H264 -> "video/avc"
+                Codec.H265 -> "video/hevc"
+                Codec.AV1 -> "video/av01"
                 else -> "video/avc"
             },
             onOutputSizeChanged = { width, height ->
@@ -331,38 +336,6 @@ class NativeCoreFacade private constructor() {
                 bootstrapPackets.removeFirst()
             }
             bootstrapPackets.addLast(cached)
-        }
-    }
-
-    /**
-     * Attach a single consumer to the session manager to deliver incoming video packets
-     * to all active decoders.
-     *
-     * - Called when a session is active and at least one decoder exists. Packets are
-     *   cached into [bootstrapPackets] to allow late-attaching decoders to catch up.
-     * - Kept only for documentation parity with the old multi-decoder design.
-     */
-    @Deprecated("TODO: Determine if this is really unnecessary")
-    private suspend fun ensureVideoConsumerAttached(sessionMgr: Scrcpy.Session) {
-        sessionMgr.attachVideoConsumer { packet ->
-            cacheBootstrapPacket(packet)
-            packetCount += 1
-            if (packetCount == 1L || packetCount % 120L == 0L) {
-                Log.i(
-                    TAG,
-                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
-                )
-            }
-            val currentDecoder = decoder ?: return@attachVideoConsumer
-            if (activeSurfaceId == null) return@attachVideoConsumer
-            runCatching {
-                currentDecoder.feedAnnexB(
-                    packet.data,
-                    packet.ptsUs,
-                    packet.isKeyFrame,
-                    packet.isConfig
-                )
-            }
         }
     }
 
