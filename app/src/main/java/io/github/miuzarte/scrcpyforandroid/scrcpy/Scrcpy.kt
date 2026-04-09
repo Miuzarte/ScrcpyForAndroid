@@ -16,6 +16,9 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.EncoderType
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -58,8 +61,8 @@ class Scrcpy(
     private val session = Session(adbService)
     private val nativeCore: NativeCoreFacade = NativeCoreFacade.get(appContext)
 
-    @Volatile
-    private var currentSession: Session.SessionInfo? = null
+    private val _currentSessionState = MutableStateFlow<Session.SessionInfo?>(null)
+    val currentSessionState: StateFlow<Session.SessionInfo?> = _currentSessionState.asStateFlow()
 
     @Volatile
     private var isRunning: Boolean = false
@@ -136,7 +139,7 @@ class Scrcpy(
             }
 
             // Create session info
-            currentSession = info
+            _currentSessionState.value = info
             isRunning = true
 
             // Setup video consumer (notify NativeCoreFacade to setup decoders)
@@ -175,7 +178,7 @@ class Scrcpy(
         } catch (e: Exception) {
             Log.e(TAG, "start(): Failed to start scrcpy session", e)
             isRunning = false
-            currentSession = null
+            _currentSessionState.value = null
             throw e
         }
     }
@@ -196,7 +199,7 @@ class Scrcpy(
             audioPlayer?.release()
             audioPlayer = null
             isRunning = false
-            currentSession = null
+            _currentSessionState.value = null
             Log.i(TAG, "stop(): Session stopped successfully")
             true
         } catch (e: Exception) {
@@ -212,7 +215,13 @@ class Scrcpy(
 
     fun isStarted(): Boolean = isRunning && session.isStarted()
 
-    fun getCurrentSession(): Session.SessionInfo? = currentSession
+    fun getCurrentSession(): Session.SessionInfo? = currentSessionState.value
+
+    fun updateCurrentSessionSize(width: Int, height: Int) {
+        val current = _currentSessionState.value ?: return
+        if (current.width == width && current.height == height) return
+        _currentSessionState.value = current.copy(width = width, height = height)
+    }
 
     sealed class ListResult {
         data class Encoders(

@@ -23,15 +23,16 @@
 - 利用 mDNS 服务实现自动连接启用无线调试的设备、自动发现等待配对设备的IP与端口
 - 自动横竖屏切换（算吗
 
-## 已知问题 / TODO
+## 已知问题
 
 - 退出全屏时的横竖屏状态可能不对，断开 scrcpy 重连就好
-- 如果受控机在锁屏时处理网络连接较慢，会导致应用界面无响应过长时间被系统杀掉（点名你米）
 - 虚拟按键的截图实现方式为发送
 `keycode 120`，安卓官方([keycodes.h#349](https://android.googlesource.com/platform/frameworks/native/+/master/include/android/keycodes.h#349))的定义为
 `System Request / Print Screen key.`，不同的厂商有不同的实现，在某些类原生(`AxionOS`) 上的行为是软重启
-- I18N
-- More: [TODO.md](TODO.md)
+
+## [TODO](TODO.md)
+
+\> [TODO.md](TODO.md)
 
 ## 建议搭配模块
 

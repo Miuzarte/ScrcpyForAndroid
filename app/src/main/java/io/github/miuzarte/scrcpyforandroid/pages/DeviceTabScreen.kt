@@ -16,7 +16,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,7 +35,6 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
@@ -97,7 +95,7 @@ fun DeviceTabScreen(
     onOpenVirtualButtonOrder: () -> Unit,
     onOpenReorderDevices: () -> Unit,
     onOpenAdvancedPage: () -> Unit,
-    onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
+    onOpenFullscreenPage: () -> Unit,
 ) {
     var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -159,7 +157,7 @@ fun DeviceTabPage(
     snackbar: SnackbarController,
     scrollBehavior: ScrollBehavior,
     onOpenAdvancedPage: () -> Unit,
-    onOpenFullscreenPage: (Scrcpy.Session.SessionInfo) -> Unit,
+    onOpenFullscreenPage: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -241,39 +239,9 @@ fun DeviceTabPage(
     var adbConnected by rememberSaveable { mutableStateOf(false) }
     var isQuickConnected by rememberSaveable { mutableStateOf(false) }
     var currentTargetHost by rememberSaveable { mutableStateOf("") }
-    var currentTargetPort by rememberSaveable { mutableIntStateOf(Defaults.ADB_PORT) }
+    var currentTargetPort by rememberSaveable { mutableStateOf(Defaults.ADB_PORT) }
     var connectedDeviceLabel by rememberSaveable { mutableStateOf("未连接") }
-    var sessionInfoWidth by rememberSaveable { mutableIntStateOf(0) }
-    var sessionInfoHeight by rememberSaveable { mutableIntStateOf(0) }
-    var sessionInfoDeviceName by rememberSaveable { mutableStateOf("") }
-    var sessionInfoCodec by rememberSaveable { mutableStateOf<Codec?>(null) }
-    var sessionInfoControlEnabled by rememberSaveable { mutableStateOf(false) }
-    var sessionInfo by remember {
-        mutableStateOf<Scrcpy.Session.SessionInfo?>(null)
-    }
-    LaunchedEffect(
-        sessionInfoWidth,
-        sessionInfoHeight,
-        sessionInfoDeviceName,
-        sessionInfoCodec,
-        sessionInfoControlEnabled
-    ) {
-        sessionInfo = if (sessionInfoDeviceName.isNotBlank()) {
-            Scrcpy.Session.SessionInfo(
-                width = sessionInfoWidth,
-                height = sessionInfoHeight,
-                deviceName = sessionInfoDeviceName,
-                codecId = 0,
-                codec = sessionInfoCodec,
-                audioCodecId = 0,
-                controlEnabled = sessionInfoControlEnabled,
-                host = currentTargetHost,
-                port = currentTargetPort,
-            )
-        } else {
-            null
-        }
-    }
+    val sessionInfo by scrcpy.currentSessionState.collectAsState()
     var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
     var editingDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
     var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -349,7 +317,6 @@ fun DeviceTabPage(
         currentTargetPort = Defaults.ADB_PORT
         audioForwardingSupported = true
         cameraMirroringSupported = true
-        sessionInfo = null
         statusLine = "未连接"
         connectedDeviceLabel = "未连接"
         clearQuickOnlineForTarget?.let { target ->
@@ -702,32 +669,6 @@ fun DeviceTabPage(
         }
     }
 
-    DisposableEffect(nativeCore) {
-        val listener: (Int, Int) -> Unit = { width, height ->
-            sessionInfo = sessionInfo?.copy(width = width, height = height)
-        }
-        nativeCore.addVideoSizeListener(listener)
-        onDispose {
-            nativeCore.removeVideoSizeListener(listener)
-        }
-    }
-
-    LaunchedEffect(sessionInfo) {
-        if (sessionInfo != null) {
-            sessionInfoWidth = sessionInfo?.width ?: 0
-            sessionInfoHeight = sessionInfo?.height ?: 0
-            sessionInfoDeviceName = sessionInfo?.deviceName.orEmpty()
-            sessionInfoCodec = sessionInfo?.codec
-            sessionInfoControlEnabled = sessionInfo?.controlEnabled == true
-        } else {
-            sessionInfoWidth = 0
-            sessionInfoHeight = 0
-            sessionInfoDeviceName = ""
-            sessionInfoCodec = null
-            sessionInfoControlEnabled = false
-        }
-    }
-
     fun sendVirtualButtonAction(action: VirtualButtonAction) {
         val keycode = action.keycode ?: return
         runBusy("发送 ${action.title}") {
@@ -942,10 +883,6 @@ fun DeviceTabPage(
                             if (options.disableScreensaver) {
                                 setKeepScreenOn(true)
                             }
-                            sessionInfo = session.copy(
-                                host = currentTargetHost,
-                                port = currentTargetPort
-                            )
                             statusLine = "scrcpy 运行中"
                             @SuppressLint("DefaultLocale")
                             val videoDetail =
@@ -972,7 +909,6 @@ fun DeviceTabPage(
                         runBusy("停止 scrcpy") {
                             scrcpy.stop()
                             setKeepScreenOn(false)
-                            sessionInfo = null
                             statusLine = "${currentTarget!!.host}:${currentTarget.port}"
                             logEvent("scrcpy 已停止")
                             snackbar.show("scrcpy 已停止")
@@ -1013,8 +949,9 @@ fun DeviceTabPage(
                             previewControlsVisible = !previewControlsVisible
                         },
                         onOpenFullscreen = {
-                            val info = sessionInfo ?: return@PreviewCard
-                            onOpenFullscreenPage(info)
+                            if (sessionInfo != null) {
+                                onOpenFullscreenPage()
+                            }
                         },
                     )
                 }

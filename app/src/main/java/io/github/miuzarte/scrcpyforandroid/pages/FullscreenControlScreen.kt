@@ -43,13 +43,11 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 @Composable
 fun FullscreenControlScreen(
     onBack: () -> Unit,
-    session: Scrcpy.Session.SessionInfo,
+    scrcpy: Scrcpy,
     nativeCore: NativeCoreFacade,
     onVideoSizeChanged: (width: Int, height: Int) -> Unit,
 ) {
-    // Disable predictive back handler temporarily to avoid decoding issues.
     BackHandler(enabled = true, onBack = onBack)
-
 
     val context = LocalContext.current
 
@@ -58,6 +56,7 @@ fun FullscreenControlScreen(
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val activity = remember(context) { context as? Activity }
+    val currentSession by scrcpy.currentSessionState.collectAsState()
 
     val asBundleShared by appSettings.bundleState.collectAsState()
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
@@ -119,14 +118,9 @@ fun FullscreenControlScreen(
         }
     }
 
-    DisposableEffect(nativeCore) {
-        val listener: (Int, Int) -> Unit = { w, h ->
-            onVideoSizeChanged(w, h)
-        }
-        nativeCore.addVideoSizeListener(listener)
-        onDispose {
-            nativeCore.removeVideoSizeListener(listener)
-        }
+    LaunchedEffect(currentSession?.width, currentSession?.height) {
+        val session = currentSession ?: return@LaunchedEffect
+        onVideoSizeChanged(session.width, session.height)
     }
 
     DisposableEffect(nativeCore) {
@@ -156,6 +150,7 @@ fun FullscreenControlScreen(
                 .fillMaxSize()
                 .padding(contentPadding),
         ) {
+            val session = currentSession ?: return@Box
             FullscreenControlScreen(
                 session = session,
                 nativeCore = nativeCore,

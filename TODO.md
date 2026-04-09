@@ -1,5 +1,8 @@
 # TODO
 
+- miuix v0.9
+- 在线更新检查
+
 ## PARAMS
 
 - orientation locking
@@ -18,3 +21,4 @@
 - [音频延迟](https://developer.android.com/ndk/guides/audio/audio-latency)
 - 横屏布局
 - 原生悬浮窗 [Petterpx/FloatingX](https://github.com/Petterpx/FloatingX)
+- I18N

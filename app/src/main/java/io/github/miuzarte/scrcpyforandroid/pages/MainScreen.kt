@@ -82,7 +82,7 @@ sealed interface RootScreen : NavKey {
     data object Home : RootScreen
     data object Advanced : RootScreen
     data object VirtualButtonOrder : RootScreen
-    data class Fullscreen(val session: Scrcpy.Session.SessionInfo) : RootScreen
+    data object Fullscreen : RootScreen
 }
 
 @Composable
@@ -215,6 +215,7 @@ fun MainScreen() {
             serverRemotePath = serverRemotePath,
         )
     }
+    val currentSession by scrcpy.currentSessionState.collectAsState()
 
     fun handleBackNavigation() {
         if (rootBackStack.size > 1) {
@@ -247,6 +248,11 @@ fun MainScreen() {
         }
     }
 
+    var showReorderDevices by rememberSaveable { mutableStateOf(false) }
+    var fullscreenOrientation by rememberSaveable {
+        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+    }
+
     val canNavigateBack = rootBackStack.size > 1
             || pagerState.currentPage != MainBottomTabDestination.Device.ordinal
 
@@ -265,11 +271,6 @@ fun MainScreen() {
         }
     }
 
-    var showReorderDevices by rememberSaveable { mutableStateOf(false) }
-    var fullscreenOrientation by rememberSaveable {
-        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-    }
-
     // Fullscreen route can force orientation based on stream ratio; all other routes are portrait.
     LaunchedEffect(activity, currentRootScreen, fullscreenOrientation) {
         val targetOrientation = when (currentRootScreen) {
@@ -277,6 +278,28 @@ fun MainScreen() {
             else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
         activity?.requestedOrientation = targetOrientation
+    }
+
+    DisposableEffect(nativeCore, scrcpy) {
+        val listener: (Int, Int) -> Unit = { width, height ->
+            scrcpy.updateCurrentSessionSize(width, height)
+        }
+        nativeCore.addVideoSizeListener(listener)
+        onDispose {
+            nativeCore.removeVideoSizeListener(listener)
+        }
+    }
+
+    LaunchedEffect(currentRootScreen, currentSession?.width, currentSession?.height) {
+        if (currentRootScreen is RootScreen.Fullscreen) {
+            val session = currentSession ?: return@LaunchedEffect
+            fullscreenOrientation =
+                if (session.width >= session.height) {
+                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
+        }
     }
 
     LaunchedEffect(asBundle.adbKeyName) {
@@ -341,16 +364,16 @@ fun MainScreen() {
                                 onOpenVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
                                 onOpenReorderDevices = { showReorderDevices = true },
                                 onOpenAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
-                                onOpenFullscreenPage = { session ->
-                                    fullscreenOrientation =
-                                        if (session.width >= session.height) {
-                                            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                        } else {
-                                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                        }
-                                    rootBackStack.add(
-                                        RootScreen.Fullscreen(session),
-                                    )
+                                onOpenFullscreenPage = {
+                                    currentSession?.let { session ->
+                                        fullscreenOrientation =
+                                            if (session.width >= session.height) {
+                                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                            } else {
+                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                            }
+                                        rootBackStack.add(RootScreen.Fullscreen)
+                                    }
                                 },
                             )
 
@@ -396,10 +419,10 @@ fun MainScreen() {
             )
         }
 
-        entry<RootScreen.Fullscreen> { screen ->
+        entry(RootScreen.Fullscreen) {
             FullscreenControlScreen(
                 onBack = ::popRoot,
-                session = screen.session,
+                scrcpy = scrcpy,
                 nativeCore = nativeCore,
                 onVideoSizeChanged = { width, height ->
                     fullscreenOrientation =
