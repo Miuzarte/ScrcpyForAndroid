@@ -83,6 +83,7 @@ private enum class MainBottomTabDestination(
 sealed interface RootScreen : NavKey {
     data object Home : RootScreen
     data object Advanced : RootScreen
+    data object About : RootScreen
     data object VirtualButtonOrder : RootScreen
     data object Fullscreen : RootScreen
 }
@@ -393,6 +394,7 @@ fun MainScreen() {
                                 snackbar = snackbarController,
                                 onOpenReorderDevices = { showReorderDevices = true },
                                 onOpenVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
+                                onOpenAbout = { rootBackStack.add(RootScreen.About) },
                                 onPickServer = {
                                     picker.launch(
                                         arrayOf(
@@ -420,6 +422,12 @@ fun MainScreen() {
                 scrollBehavior = advancedPageScrollBehavior,
                 snackbar = snackbarController,
                 scrcpy = scrcpy,
+            )
+        }
+
+        entry(RootScreen.About) {
+            AboutScreen(
+                onBack = ::popRoot,
             )
         }
 

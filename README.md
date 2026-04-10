@@ -41,8 +41,8 @@
 ## 构建
 
 - JDK 17+
-- Android SDK（含 `compileSdk 37` / `buildTools 36.0.0`）
-- Android NDK `28.2.13676358`
+- Android SDK (`compileSdk 37` / `buildTools 37.0.0`)
+- Android NDK `29.0.14206865`
 
 ```bash
 ./gradlew assembleDebug

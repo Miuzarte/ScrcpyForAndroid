@@ -1,8 +1,5 @@
 # TODO
 
-- miuix v0.9
-- 在线更新检查
-
 ## PARAMS
 
 - orientation locking

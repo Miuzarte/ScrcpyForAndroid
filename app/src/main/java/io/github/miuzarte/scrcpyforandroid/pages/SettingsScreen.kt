@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -68,6 +67,7 @@ fun SettingsScreen(
     snackbar: SnackbarController,
     onOpenReorderDevices: () -> Unit,
     onOpenVirtualButtonOrder: () -> Unit,
+    onOpenAbout: () -> Unit,
     onPickServer: () -> Unit,
 ) {
     Scaffold(
@@ -84,6 +84,7 @@ fun SettingsScreen(
             snackbar = snackbar,
             onOpenReorderDevices = onOpenReorderDevices,
             onOpenVirtualButtonOrder = onOpenVirtualButtonOrder,
+            onOpenAbout = onOpenAbout,
             onPickServer = onPickServer,
         )
     }
@@ -96,6 +97,7 @@ fun SettingsPage(
     snackbar: SnackbarController,
     onOpenReorderDevices: () -> Unit,
     onOpenVirtualButtonOrder: () -> Unit,
+    onOpenAbout: () -> Unit,
     onPickServer: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -155,33 +157,21 @@ fun SettingsPage(
     }
 
     val updateSummary = remember(updateState) {
-        when (val state = updateState) {
-            AppUpdateChecker.State.Idle ->
-                "当前版本 ${BuildConfig.VERSION_NAME}"
+        "当前版本 ${BuildConfig.VERSION_NAME}" + when (val state = updateState) {
+            AppUpdateChecker.State.Idle -> ""
+            AppUpdateChecker.State.Checking -> "，正在检查更新"
+            AppUpdateChecker.State.Error -> "，检查更新失败"
 
-            AppUpdateChecker.State.Checking ->
-                "当前版本 ${BuildConfig.VERSION_NAME}，正在检查更新"
+            is AppUpdateChecker.State.Ready -> when {
+                state.release.hasUpdate ->
+                    "，发现新版本 ${state.release.latestVersion}"
 
-            is AppUpdateChecker.State.Ready -> {
-                when {
-                    state.release.hasUpdate ->
-                        "当前版本 ${state.release.currentVersion}，发现新版本 ${state.release.latestVersion}"
+                state.release.currentVersion == state.release.latestVersion.removePrefix("v")
+                        || state.release.currentVersion == state.release.latestVersion ->
+                    "，已是最新版本"
 
-                    state.release.currentVersion == state.release.latestVersion.removePrefix("v")
-                            || state.release.currentVersion == state.release.latestVersion ->
-                        "当前版本 ${state.release.currentVersion}，已是最新版本"
-
-                    else ->
-                        "当前版本 ${state.release.currentVersion}，高于最新发布版本 ${state.release.latestVersion}"
-                }
+                else -> "，高于最新发布版本 ${state.release.latestVersion}"
             }
-        }
-    }
-
-    val updateUrl = remember(updateState) {
-        when (val state = updateState) {
-            is AppUpdateChecker.State.Ready -> state.release.htmlUrl
-            else -> "https://github.com/Miuzarte/ScrcpyForAndroid/releases"
         }
     }
 
@@ -191,7 +181,7 @@ fun SettingsPage(
         scrollBehavior = scrollBehavior,
     ) {
         item {
-            SectionSmallTitle("主题", showLeadingSpacer = false)
+            SectionSmallTitle("主题")
             Card {
                 OverlayDropdownPreference(
                     title = "外观模式",
@@ -281,7 +271,7 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("scrcpy-server", showLeadingSpacer = false)
+            SectionSmallTitle("scrcpy-server")
             Card {
                 Column(
                     modifier = Modifier.padding(vertical = UiSpacing.Large),
@@ -388,7 +378,7 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("ADB", showLeadingSpacer = false)
+            SectionSmallTitle("ADB")
             Card {
                 Column(
                     modifier = Modifier.padding(vertical = UiSpacing.Large),
@@ -446,7 +436,7 @@ fun SettingsPage(
         if (needMigration) item {
             // 这部分应该不会显示出来,
             // 应用启动时就会执行迁移与旧数据的删除
-            SectionSmallTitle("应用", showLeadingSpacer = false)
+            SectionSmallTitle("应用")
             Card {
                 ArrowPreference(
                     title = "恢复旧版本配置",
@@ -479,19 +469,12 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("关于", showLeadingSpacer = false)
+            SectionSmallTitle("")
             Card {
                 ArrowPreference(
-                    title = "仓库发布页",
-                    summary = "$updateSummary\n${AppUpdateChecker.REPO_URL.removePrefix("https://")}",
-                    onClick = {
-                        context.startActivity(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                updateUrl.toUri(),
-                            )
-                        )
-                    },
+                    title = "关于",
+                    summary = updateSummary,
+                    onClick = onOpenAbout,
                 )
             }
         }

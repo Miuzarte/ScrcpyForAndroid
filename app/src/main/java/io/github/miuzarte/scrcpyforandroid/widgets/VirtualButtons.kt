@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -70,7 +70,7 @@ enum class VirtualButtonAction(
     BACK(
         "back",
         "返回",
-        Icons.AutoMirrored.Filled.ArrowBack,
+        Icons.AutoMirrored.Rounded.ArrowBack,
         UiAndroidKeycodes.BACK
     ),
     APP_SWITCH(

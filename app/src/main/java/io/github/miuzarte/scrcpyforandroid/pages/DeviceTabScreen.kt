@@ -833,7 +833,7 @@ fun DeviceTabPage(
             }
 
             item {
-                SectionSmallTitle("无线配对", showLeadingSpacer = false)
+                SectionSmallTitle("无线配对")
                 // "使用配对码配对设备"
                 PairingCard(
                     busy = busy,
@@ -866,7 +866,7 @@ fun DeviceTabPage(
 
         if (adbConnected) {
             item {
-                SectionSmallTitle("Scrcpy", showLeadingSpacer = false)
+                SectionSmallTitle("Scrcpy")
                 ConfigPanel(
                     busy = busy,
                     snackbar = snackbar,
@@ -970,7 +970,7 @@ fun DeviceTabPage(
 
         if (EventLogger.hasLogs()) {
             item {
-                SectionSmallTitle("日志", showLeadingSpacer = false)
+                SectionSmallTitle("日志")
                 Card {
                     TextField(
                         value = EventLogger.eventLog.joinToString(separator = "\n"),

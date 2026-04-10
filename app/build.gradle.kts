@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.material)
     implementation(libs.miuix.ui)
+    implementation(libs.miuix.blur)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
     implementation(libs.miuix.navigation3.ui)
