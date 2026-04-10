@@ -28,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -102,6 +105,21 @@ fun SettingsPage(
     val snackbar = LocalSnackbarController.current
     val navigator = LocalRootNavigator.current
     val serverPicker = LocalServerPicker.current
+    val floatingWindowPermissionRequester = LocalFloatingWindowPermissionRequester.current
+    val isFloatingWindowPermissionGranted by floatingWindowPermissionRequester.permissionGrantedState
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, floatingWindowPermissionRequester) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                floatingWindowPermissionRequester.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val asBundleShared by appSettings.bundleState.collectAsState()
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
@@ -265,6 +283,37 @@ fun SettingsPage(
                     checked = asBundle.showFullscreenFloatingButton,
                     onCheckedChange = {
                         asBundle = asBundle.copy(showFullscreenFloatingButton = it)
+                    },
+                )
+                ArrowPreference(
+                    title = "系统悬浮窗权限",
+                    summary =
+                        if (isFloatingWindowPermissionGranted) "已授予"
+                        else "未授予",
+                    onClick = floatingWindowPermissionRequester.request,
+                )
+                SuperSlider(
+                    title = "悬浮窗最小宽度",
+                    summary = "系统悬浮窗宽度基准，按受控机分辨率自动等比计算小窗尺寸",
+                    value = asBundle.floatingOverlayMinWidthDp.toFloat(),
+                    onValueChange = {
+                        asBundle = asBundle.copy(
+                            floatingOverlayMinWidthDp = it.roundToInt().coerceIn(100, 300)
+                        )
+                    },
+                    valueRange = 100f..300f,
+                    steps = 300 - 100 - 2,
+                    unit = "dp",
+                    displayFormatter = { it.roundToInt().toString() },
+                    inputInitialValue = asBundle.floatingOverlayMinWidthDp.toString(),
+                    inputFilter = { it.filter(Char::isDigit) },
+                    inputValueRange = 32f..UShort.MAX_VALUE.toFloat(),
+                    onInputConfirm = { input ->
+                        input.toIntOrNull()?.let {
+                            asBundle = asBundle.copy(
+                                floatingOverlayMinWidthDp = it.coerceAtLeast(32)
+                            )
+                        }
                     },
                 )
             }

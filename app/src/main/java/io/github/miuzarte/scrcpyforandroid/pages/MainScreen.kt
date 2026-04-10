@@ -37,6 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
@@ -50,6 +53,8 @@ import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
+import io.github.miuzarte.scrcpyforandroid.services.FloatingOverlayController
+import io.github.miuzarte.scrcpyforandroid.services.FloatingWindowPermissions
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -106,6 +111,9 @@ fun MainScreen() {
     // Core services
     val nativeCore = remember(appContext) {
         NativeCoreFacade.get(appContext)
+    }
+    val floatingOverlayController = remember(appContext) {
+        FloatingOverlayController(appContext)
     }
     val adbService = remember(appContext) {
         NativeAdbService(appContext)
@@ -256,6 +264,22 @@ fun MainScreen() {
         }
         asBundle = asBundle.copy(customServerUri = uri.toString())
     }
+    var canDrawOverlays by remember {
+        mutableStateOf(FloatingWindowPermissions.canDrawOverlays(context))
+    }
+    val floatingWindowPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val granted = FloatingWindowPermissions.canDrawOverlays(context)
+        canDrawOverlays = granted
+        scope.launch {
+            if (granted) {
+                snackbarController.show("系统悬浮窗权限已授予")
+            } else {
+                snackbarController.show("系统悬浮窗权限未授予")
+            }
+        }
+    }
     val serverPicker = remember(picker) {
         ServerPicker {
             picker.launch(
@@ -267,10 +291,78 @@ fun MainScreen() {
             )
         }
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val floatingWindowPermissionRequester = remember(
+        canDrawOverlays,
+        floatingWindowPermissionLauncher,
+    ) {
+        FloatingWindowPermissionRequester(
+            permissionGrantedState = androidx.compose.runtime.derivedStateOf { canDrawOverlays },
+            refresh = {
+                canDrawOverlays = FloatingWindowPermissions.canDrawOverlays(context)
+            },
+            request = {
+                if (!canDrawOverlays) {
+                    floatingWindowPermissionLauncher.launch(
+                        FloatingWindowPermissions.createManageOverlayPermissionIntent(context)
+                    )
+                }
+            },
+        )
+    }
 
     // Derived flags
     val canNavigateBack = rootBackStack.size > 1
             || pagerState.currentPage != MainBottomTabDestination.Device.ordinal
+    val currentSessionLatest by rememberUpdatedState(currentSession)
+    val canDrawOverlaysLatest by rememberUpdatedState(canDrawOverlays)
+
+    DisposableEffect(lifecycleOwner, floatingOverlayController, scrcpy, nativeCore, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START,
+                Lifecycle.Event.ON_RESUME,
+                -> {
+                    canDrawOverlays = FloatingWindowPermissions.canDrawOverlays(context)
+                    floatingOverlayController.hide()
+                }
+
+                Lifecycle.Event.ON_STOP -> {
+                    canDrawOverlays = FloatingWindowPermissions.canDrawOverlays(context)
+                    if (currentSessionLatest != null && canDrawOverlaysLatest) {
+                        floatingOverlayController.show(scrcpy = scrcpy, nativeCore = nativeCore)
+                    } else {
+                        floatingOverlayController.hide()
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            floatingOverlayController.hide()
+        }
+    }
+
+    LaunchedEffect(currentSession, canDrawOverlays) {
+        if (currentSession == null || !canDrawOverlays) {
+            floatingOverlayController.hide()
+        }
+    }
+
+    LaunchedEffect(
+        currentSession?.width,
+        currentSession?.height,
+        asBundle.floatingOverlayMinWidthDp,
+    ) {
+        val session = currentSession ?: return@LaunchedEffect
+        floatingOverlayController.syncSizeWithSession(
+            sessionWidth = session.width,
+            sessionHeight = session.height,
+        )
+    }
 
     LaunchedEffect(asBundle.lastUpdateCheckAt) {
         val now = System.currentTimeMillis()
@@ -471,6 +563,7 @@ fun MainScreen() {
             LocalAppHaptics provides haptics,
             LocalFullscreenNavigationState provides fullscreenNavigationState,
             LocalServerPicker provides serverPicker,
+            LocalFloatingWindowPermissionRequester provides floatingWindowPermissionRequester,
         ) {
             NavDisplay(
                 entries = rootEntries,

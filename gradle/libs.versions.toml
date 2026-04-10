@@ -12,6 +12,7 @@ espressoCore = "3.7.0"
 miuix = "0.9.0"
 material = "1.13.0"
 runtime = "1.10.5"
+floatingx = "2.3.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,6 +37,8 @@ miuix-preference = { group = "top.yukonga.miuix.kmp", name = "miuix-preference",
 miuix-icons = { group = "top.yukonga.miuix.kmp", name = "miuix-icons", version.ref = "miuix" }
 miuix-navigation3-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-navigation3-ui", version.ref = "miuix" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+floatingx = { group = "io.github.petterpx", name = "floatingx", version.ref = "floatingx" }
+floatingx-compose = { group = "io.github.petterpx", name = "floatingx-compose", version.ref = "floatingx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

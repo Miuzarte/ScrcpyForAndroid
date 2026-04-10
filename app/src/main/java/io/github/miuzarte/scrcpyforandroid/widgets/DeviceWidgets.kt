@@ -755,7 +755,9 @@ fun FullscreenControlScreen(
     enableBackHandler: Boolean = true,
     onInjectTouch: suspend (action: Int, pointerId: Long, x: Int, y: Int, pressure: Float, buttons: Int) -> Unit,
 ) {
-    BackHandler(enabled = enableBackHandler, onBack = onDismiss)
+    if (enableBackHandler) {
+        BackHandler(enabled = true, onBack = onDismiss)
+    }
     val coroutineScope = rememberCoroutineScope()
     var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
     val activePointerIds = remember { linkedSetOf<Int>() }

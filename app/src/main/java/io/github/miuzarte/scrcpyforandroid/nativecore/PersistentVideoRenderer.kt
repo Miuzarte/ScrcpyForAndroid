@@ -54,7 +54,7 @@ class PersistentVideoRenderer {
     private var stMatrixHandle = 0
     private var samplerHandle = 0
 
-    private val initLock = Object()
+    private val initLock = Any()
 
     fun getDecoderSurface(): Surface {
         ensureInitialized()

@@ -60,6 +60,7 @@ specific abi:
 - JNI ADB 实现: [rikkaapps/shizuku](https://github.com/rikkaapps/shizuku), [vvb2060/ndk.boringssl](https://github.com/vvb2060), [lsposed/libcxx](https://github.com/lsposed/libcxx)
 - 界面组件: [YuKongA/miuix](https://github.com/compose-miuix-ui/miuix)
 - 界面设计参考: [tiann/KernelSU/manager](https://github.com/tiann/KernelSU/tree/main/manager)
+- 悬浮窗库: [Petterpx/FloatingX](https://github.com/Petterpx/FloatingX)
 
 ## License
 

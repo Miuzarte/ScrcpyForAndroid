@@ -46,6 +46,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             intPreferencesKey("device_preview_card_height_dp"),
             320
         )
+        val FLOATING_OVERLAY_MIN_WIDTH_DP = Pair(
+            intPreferencesKey("floating_overlay_min_width_dp"),
+            108
+        )
         val PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT = Pair(
             booleanPreferencesKey("preview_virtual_button_show_text"),
             true
@@ -99,6 +103,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     val fullscreenFloatingButtonXFraction by setting(FULLSCREEN_FLOATING_BUTTON_X_FRACTION)
     val fullscreenFloatingButtonYFraction by setting(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION)
     val devicePreviewCardHeightDp by setting(DEVICE_PREVIEW_CARD_HEIGHT_DP)
+    val floatingOverlayMinWidthDp by setting(FLOATING_OVERLAY_MIN_WIDTH_DP)
     val previewVirtualButtonShowText by setting(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT)
     val virtualButtonsLayout by setting(VIRTUAL_BUTTONS_LAYOUT)
 
@@ -124,6 +129,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenFloatingButtonXFraction: Float,
         val fullscreenFloatingButtonYFraction: Float,
         val devicePreviewCardHeightDp: Int,
+        val floatingOverlayMinWidthDp: Int,
         val previewVirtualButtonShowText: Boolean,
         val virtualButtonsLayout: String,
         val customServerUri: String,
@@ -146,6 +152,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_FLOATING_BUTTON_X_FRACTION) { bundle: Bundle -> bundle.fullscreenFloatingButtonXFraction },
         bundleField(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION) { bundle: Bundle -> bundle.fullscreenFloatingButtonYFraction },
         bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { bundle: Bundle -> bundle.devicePreviewCardHeightDp },
+        bundleField(FLOATING_OVERLAY_MIN_WIDTH_DP) { bundle: Bundle -> bundle.floatingOverlayMinWidthDp },
         bundleField(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT) { bundle: Bundle -> bundle.previewVirtualButtonShowText },
         bundleField(VIRTUAL_BUTTONS_LAYOUT) { bundle: Bundle -> bundle.virtualButtonsLayout },
         bundleField(CUSTOM_SERVER_URI) { bundle: Bundle -> bundle.customServerUri },
@@ -169,6 +176,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fullscreenFloatingButtonXFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_X_FRACTION),
         fullscreenFloatingButtonYFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION),
         devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
+        floatingOverlayMinWidthDp = preferences.read(FLOATING_OVERLAY_MIN_WIDTH_DP),
         previewVirtualButtonShowText = preferences.read(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT),
         virtualButtonsLayout = preferences.read(VIRTUAL_BUTTONS_LAYOUT),
         customServerUri = preferences.read(CUSTOM_SERVER_URI),

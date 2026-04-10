@@ -20,8 +20,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.1.0"
+        versionCode = 7
+        versionName = "0.1.1"
 
         externalNativeBuild {
             cmake {
@@ -57,8 +57,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -99,6 +99,8 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation(libs.androidx.compose.runtime)
+    implementation(libs.floatingx)
+    implementation(libs.floatingx.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
