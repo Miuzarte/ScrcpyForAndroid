@@ -23,10 +23,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -250,14 +250,17 @@ internal fun PreviewCard(
     modifier: Modifier,
     sessionInfo: Scrcpy.Session.SessionInfo?,
     previewHeightDp: Int,
-    controlsVisible: Boolean,
-    onTapped: () -> Unit,
     onOpenFullscreen: () -> Unit,
     autoBringIntoView: Boolean = false,
     onAutoBringIntoViewConsumed: () -> Unit = {},
 ) {
     val haptics = rememberAppHaptics()
-    val alpha by animateFloatAsState(if (controlsVisible) 1f else 0f, label = "preview-controls")
+
+    var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        if (previewControlsVisible) 1f else 0f,
+        label = "preview-controls"
+    )
     val lifecycleOwner = LocalLifecycleOwner.current
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
@@ -268,6 +271,9 @@ internal fun PreviewCard(
     }
 
     DisposableEffect(lifecycleOwner) {
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            VideoOutputTargetState.set(VideoOutputTarget.PREVIEW)
+        }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> VideoOutputTargetState.set(VideoOutputTarget.PREVIEW)
@@ -287,12 +293,20 @@ internal fun PreviewCard(
         }
     }
 
-    Card(modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester).then(modifier)) {
+    Card(
+        modifier = Modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .then(modifier)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(previewHeightDp.coerceAtLeast(120).dp)
-                .pointerInput(sessionInfo) { detectTapGestures(onTap = { onTapped() }) },
+                .pointerInput(sessionInfo) {
+                    detectTapGestures(onTap = {
+                        previewControlsVisible = !previewControlsVisible
+                    })
+                },
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val sessionAspect =
@@ -801,6 +815,17 @@ fun ScrcpyVideoSurface(
     }
 
     DisposableEffect(lifecycleOwner, session, currentSurface) {
+        val surface = currentSurface
+        if (
+            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+            session != null &&
+            surface != null &&
+            surface.isValid
+        ) {
+            scope.launch {
+                NativeCoreFacade.attachVideoSurface(surface)
+            }
+        }
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START) {
                 val surface = currentSurface
@@ -916,6 +941,8 @@ internal fun DeviceTile(
             host = trimmedHost,
             port = currentDraft.port,
             startScrcpyOnConnect = currentDraft.startScrcpyOnConnect,
+            openFullscreenOnStart = currentDraft.startScrcpyOnConnect
+                    && currentDraft.openFullscreenOnStart,
         )
         if (updated != device) {
             onEditorSave(updated)
@@ -1048,6 +1075,18 @@ internal fun DeviceTile(
                             draft = currentDraft.copy(startScrcpyOnConnect = it)
                         },
                     )
+                    AnimatedVisibility(currentDraft.startScrcpyOnConnect) {
+                        CheckboxPreference(
+                            title = "直接进入全屏",
+                            checkboxLocation = CheckboxLocation.End,
+                            checked = currentDraft.startScrcpyOnConnect
+                                    && currentDraft.openFullscreenOnStart,
+                            enabled = currentDraft.startScrcpyOnConnect,
+                            onCheckedChange = {
+                                draft = currentDraft.copy(openFullscreenOnStart = it)
+                            },
+                        )
+                    }
                 }
                 Row(
                     modifier = Modifier

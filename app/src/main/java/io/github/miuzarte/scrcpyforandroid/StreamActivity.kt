@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid
 
+import android.R.drawable
 import android.app.PictureInPictureUiState
 import android.app.RemoteAction
 import android.content.Context
@@ -8,16 +9,18 @@ import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.app.PictureInPictureParamsCompat
+import androidx.core.app.PictureInPictureParamsCompat.Builder
 import androidx.core.content.ContextCompat
 import androidx.core.pip.BasicPictureInPicture
 import io.github.miuzarte.scrcpyforandroid.pages.StreamScreen
 import io.github.miuzarte.scrcpyforandroid.services.PictureInPictureActionReceiver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.lang.ref.WeakReference
 
 class StreamActivity : ComponentActivity() {
     private val basicPip = BasicPictureInPicture(this)
+
     private val pipActionReceiver = PictureInPictureActionReceiver()
     private var isPipActionReceiverRegistered = false
 
@@ -28,7 +31,7 @@ class StreamActivity : ComponentActivity() {
 
     val pipStopAction: RemoteAction by lazy {
         RemoteAction(
-            Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+            Icon.createWithResource(this, drawable.ic_menu_close_clear_cancel),
             "停止投屏",
             "停止投屏",
             PictureInPictureActionReceiver.createPendingIntent(this),
@@ -39,6 +42,7 @@ class StreamActivity : ComponentActivity() {
     // 都会重建 activity
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentActivityRef = WeakReference(this)
 
         registerPipActionReceiver()
 
@@ -76,11 +80,13 @@ class StreamActivity : ComponentActivity() {
          */
     }
 
-    fun configurePip(params: PictureInPictureParamsCompat) {
-        basicPip.setPictureInPictureParams(params)
-    }
+    fun configurePip(block: Builder.() -> Builder) =
+        basicPip.setPictureInPictureParams(Builder().block().build())
 
     override fun onDestroy() {
+        currentActivityRef?.get()
+            ?.takeIf { it === this }
+            ?.let { currentActivityRef = null }
         unregisterPipActionReceiver()
         super.onDestroy()
     }
@@ -138,8 +144,16 @@ class StreamActivity : ComponentActivity() {
     }
 
     companion object {
+        private var currentActivityRef: WeakReference<StreamActivity>? = null
+
         fun createIntent(context: Context): Intent {
             return Intent(context, StreamActivity::class.java)
+        }
+
+        fun dismissActivePictureInPicture() {
+            currentActivityRef?.get()
+                ?.takeIf { it.isInPictureInPictureMode }
+                ?.finish()
         }
     }
 }

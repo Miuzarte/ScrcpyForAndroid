@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,7 +38,6 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
@@ -232,10 +232,9 @@ fun DeviceTabPage(
     var adbConnected by rememberSaveable { mutableStateOf(false) }
     var isQuickConnected by rememberSaveable { mutableStateOf(false) }
     var currentTargetHost by rememberSaveable { mutableStateOf("") }
-    var currentTargetPort by rememberSaveable { mutableStateOf(Defaults.ADB_PORT) }
+    var currentTargetPort by rememberSaveable { mutableIntStateOf(Defaults.ADB_PORT) }
     var connectedDeviceLabel by rememberSaveable { mutableStateOf("未连接") }
     val sessionInfo by scrcpy.currentSessionState.collectAsState()
-    var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
     var editingDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
     var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
@@ -276,9 +275,6 @@ fun DeviceTabPage(
         if (serialized != qdBundle.quickDevicesList) {
             qdBundle = qdBundle.copy(quickDevicesList = serialized)
         }
-    }
-    val editingDevice = remember(savedShortcuts, editingDeviceId) {
-        editingDeviceId?.let(savedShortcuts::get)
     }
 
     /**
@@ -400,10 +396,7 @@ fun DeviceTabPage(
     suspend fun keepAliveCheck(host: String, port: Int): Boolean {
         return withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
             val connected = NativeAdbService.isConnected()
-            if (!connected) {
-                return@withTimeout false
-            }
-            return@withTimeout true
+            return@withTimeout connected
         }
     }
 
@@ -536,10 +529,15 @@ fun DeviceTabPage(
         }
     }
 
-    suspend fun startScrcpySession() {
+    suspend fun startScrcpySession(openFullscreen: Boolean = false) {
         val options = scrcpyOptions.toClientOptions(soBundleShared).fix()
         val session = scrcpy.start(options)
         pendingScrollToPreview = true
+        if (openFullscreen) {
+            withContext(Dispatchers.Main) {
+                context.startActivity(StreamActivity.createIntent(context))
+            }
+        }
         if (options.disableScreensaver) {
             setKeepScreenOn(true)
         }
@@ -571,7 +569,11 @@ fun DeviceTabPage(
         listState.animateScrollToItem(PREVIEW_CARD_ITEM_INDEX)
     }
 
-    suspend fun handleAdbConnected(host: String, port: Int) {
+    suspend fun handleAdbConnected(
+        host: String, port: Int,
+        autoStartScrcpy: Boolean = false,
+        autoEnterFullScreen: Boolean = false,
+    ) {
         currentTargetHost = host
         currentTargetPort = port
 
@@ -603,15 +605,11 @@ fun DeviceTabPage(
         )
         snackbar.show("ADB 已连接")
 
-        if (
-            savedShortcuts.get(host, port)?.startScrcpyOnConnect == true &&
-            sessionInfo == null
-        ) {
-            runBusy("启动 scrcpy") {
-                startScrcpySession()
-            }
+        if (autoStartScrcpy && sessionInfo == null) runBusy("启动 scrcpy") {
+            startScrcpySession(openFullscreen = autoStartScrcpy && autoEnterFullScreen)
         }
     }
+
     LaunchedEffect(
         adbConnected,
         asBundle.adbAutoReconnectPairedDevice,
@@ -751,8 +749,9 @@ fun DeviceTabPage(
                     adbConnecting && activeDeviceActionId == device.id
                 },
                 editingDeviceId = editingDeviceId,
-                onClick = {
-                    snackbar.show("长按可编辑")
+                onClick = { device ->
+                    if (editingDeviceId != device.id)
+                        snackbar.show("长按可编辑")
                 },
                 onLongClick = { device ->
                     val connected = adbConnected
@@ -768,11 +767,14 @@ fun DeviceTabPage(
                 },
                 onAction = { device ->
                     haptics.contextClick()
+                    if (editingDeviceId == device.id) editingDeviceId = null
+
                     val host = device.host
                     val port = device.port
                     val connected = adbConnected
                             && currentTarget?.host == host
                             && currentTarget.port == port
+
                     if (!connected) {
                         runAdbConnect(
                             "连接 ADB",
@@ -787,7 +789,12 @@ fun DeviceTabPage(
                                 savedShortcuts = savedShortcuts.update(
                                     host = host, port = port,
                                 )
-                                handleAdbConnected(host, port)
+                                handleAdbConnected(
+                                    host = host, port = port,
+                                    autoStartScrcpy = device.startScrcpyOnConnect,
+                                    autoEnterFullScreen = device.startScrcpyOnConnect
+                                            && device.openFullscreenOnStart,
+                                )
                             } catch (e: Exception) {
                                 statusLine = "ADB 连接失败"
                                 logEvent("ADB 连接失败: $e", Log.ERROR)
@@ -817,6 +824,7 @@ fun DeviceTabPage(
                         host = updated.host,
                         port = updated.port,
                         startScrcpyOnConnect = updated.startScrcpyOnConnect,
+                        openFullscreenOnStart = updated.openFullscreenOnStart,
                     )
                 },
                 onEditorDelete = { device ->
@@ -962,10 +970,6 @@ fun DeviceTabPage(
                         modifier = Modifier,
                         sessionInfo = sessionInfo,
                         previewHeightDp = asBundle.devicePreviewCardHeightDp.coerceAtLeast(120),
-                        controlsVisible = previewControlsVisible,
-                        onTapped = {
-                            previewControlsVisible = !previewControlsVisible
-                        },
                         onOpenFullscreen = {
                             context.startActivity(StreamActivity.createIntent(context))
                         },

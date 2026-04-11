@@ -33,4 +33,9 @@ class MainActivity : ComponentActivity() {
             MainScreen()
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        StreamActivity.dismissActivePictureInPicture()
+    }
 }

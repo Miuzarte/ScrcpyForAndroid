@@ -12,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.core.app.PictureInPictureParamsCompat
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
 import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.haptics.LocalAppHaptics
@@ -72,15 +71,13 @@ fun StreamScreen(activity: StreamActivity) {
             lastPipAspectRatio = ratio
         }
 
-        activity.configurePip(
-             PictureInPictureParamsCompat.Builder()
-                .setEnabled(true)
-                .setAspectRatio(pipAspectRatio)
-                .setSourceRectHint(pipSourceRectHint)
-                .setSeamlessResizeEnabled(true)
-                .setCloseAction(activity.pipStopAction)
-                .build(),
-        )
+        activity.configurePip {
+            setEnabled(true)
+            setAspectRatio(pipAspectRatio)
+            setSourceRectHint(pipSourceRectHint)
+            setSeamlessResizeEnabled(true)
+            setCloseAction(activity.pipStopAction)
+        }
     }
 
     val themeMode =

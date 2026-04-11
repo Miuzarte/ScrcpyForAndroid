@@ -39,6 +39,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         port: Int? = null,
         name: String? = null,
         startScrcpyOnConnect: Boolean? = null,
+        openFullscreenOnStart: Boolean? = null,
         newPort: Int? = null,
         updateNameOnlyWhenEmpty: Boolean = false,
     ): DeviceShortcuts {
@@ -59,6 +60,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         val finalHost = if (updateById) host ?: old.host else old.host
         val finalPort = if (updateById) port ?: old.port else newPort ?: old.port
         val finalStartScrcpyOnConnect = startScrcpyOnConnect ?: old.startScrcpyOnConnect
+        val finalOpenFullscreenOnStart = openFullscreenOnStart ?: old.openFullscreenOnStart
 
         // 若无任何变化，返回原实例
         if (
@@ -66,6 +68,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
             && finalHost == old.host
             && finalPort == old.port
             && finalStartScrcpyOnConnect == old.startScrcpyOnConnect
+            && finalOpenFullscreenOnStart == old.openFullscreenOnStart
         )
             return this
 
@@ -75,6 +78,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
                 host = finalHost,
                 port = finalPort,
                 startScrcpyOnConnect = finalStartScrcpyOnConnect,
+                openFullscreenOnStart = finalOpenFullscreenOnStart,
             )
         }
         return DeviceShortcuts(
@@ -128,13 +132,18 @@ data class DeviceShortcut(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
     val startScrcpyOnConnect: Boolean = false,
+    val openFullscreenOnStart: Boolean = false,
 ) {
     val id: String get() = "$host:$port"
 
     fun marshalToString(
         separator: String = DEFAULT_SEPARATOR,
     ): String = listOf(
-        name.trim(), host.trim(), port.toString(), if (startScrcpyOnConnect) "1" else "0"
+        name.trim(),
+        host.trim(),
+        port.toString(),
+        if (startScrcpyOnConnect) "1" else "0",
+        if (openFullscreenOnStart) "1" else "0",
     ).joinToString(
         separator = separator
     )
@@ -147,16 +156,19 @@ data class DeviceShortcut(
         ): DeviceShortcut? {
             val parts = s.split(separator)
             return when (parts.size) {
-                3, 4 -> {
+                3, 4, 5 -> {
                     val name = parts[0].trim()
                     val host = parts[1].trim()
                     val port = parts[2].trim().toIntOrNull() ?: Defaults.ADB_PORT
                     val startScrcpyOnConnect = parts.getOrNull(3)?.trim() == "1"
+                    val openFullscreenOnStart =
+                        startScrcpyOnConnect && parts.getOrNull(4)?.trim() == "1"
                     if (host.isNotBlank()) DeviceShortcut(
                         name = name,
                         host = host,
                         port = port,
                         startScrcpyOnConnect = startScrcpyOnConnect,
+                        openFullscreenOnStart = openFullscreenOnStart,
                     )
                     else null
                 }

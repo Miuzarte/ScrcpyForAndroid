@@ -955,7 +955,7 @@ internal fun ScrcpyAllOptionsPage(
                         }
                     },
                 )
-                // TODO: 在 OverlaySpinnerPreference / OverlayDropdownPreference 支持展开状态回调后, 在展开时触发获取
+                // TODO: 等 MIUIX 发版, 在 OverlaySpinnerPreference / OverlayDropdownPreference 支持展开状态回调后, 在展开时触发获取
                 OverlaySpinnerPreference(
                     title = "视频编码器",
                     summary = "--video-encoder",
