@@ -1,17 +1,18 @@
 package io.github.miuzarte.scrcpyforandroid
 
 import android.app.PendingIntent
+import android.app.PictureInPictureUiState
 import android.app.RemoteAction
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.core.app.PictureInPictureParamsCompat
 import androidx.core.pip.BasicPictureInPicture
-import androidx.core.pip.PictureInPictureDelegate
 import io.github.miuzarte.scrcpyforandroid.pages.StreamScreen
 import io.github.miuzarte.scrcpyforandroid.services.PictureInPictureActionReceiver
 import io.github.miuzarte.scrcpyforandroid.widgets.VideoOutputTarget
@@ -20,26 +21,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class StreamActivity : ComponentActivity() {
-    private lateinit var basicPip: BasicPictureInPicture // = this
+    private val basicPip = BasicPictureInPicture(this)
 
-    // pip 是否已被配置、允许进入
-    private var pipConfigured: Boolean = false
-    private var pipParams = PictureInPictureParamsCompat
-        .Builder()
-        .setEnabled(false)
-        .build()
-
-    // 是否处于 PiP
-    // MIUI 上进入 PiP 时，动画事件比 onPictureInPictureModeChanged() 更稳定，
-    // 所以进入 PiP 直接由动画事件置为 true
+    // 是否处于 pip
+    // 回到全屏时会因重建而变回初始值
     private val _pipModeState = MutableStateFlow(false)
     val pipModeState: StateFlow<Boolean> = _pipModeState
 
     val pipStopAction: RemoteAction by lazy {
-        val intent = Intent(this, PictureInPictureActionReceiver::class.java).apply {
-            action = PictureInPictureActionReceiver.ACTION_STOP_SCRCPY
-            `package` = packageName
-        }
+        val intent = Intent(this, PictureInPictureActionReceiver::class.java)
+            .apply {
+                action = PictureInPictureActionReceiver.ACTION_STOP_SCRCPY
+                `package` = packageName
+            }
         val pendingIntent = PendingIntent.getBroadcast(
             this,
             1,
@@ -54,27 +48,31 @@ class StreamActivity : ComponentActivity() {
         )
     }
 
+    // 每次 进出全屏/进出画中画
+    // 都会重建 activity
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        basicPip = BasicPictureInPicture(this)
+
+        // 声明要画中画
+        basicPip.setEnabled(true)
+
+        setContent {
+            StreamScreen(activity = this)
+        }
+
+        /*
+        // 可能以后有用
         basicPip.addOnPictureInPictureEventListener(
             executor = mainExecutor,
             listener = object : PictureInPictureDelegate.OnPictureInPictureEventListener {
                 override fun onPictureInPictureEvent(
                     event: PictureInPictureDelegate.Event,
-                    newConfig: Configuration?,
+                    config: Configuration?,
                 ) {
-                    // HyperOS 3 下稳定收到的是进入动画事件
-                    // 这里直接把进入动画开始视为已经进入 PiP，尽量少依赖平台回调
+                    // MIUI 只有这些事件
                     when (event) {
-                        PictureInPictureDelegate.Event.ENTER_ANIMATION_START -> {
-                            _pipModeState.value = true
-                            VideoOutputTargetState.set(VideoOutputTarget.PICTURE_IN_PICTURE)
-                        }
-
-                        PictureInPictureDelegate.Event.ENTER_ANIMATION_END -> {
-                            _pipModeState.value = true
-                        }
+                        PictureInPictureDelegate.Event.ENTER_ANIMATION_START -> {}
+                        PictureInPictureDelegate.Event.ENTER_ANIMATION_END -> {}
 
                         PictureInPictureDelegate.Event.STASHED -> {}
                         PictureInPictureDelegate.Event.UNSTASHED -> {}
@@ -86,49 +84,18 @@ class StreamActivity : ComponentActivity() {
                 }
             }
         )
-
-        setContent {
-            StreamScreen(activity = this)
-        }
+         */
     }
 
-    fun configurePictureInPicture(
-        enabled: Boolean,
-        params: PictureInPictureParamsCompat,
-    ) {
-        // 由 StreamScreen 决定何时更新 PiP 参数；
-        // StreamActivity 这里只负责缓存并转发最新配置
-        pipConfigured = enabled
-        pipParams = params
-        basicPip
-            .setEnabled(enabled)
-            .setPictureInPictureParams(params)
+    fun configurePip(params: PictureInPictureParamsCompat) {
+        basicPip.setPictureInPictureParams(params)
     }
 
-    fun enterConfiguredPip(): Boolean {
-        // onUserLeaveHint() 可能发生在 PiP 还没准备好之前，
-        // 所以这里先做一次兜底判断
-        if (!pipConfigured) return false
-        return runCatching {
-            enterPictureInPictureMode(pipParams)
-            true
-        }.getOrElse {
-            VideoOutputTargetState.set(VideoOutputTarget.FULLSCREEN)
-            false
-        }
-    }
-
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-
-        enterConfiguredPip()
-    }
-
+    /*
+    // 回到全屏也会停止, 暂时不做
     override fun onDestroy() {
         super.onDestroy()
 
-        // 回到全屏也会停止
-        /*
         if (_pipModeState.value) {
             Thread {
                 runBlocking {
@@ -136,19 +103,28 @@ class StreamActivity : ComponentActivity() {
                 }
             }.start()
         }
-         */
     }
+     */
 
-    // MIUI 不进
-    override fun onPictureInPictureModeChanged(
-        isInPictureInPictureMode: Boolean,
-        newConfig: Configuration,
-    ) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+    //- onPictureInPictureModeChanged
+    //+ onPictureInPictureUiStateChanged
+    //- onUserLeaveHint
 
-        if (!isInPictureInPictureMode) {
-            _pipModeState.value = false
-            VideoOutputTargetState.set(VideoOutputTarget.FULLSCREEN)
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
+        super.onPictureInPictureUiStateChanged(pipState)
+
+        when {
+            // 进入画中画
+            pipState.isTransitioningToPip -> if (!_pipModeState.value) {
+                _pipModeState.value = true
+                VideoOutputTargetState.set(VideoOutputTarget.PICTURE_IN_PICTURE)
+            }
+            // 收进边缘
+            pipState.isStashed -> if (!_pipModeState.value) {
+                _pipModeState.value = true
+                VideoOutputTargetState.set(VideoOutputTarget.PICTURE_IN_PICTURE)
+            }
         }
     }
 

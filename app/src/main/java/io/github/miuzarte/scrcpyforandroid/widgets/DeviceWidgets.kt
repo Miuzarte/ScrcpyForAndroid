@@ -764,17 +764,27 @@ fun ScrcpyVideoSurface(
     session: Scrcpy.Session.SessionInfo?,
     target: VideoOutputTarget,
 ) {
+
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    val scope = rememberCoroutineScope()
+
+    val lifecycleOwner = LocalLifecycleOwner.current
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
     var currentSurfaceView by remember { mutableStateOf<SurfaceView?>(null) }
-    val scope = rememberCoroutineScope()
-    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val currentTarget by VideoOutputTargetState.current.collectAsState()
-    val latestSession by rememberUpdatedState(session)
-    val latestCurrentTarget by rememberUpdatedState(currentTarget)
 
-    LaunchedEffect(session?.width, session?.height, currentSurfaceView) {
+    val currentTarget by VideoOutputTargetState.current.collectAsState()
+    val latestCurrentTarget by rememberUpdatedState(currentTarget)
+    val latestSession by rememberUpdatedState(session)
+    val latestRequestedTarget by rememberUpdatedState(target)
+
+    LaunchedEffect(session?.width, session?.height, currentSurfaceView, target) {
         val surfaceView = currentSurfaceView ?: return@LaunchedEffect
+        if (target == VideoOutputTarget.PICTURE_IN_PICTURE) {
+            // In PiP, let SurfaceView buffer follow viewport to avoid stale portrait frame crop.
+            surfaceView.holder.setSizeFromLayout()
+            return@LaunchedEffect
+        }
+
         val currentSession = session ?: return@LaunchedEffect
         if (currentSession.width > 0 && currentSession.height > 0) {
             surfaceView.holder.setFixedSize(currentSession.width, currentSession.height)
@@ -782,8 +792,8 @@ fun ScrcpyVideoSurface(
     }
 
     LaunchedEffect(session, currentSurface, currentTarget, target) {
-        val surface = currentSurface
-        if (currentTarget == target && session != null && surface != null && surface.isValid) {
+        val surface = currentSurface ?: return@LaunchedEffect
+        if (currentTarget == target && session != null && surface.isValid) {
             NativeCoreFacade.attachVideoSurface(surface)
         }
     }
@@ -844,9 +854,14 @@ fun ScrcpyVideoSurface(
                         height: Int,
                     ) {
                         if (width <= 0 || height <= 0) return
+                        if (!holder.surface.isValid) return
                         val surface = holder.surface
-                        if (!surface.isValid) return
                         currentSurface = surface
+                        if (latestCurrentTarget == latestRequestedTarget && latestSession != null) {
+                            scope.launch {
+                                NativeCoreFacade.attachVideoSurface(surface)
+                            }
+                        }
                     }
 
                     override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -940,7 +955,7 @@ internal fun DeviceTile(
                     .weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // statu dot
+                // status dot
                 Box(
                     modifier = Modifier
                         .size(8.dp)

@@ -80,6 +80,10 @@ internal fun AboutScreen() {
     val lazyListState = rememberLazyListState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
 
+    LaunchedEffect(Unit) {
+        AppUpdateChecker.ensureChecked(BuildConfig.VERSION_NAME)
+    }
+
     val scrollProgress by remember {
         derivedStateOf {
             if (logoHeightPx <= 0) {

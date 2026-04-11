@@ -77,14 +77,12 @@ fun StreamScreen(activity: StreamActivity) {
         ).also { ratio ->
             lastPipAspectRatio = ratio
         }
-        activity.configurePictureInPicture(
-            enabled = true,
-            params = PictureInPictureParamsCompat.Builder()
+
+        activity.configurePip(
+             PictureInPictureParamsCompat.Builder()
                 .setEnabled(true)
                 .setAspectRatio(pipAspectRatio)
-                .setSourceRectHint(
-                    if (!isInPip) pipSourceRectHint else null
-                )
+                .setSourceRectHint(pipSourceRectHint)
                 .setSeamlessResizeEnabled(true)
                 .setCloseAction(activity.pipStopAction)
                 .build(),

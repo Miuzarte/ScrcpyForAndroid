@@ -25,6 +25,7 @@
 
 ## 已知问题
 
+- 因为没有设备用于（也懒得）测试，应用可能无法正常运行在安卓版本较低的设备上，特别是画中画功能，非常取决于国产 ROM 的实现
 - 关闭画中画后不会停止 scrcpy 串流，仍然需要回到应用中点击停止
 - 虚拟按键的截图实现方式为发送
 `keycode 120`，安卓官方([keycodes.h#349](https://android.googlesource.com/platform/frameworks/native/+/master/include/android/keycodes.h#349))的定义为

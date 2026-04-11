@@ -44,7 +44,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         )
         val DEVICE_PREVIEW_CARD_HEIGHT_DP = Pair(
             intPreferencesKey("device_preview_card_height_dp"),
-            320
+            1080/3
         )
         val PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT = Pair(
             booleanPreferencesKey("preview_virtual_button_show_text"),

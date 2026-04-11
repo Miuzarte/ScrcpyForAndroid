@@ -351,6 +351,9 @@ class VirtualButtonBar(
                 maxX * offsetXFraction.coerceIn(0f, 1f)
             val currentY =
                 maxY * offsetYFraction.coerceIn(0f, 1f)
+            val popupAlignment =
+                if (offsetXFraction > 0.5f) PopupPositionProvider.Align.TopEnd
+                else PopupPositionProvider.Align.TopStart
 
             Box(
                 modifier = Modifier
@@ -422,6 +425,7 @@ class VirtualButtonBar(
                         showActions = false
                     },
                     renderInRootScaffold = true,
+                    popupAlignment = popupAlignment,
                 )
             }
         }
@@ -434,6 +438,7 @@ class VirtualButtonBar(
         onDismiss: () -> Unit,
         onAction: suspend (VirtualButtonAction) -> Unit,
         renderInRootScaffold: Boolean,
+        popupAlignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
     ) {
         val scope = rememberCoroutineScope()
         val haptics = LocalAppHaptics.current
@@ -456,7 +461,7 @@ class VirtualButtonBar(
         OverlayListPopup(
             show = show,
             popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-            alignment = PopupPositionProvider.Align.TopEnd,
+            alignment = popupAlignment,
             onDismissRequest = onDismiss,
             renderInRootScaffold = renderInRootScaffold,
             enableWindowDim = false,

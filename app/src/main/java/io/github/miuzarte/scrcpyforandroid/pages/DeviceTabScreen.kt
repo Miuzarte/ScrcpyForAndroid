@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
@@ -238,6 +239,8 @@ fun DeviceTabPage(
 
     var audioForwardingSupported by rememberSaveable { mutableStateOf(true) }
     var cameraMirroringSupported by rememberSaveable { mutableStateOf(true) }
+    var pendingScrollToPreview by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     val currentTarget =
         if (currentTargetHost.isNotBlank())
@@ -528,6 +531,7 @@ fun DeviceTabPage(
     suspend fun startScrcpySession() {
         val options = scrcpyOptions.toClientOptions(soBundleShared).fix()
         val session = scrcpy.start(options)
+        pendingScrollToPreview = true
         if (options.disableScreensaver) {
             setKeepScreenOn(true)
         }
@@ -551,6 +555,15 @@ fun DeviceTabPage(
                     ", maxSize=${options.maxSize}, maxFps=${options.maxFps}"
         )
         snackbar.show("scrcpy 已启动")
+    }
+
+    LaunchedEffect(pendingScrollToPreview, sessionInfo) {
+        if (!pendingScrollToPreview) return@LaunchedEffect
+        val session = sessionInfo ?: return@LaunchedEffect
+        if (session.width <= 0 || session.height <= 0) return@LaunchedEffect
+        // status/device list/scrcpy panel are above the preview card
+        listState.animateScrollToItem(index = 3)
+        pendingScrollToPreview = false
     }
 
     suspend fun handleAdbConnected(host: String, port: Int) {
@@ -707,6 +720,7 @@ fun DeviceTabPage(
     LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
+        state = listState,
     ) {
         item {
             StatusCard(
