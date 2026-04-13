@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
@@ -100,11 +101,9 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Store
-import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import androidx.compose.foundation.lazy.LazyColumn as FoundationLazyColumn
 
 private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
 private const val ADB_KEEPALIVE_INTERVAL_MS = 3_000L
@@ -616,7 +615,7 @@ fun DeviceTabPage(
 
         val apps = scrcpy.listings.getApps(forceRefresh = false)
         val matches = apps.filter {
-            it.label.startsWith(searchName, ignoreCase = true)
+            it.label?.startsWith(searchName, ignoreCase = true) == true
         }
 
         require(matches.isNotEmpty()) {
@@ -624,7 +623,9 @@ fun DeviceTabPage(
         }
         require(matches.size == 1) {
             "按应用名匹配到多个应用: " +
-                    matches.take(5).joinToString { "${it.label} (${it.packageName})" }
+                    matches.take(5).joinToString {
+                        "${it.label ?: it.packageName} (${it.packageName})"
+                    }
         }
 
         return StartAppRequest(
@@ -773,11 +774,13 @@ fun DeviceTabPage(
                     "sdk=${info.sdkInt}"
         )
         snackbar.show("ADB 已连接")
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                scrcpy.listings.getApps(forceRefresh = true)
-            }.onFailure { error ->
-                logEvent("获取应用列表失败: ${error.message}", Log.WARN, error)
+        if (asBundle.adbAutoLoadAppListOnConnect) {
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    scrcpy.listings.getApps(forceRefresh = true)
+                }.onFailure { error ->
+                    logEvent("获取应用列表失败: ${error.message}", Log.WARN, error)
+                }
             }
         }
 
@@ -1265,7 +1268,7 @@ private fun RecentTasksBottomSheet(
                 }
 
                 else -> {
-                    FoundationLazyColumn(
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 420.dp),
@@ -1274,15 +1277,19 @@ private fun RecentTasksBottomSheet(
                             val task = tasks[index]
                             val app = scrcpy.listings.findCachedApp(task.packageName)
                             val entry = SpinnerEntry(
-                                icon = { modifier ->
-                                    Icon(
-                                        imageVector = if (app?.system == true) MiuixIcons.Tune else MiuixIcons.Store,
-                                        contentDescription = task.packageName,
-                                        modifier = modifier,
-                                    )
+                                icon = app?.system?.let { system ->
+                                    { modifier ->
+                                        Icon(
+                                            imageVector =
+                                                if (system) Icons.Rounded.Android // MiuixIcons.Tune
+                                                else MiuixIcons.Store,
+                                            contentDescription = task.packageName,
+                                            modifier = modifier,
+                                        )
+                                    }
                                 },
                                 title = app?.label?.takeIf { it.isNotBlank() } ?: task.packageName,
-                                summary = task.packageName,
+                                summary = app?.let { task.packageName },
                             )
                             RecentTaskSheetItem(
                                 entry = entry,

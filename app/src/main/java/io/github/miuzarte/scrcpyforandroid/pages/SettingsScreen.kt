@@ -430,6 +430,19 @@ fun SettingsPage(
                         )
                     },
                 )
+                SwitchPreference(
+                    title = "连接后自动获取应用列表",
+                    summary = "ADB 连接成功后立刻执行 --list-apps，用于补全最近任务列表应用名",
+                    checked = asBundle.adbAutoLoadAppListOnConnect,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            adbAutoLoadAppListOnConnect = it
+                        )
+                        if (it) snackbar.show(
+                            "--list-apps 操作可能非常耗时（特别是在息屏状态下），启用后可能导致连接设备后阻塞过久！"
+                        )
+                    },
+                )
             }
         }
 

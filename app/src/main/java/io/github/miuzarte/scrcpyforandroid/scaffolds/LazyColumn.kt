@@ -15,15 +15,16 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
 fun LazyColumn(
-    contentPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    scrollBehavior: ScrollBehavior? = null,
     state: LazyListState = rememberLazyListState(),
     itemSpacing: Dp = UiSpacing.PageItem,
     horizontalPadding: Dp = UiSpacing.PageHorizontal,
@@ -43,7 +44,11 @@ fun LazyColumn(
                     } else Modifier
             )
             .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .then(
+                if (scrollBehavior != null)
+                    Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                else Modifier
+            )
             .padding(contentPadding),
         state = state,
         contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding),

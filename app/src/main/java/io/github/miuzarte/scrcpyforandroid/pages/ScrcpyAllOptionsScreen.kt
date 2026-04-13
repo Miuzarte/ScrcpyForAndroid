@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -648,16 +649,18 @@ internal fun ScrcpyAllOptionsPage(
                 apps.forEach { app ->
                     add(
                         SpinnerEntry(
-                            icon = {
-                                Icon(
-                                    imageVector =
-                                        if (app.system) MiuixIcons.Tune
-                                        else MiuixIcons.Store,
-                                    contentDescription = app.label,
-                                    modifier = Modifier.padding(end = UiSpacing.ContentVertical),
-                                )
+                            icon = app.system?.let { system ->
+                                {
+                                    Icon(
+                                        imageVector =
+                                            if (system) Icons.Rounded.Android // MiuixIcons.Tune
+                                            else MiuixIcons.Store,
+                                        contentDescription = app.label ?: app.packageName,
+                                        modifier = Modifier.padding(end = UiSpacing.ContentVertical),
+                                    )
+                                }
                             },
-                            title = app.label,
+                            title = app.label?.takeIf { it.isNotBlank() } ?: app.packageName,
                             summary = app.packageName,
                         )
                     )

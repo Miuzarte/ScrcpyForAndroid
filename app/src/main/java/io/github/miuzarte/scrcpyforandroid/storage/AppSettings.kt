@@ -78,9 +78,14 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             booleanPreferencesKey("adb_auto_reconnect_paired_device"),
             true
         )
+        // 没必要加开关, 保持启用
         val ADB_MDNS_LAN_DISCOVERY = Pair(
             booleanPreferencesKey("adb_mdns_lan_discovery"),
             true
+        )
+        val ADB_AUTO_LOAD_APP_LIST_ON_CONNECT = Pair(
+            booleanPreferencesKey("adb_auto_load_app_list_on_connect"),
+            false
         )
         val LAST_UPDATE_CHECK_AT = Pair(
             longPreferencesKey("last_update_check_at"),
@@ -112,6 +117,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     val adbPairingAutoDiscoverOnDialogOpen by setting(ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN)
     val adbAutoReconnectPairedDevice by setting(ADB_AUTO_RECONNECT_PAIRED_DEVICE)
     val adbMdnsLanDiscovery by setting(ADB_MDNS_LAN_DISCOVERY)
+    val adbAutoLoadAppListOnConnect by setting(ADB_AUTO_LOAD_APP_LIST_ON_CONNECT)
     val lastUpdateCheckAt by setting(LAST_UPDATE_CHECK_AT)
 
     @Parcelize
@@ -133,6 +139,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val adbPairingAutoDiscoverOnDialogOpen: Boolean,
         val adbAutoReconnectPairedDevice: Boolean,
         val adbMdnsLanDiscovery: Boolean,
+        val adbAutoLoadAppListOnConnect: Boolean,
         val lastUpdateCheckAt: Long,
     ) : Parcelable {
     }
@@ -155,6 +162,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN) { bundle: Bundle -> bundle.adbPairingAutoDiscoverOnDialogOpen },
         bundleField(ADB_AUTO_RECONNECT_PAIRED_DEVICE) { bundle: Bundle -> bundle.adbAutoReconnectPairedDevice },
         bundleField(ADB_MDNS_LAN_DISCOVERY) { bundle: Bundle -> bundle.adbMdnsLanDiscovery },
+        bundleField(ADB_AUTO_LOAD_APP_LIST_ON_CONNECT) { bundle: Bundle -> bundle.adbAutoLoadAppListOnConnect },
         bundleField(LAST_UPDATE_CHECK_AT) { bundle: Bundle -> bundle.lastUpdateCheckAt },
     )
 
@@ -180,6 +188,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         ),
         adbAutoReconnectPairedDevice = preferences.read(ADB_AUTO_RECONNECT_PAIRED_DEVICE),
         adbMdnsLanDiscovery = preferences.read(ADB_MDNS_LAN_DISCOVERY),
+        adbAutoLoadAppListOnConnect = preferences.read(ADB_AUTO_LOAD_APP_LIST_ON_CONNECT),
         lastUpdateCheckAt = preferences.read(LAST_UPDATE_CHECK_AT),
     )
 

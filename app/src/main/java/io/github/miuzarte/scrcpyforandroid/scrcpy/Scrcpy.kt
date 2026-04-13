@@ -670,8 +670,8 @@ class Scrcpy(
     )
 
     data class AppInfo(
-        val system: Boolean,
-        val label: String,
+        val system: Boolean?,
+        val label: String?,
         val packageName: String,
     )
 
