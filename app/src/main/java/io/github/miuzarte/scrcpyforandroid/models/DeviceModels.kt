@@ -19,8 +19,24 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
             separator: String = DEFAULT_SEPARATOR,
         ): DeviceShortcuts {
             if (s.isBlank()) return DeviceShortcuts(emptyList())
+            var nextLegacyId = 1
             val list = s.splitToSequence(separator)
-                .mapNotNull { DeviceShortcut.unmarshalFrom(it) }
+                .mapNotNull { raw ->
+                    val firstValue = raw.split(DeviceShortcut.DEFAULT_SEPARATOR, limit = 2)
+                        .firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+                    if (firstValue.toIntOrNull() != null) {
+                        DeviceShortcut.unmarshalFrom(raw)
+                    } else {
+                        DeviceShortcut.unmarshalFrom(
+                            s = raw,
+                            fallbackId = nextLegacyId.toString(),
+                        ).also {
+                            if (it != null) nextLegacyId++
+                        }
+                    }
+                }
                 .toList()
             return DeviceShortcuts(list)
         }
@@ -56,6 +72,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         val updateById = id != null
 
         val updated = DeviceShortcut(
+            id = old.id,
             name = when {
                 name == null -> old.name
                 updateNameOnlyWhenEmpty && old.name.isNotBlank() -> old.name
@@ -88,15 +105,33 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         shortcut: DeviceShortcut,
         index: Int? = null,
     ): DeviceShortcuts {
-        val existingIdx = getIndex(shortcut.id)
+        val normalizedShortcut = normalizeId(shortcut)
+        val existingById = getIndex(normalizedShortcut.id)
+        val existingIdx = if (existingById >= 0) {
+            existingById
+        } else {
+            getIndex(normalizedShortcut.host, normalizedShortcut.port)
+        }
         val newList = devices.toMutableList()
         if (existingIdx >= 0) {
-            newList[existingIdx] = shortcut
+            // Keep existing id stable when matching by host:port.
+            val existingId = devices[existingIdx].id
+            newList[existingIdx] = normalizedShortcut.copy(id = existingId)
         } else {
-            if (index != null) newList.add(index, shortcut)
-            else newList.add(shortcut)
+            if (index != null) newList.add(index, normalizedShortcut)
+            else newList.add(normalizedShortcut)
         }
         return DeviceShortcuts(newList)
+    }
+
+    private fun normalizeId(shortcut: DeviceShortcut): DeviceShortcut {
+        if (shortcut.id.toIntOrNull() != null) return shortcut
+        return shortcut.copy(id = nextId())
+    }
+
+    private fun nextId(): String {
+        val maxId = devices.maxOfOrNull { it.id.toIntOrNull() ?: 0 } ?: 0
+        return (maxId + 1).toString()
     }
 
     fun move(fromIndex: Int, toIndex: Int): DeviceShortcuts {
@@ -121,8 +156,8 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
         DeviceShortcuts(devices)
 }
 
-// TODO: 增加 id 字段，解决编辑端口的问题
 data class DeviceShortcut(
+    val id: String = "",
     val name: String = "",
     val host: String,
     val port: Int = Defaults.ADB_PORT,
@@ -130,11 +165,10 @@ data class DeviceShortcut(
     val openFullscreenOnStart: Boolean = false,
     val scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
 ) {
-    val id: String get() = "$host:$port"
-
     fun marshalToString(
         separator: String = DEFAULT_SEPARATOR,
     ): String = listOf(
+        id.trim(),
         name.trim(),
         host.trim(),
         port.toString(),
@@ -150,10 +184,45 @@ data class DeviceShortcut(
         fun unmarshalFrom(
             s: String,
             separator: String = DEFAULT_SEPARATOR,
+            fallbackId: String? = null,
         ): DeviceShortcut? {
             val parts = s.split(separator)
-            return when (parts.size) {
+            val idInData = parts.firstOrNull()
+                ?.trim()
+                ?.takeIf { it.toIntOrNull() != null }
+            return if (idInData != null) when (parts.size) {
+                4, 5, 6, 7 -> {
+                    val name = parts[1].trim()
+                    val host = parts[2].trim()
+                    val port = parts[3].trim().toIntOrNull() ?: Defaults.ADB_PORT
+
+                    val startScrcpyOnConnect = parts.getOrNull(4)
+                        ?.trim() == "1"
+                    val openFullscreenOnStart = startScrcpyOnConnect
+                            && parts.getOrNull(5)
+                        ?.trim() == "1"
+                    val scrcpyProfileId = parts.getOrNull(6)
+                        ?.trim()
+                        .takeUnless { it.isNullOrBlank() }
+                        ?: ScrcpyOptions.GLOBAL_PROFILE_ID
+
+                    if (host.isNotBlank()) DeviceShortcut(
+                        id = idInData,
+                        name = name,
+                        host = host,
+                        port = port,
+                        startScrcpyOnConnect = startScrcpyOnConnect,
+                        openFullscreenOnStart = openFullscreenOnStart,
+                        scrcpyProfileId = scrcpyProfileId,
+                    )
+                    else null
+                }
+
+                else -> null
+            }
+            else when (parts.size) {
                 3, 4, 5, 6 -> {
+                    val id = fallbackId ?: return null
                     val name = parts[0].trim()
                     val host = parts[1].trim()
                     val port = parts[2].trim().toIntOrNull() ?: Defaults.ADB_PORT
@@ -169,6 +238,7 @@ data class DeviceShortcut(
                         ?: ScrcpyOptions.GLOBAL_PROFILE_ID
 
                     if (host.isNotBlank()) DeviceShortcut(
+                        id = id,
                         name = name,
                         host = host,
                         port = port,

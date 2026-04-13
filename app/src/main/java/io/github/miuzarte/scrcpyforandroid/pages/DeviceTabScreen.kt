@@ -185,7 +185,7 @@ fun DeviceTabPage(
     scrcpy: Scrcpy,
 ) {
     val activity = LocalActivity.current
-    val fragmentActivity = remember(activity) {activity as? FragmentActivity}
+    val fragmentActivity = remember(activity) { activity as? FragmentActivity }
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
@@ -320,10 +320,14 @@ fun DeviceTabPage(
             VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout)
         )
     }
+
+    var quickConnectInputTemp by rememberSaveable(qdBundle.quickConnectInput) {
+        mutableStateOf(qdBundle.quickConnectInput)
+    }
+
     var savedShortcuts by remember {
         mutableStateOf(DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList))
     }
-
     LaunchedEffect(qdBundle.quickDevicesList) {
         savedShortcuts = DeviceShortcuts.unmarshalFrom(qdBundle.quickDevicesList)
     }
@@ -1008,17 +1012,24 @@ fun DeviceTabPage(
             // "快速连接"
             item {
                 QuickConnectCard(
-                    input = qdBundle.quickConnectInput,
+                    input = quickConnectInputTemp,
                     onValueChange = {
-                        qdBundle = qdBundle.copy(quickConnectInput = it)
+                        quickConnectInputTemp = it
+                    },
+                    onFocusLost = {
+                        qdBundle = qdBundle.copy(
+                            quickConnectInput = quickConnectInputTemp
+                        )
                     },
                     enabled = !adbConnecting,
                     onAddDevice = {
-                        val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
+                        val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                             ?: return@QuickConnectCard
+
                         savedShortcuts = savedShortcuts.upsert(
                             DeviceShortcut(host = target.host, port = target.port)
                         )
+
                         Log.d(
                             "SavedShortcuts",
                             "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
@@ -1026,8 +1037,9 @@ fun DeviceTabPage(
                         snackbar.show("已添加设备: ${target.host}:${target.port}")
                     },
                     onConnect = {
-                        val target = ConnectionTarget.unmarshalFrom(qdBundle.quickConnectInput)
+                        val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                             ?: return@QuickConnectCard
+
                         adbCallbacks.onQuickConnect(target)
                     },
                 )

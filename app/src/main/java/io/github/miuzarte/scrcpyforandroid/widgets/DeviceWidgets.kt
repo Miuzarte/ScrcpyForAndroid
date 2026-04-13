@@ -953,6 +953,7 @@ internal fun DeviceTile(
         val trimmedHost = currentDraft.host.trim()
         if (trimmedHost.isBlank()) return@LaunchedEffect
         val updated = DeviceShortcut(
+            id = currentDraft.id,
             name = currentDraft.name.trim(),
             host = trimmedHost,
             port = currentDraft.port,
@@ -1200,7 +1201,7 @@ internal fun DeviceTileList(
 internal fun QuickConnectCard(
     input: String,
     onValueChange: (String) -> Unit,
-    onFocusChange: (() -> Unit)? = null,
+    onFocusLost: (() -> Unit)? = null,
     onConnect: () -> Unit,
     onAddDevice: () -> Unit,
     enabled: Boolean = true,
@@ -1240,7 +1241,7 @@ internal fun QuickConnectCard(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                onFocusLost = onFocusChange,
+                onFocusLost = onFocusLost,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

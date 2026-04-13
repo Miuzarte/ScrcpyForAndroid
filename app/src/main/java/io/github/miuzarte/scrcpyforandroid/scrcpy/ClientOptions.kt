@@ -11,8 +11,6 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.OrientationLock
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 
-// TODO: 配置切换
-
 data class ClientOptions(
     // var serial: String = "", // to server
 
