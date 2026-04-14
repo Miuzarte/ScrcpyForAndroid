@@ -22,7 +22,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 
 @Composable
 fun SuperSlider(
@@ -69,8 +70,8 @@ fun SuperSlider(
             val text = if (shouldShowUnit) "$valueText $unit" else valueText
             Text(
                 text = text,
-                fontSize = MiuixTheme.textStyles.body2.fontSize,
-                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                fontSize = textStyles.body2.fontSize,
+                color = colorScheme.onSurfaceVariantActions,
             )
         },
         enabled = enabled,

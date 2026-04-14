@@ -10,6 +10,10 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -32,13 +36,21 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.ui.NavDisplay
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
@@ -55,6 +67,13 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableFloatingBottomBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableFloatingBottomBarBlur
+import io.github.miuzarte.scrcpyforandroid.ui.component.FloatingBottomBar
+import io.github.miuzarte.scrcpyforandroid.ui.component.FloatingBottomBarItem
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,15 +81,19 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.ThemeController
+import top.yukonga.miuix.kmp.blur.layerBackdrop as miuixLayerBackdrop
 
 private enum class MainBottomTabDestination(
     val label: String,
@@ -316,59 +339,151 @@ fun MainScreen() {
 
     val rootEntryProvider = entryProvider<NavKey> {
         entry(RootScreen.Home) {
+            val blurBackdrop = rememberBlurBackdrop(enableBlur = asBundle.blur)
+            val floatingBarBlurActive = asBundle.blur && asBundle.floatingBottomBarBlur
+            val surfaceColor = colorScheme.surface
+            val glassBackdrop = rememberLayerBackdrop {
+                drawRect(surfaceColor)
+                drawContent()
+            }
+
+            fun navigateToTab(tab: MainBottomTabDestination) {
+                scope.launch {
+                    pagerState.animateScrollToPage(
+                        page = tab.ordinal,
+                        animationSpec = spring(
+                            dampingRatio = UiMotion.PAGE_SWITCH_DAMPING_RATIO,
+                            stiffness = UiMotion.PAGE_SWITCH_STIFFNESS,
+                        ),
+                    )
+                }
+            }
+
             Scaffold(
                 bottomBar = {
-                    NavigationBar {
-                        tabs.forEach { tab ->
-                            NavigationBarItem(
-                                selected = currentTab == tab,
-                                onClick = {
-                                    scope.launch {
-                                        pagerState.animateScrollToPage(
-                                            page = tab.ordinal,
-                                            animationSpec = spring(
-                                                dampingRatio = UiMotion.PAGE_SWITCH_DAMPING_RATIO,
-                                                stiffness = UiMotion.PAGE_SWITCH_STIFFNESS,
-                                            ),
-                                        )
-                                    }
-                                },
-                                icon = tab.icon,
-                                label = tab.label,
-                            )
+                    if (!asBundle.floatingBottomBar) {
+                        BlurredBar(backdrop = blurBackdrop) {
+                            NavigationBar(
+                                color =
+                                    if (blurBackdrop != null) Color.Transparent
+                                    else colorScheme.surface,
+                            ) {
+                                tabs.forEach { tab ->
+                                    NavigationBarItem(
+                                        selected = currentTab == tab,
+                                        onClick = { navigateToTab(tab) },
+                                        icon = tab.icon,
+                                        label = tab.label,
+                                    )
+                                }
+                            }
                         }
                     }
                 },
                 snackbarHost = { SnackbarHost(snackHostState) },
             ) { contentPadding ->
-                HorizontalPager(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = contentPadding.calculateBottomPadding()),
-                    state = pagerState,
-                    beyondViewportPageCount = 1,
-                ) { page ->
-                    val tab = tabs[page]
-                    saveableStateHolder.SaveableStateProvider(tab.name) {
-                        when (tab) {
-                            MainBottomTabDestination.Device -> DeviceTabScreen(
-                                scrollBehavior = devicesPageScrollBehavior,
-                                scrcpy = scrcpy,
-                                onOpenReorderDevices = { showReorderDevices = true },
-                            )
-
-                            MainBottomTabDestination.Settings -> SettingsScreen(
-                                scrollBehavior = settingsPageScrollBehavior,
-                                onOpenReorderDevices = { showReorderDevices = true },
-                            )
-                        }
-                    }
+                val bottomInnerPadding: Dp = if (asBundle.floatingBottomBar) {
+                    12.dp + 64.dp + contentPadding.calculateBottomPadding()
+                } else {
+                    contentPadding.calculateBottomPadding()
                 }
 
-                ReorderDevicesScreen(
-                    show = showReorderDevices,
-                    onDismissRequest = { showReorderDevices = false },
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(if (blurBackdrop != null) Modifier.miuixLayerBackdrop(blurBackdrop) else Modifier),
+                    ) {
+                        HorizontalPager(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .then(
+                                    if (asBundle.floatingBottomBar && floatingBarBlurActive) {
+                                        Modifier.layerBackdrop(glassBackdrop)
+                                    } else {
+                                        Modifier
+                                    }
+                                ),
+                            state = pagerState,
+                            beyondViewportPageCount = 1,
+                        ) { page ->
+                            val tab = tabs[page]
+                            saveableStateHolder.SaveableStateProvider(tab.name) {
+                                when (tab) {
+                                    MainBottomTabDestination.Device -> DeviceTabScreen(
+                                        scrollBehavior = devicesPageScrollBehavior,
+                                        scrcpy = scrcpy,
+                                        bottomInnerPadding = bottomInnerPadding,
+                                        onOpenReorderDevices = { showReorderDevices = true },
+                                    )
+
+                                    MainBottomTabDestination.Settings -> SettingsScreen(
+                                        scrollBehavior = settingsPageScrollBehavior,
+                                        bottomInnerPadding = bottomInnerPadding,
+                                        onOpenReorderDevices = { showReorderDevices = true },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (asBundle.floatingBottomBar) {
+                        FloatingBottomBar(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp + contentPadding.calculateBottomPadding())
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {},
+                                ),
+                            selectedIndex = { pagerState.currentPage },
+                            onSelected = { index ->
+                                scope.launch {
+                                    pagerState.animateScrollToPage(
+                                        page = index,
+                                        animationSpec = spring(
+                                            dampingRatio = UiMotion.PAGE_SWITCH_DAMPING_RATIO,
+                                            stiffness = UiMotion.PAGE_SWITCH_STIFFNESS,
+                                        ),
+                                    )
+                                }
+                            },
+                            backdrop = glassBackdrop,
+                            tabsCount = tabs.size,
+                            isBlurEnabled = floatingBarBlurActive,
+                        ) {
+                            tabs.forEach { tab ->
+                                FloatingBottomBarItem(
+                                    onClick = { navigateToTab(tab) },
+                                    modifier = Modifier.defaultMinSize(minWidth = 76.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = colorScheme.onSurface,
+                                    )
+                                    Text(
+                                        text = tab.label,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        color = colorScheme.onSurface,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Visible,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    ReorderDevicesScreen(
+                        show = showReorderDevices,
+                        onDismissRequest = { showReorderDevices = false },
+                    )
+                }
             }
         }
 
@@ -403,8 +518,14 @@ fun MainScreen() {
     }
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
-    MiuixTheme(controller = themeController) {
+    MiuixTheme(
+        controller = themeController,
+        smoothRounding = asBundle.smoothCorner,
+    ) {
         CompositionLocalProvider(
+            LocalEnableBlur provides asBundle.blur,
+            LocalEnableFloatingBottomBar provides asBundle.floatingBottomBar,
+            LocalEnableFloatingBottomBarBlur provides asBundle.floatingBottomBarBlur,
             LocalRootNavigator provides rootNavigator,
             LocalSnackbarController provides snackbarController,
             LocalAppHaptics provides haptics,

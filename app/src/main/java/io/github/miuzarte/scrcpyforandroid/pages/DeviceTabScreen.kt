@@ -6,6 +6,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.BlendModeColorFilter
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -70,6 +72,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTileList
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
@@ -102,12 +107,14 @@ import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 
 private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
 private const val ADB_KEEPALIVE_INTERVAL_MS = 3_000L
@@ -129,52 +136,63 @@ private data class StartAppRequest(
 fun DeviceTabScreen(
     scrollBehavior: ScrollBehavior,
     scrcpy: Scrcpy,
+    bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
 ) {
     val navigator = LocalRootNavigator.current
     var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
+    val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
+    val blurActive = blurBackdrop != null
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = "设备",
-                actions = {
-                    IconButton(
-                        onClick = { showThreePointMenu = true },
-                        holdDownState = showThreePointMenu,
-                    ) {
-                        Icon(
-                            Icons.Rounded.MoreVert,
-                            contentDescription = "更多"
+            BlurredBar(backdrop = blurBackdrop) {
+                TopAppBar(
+                    title = "设备",
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface,
+                    actions = {
+                        IconButton(
+                            onClick = { showThreePointMenu = true },
+                            holdDownState = showThreePointMenu,
+                        ) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = "更多"
+                            )
+                        }
+                        DeviceMenuPopup(
+                            show = showThreePointMenu,
+                            onDismissRequest = { showThreePointMenu = false },
+                            onReorderDevices = {
+                                onOpenReorderDevices()
+                                showThreePointMenu = false
+                            },
+                            onOpenVirtualButtonOrder = {
+                                navigator.push(RootScreen.VirtualButtonOrder)
+                                showThreePointMenu = false
+                            },
+                            canClearLogs = EventLogger.hasLogs(),
+                            onClearLogs = {
+                                EventLogger.clearLogs()
+                                showThreePointMenu = false
+                            },
                         )
-                    }
-                    DeviceMenuPopup(
-                        show = showThreePointMenu,
-                        onDismissRequest = { showThreePointMenu = false },
-                        onReorderDevices = {
-                            onOpenReorderDevices()
-                            showThreePointMenu = false
-                        },
-                        onOpenVirtualButtonOrder = {
-                            navigator.push(RootScreen.VirtualButtonOrder)
-                            showThreePointMenu = false
-                        },
-                        canClearLogs = EventLogger.hasLogs(),
-                        onClearLogs = {
-                            EventLogger.clearLogs()
-                            showThreePointMenu = false
-                        },
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { pagePadding ->
-        DeviceTabPage(
-            contentPadding = pagePadding,
-            scrollBehavior = scrollBehavior,
-            scrcpy = scrcpy,
-        )
+        Box(modifier = if (blurActive) Modifier.layerBackdrop(blurBackdrop) else Modifier) {
+            DeviceTabPage(
+                contentPadding = pagePadding,
+                scrollBehavior = scrollBehavior,
+                scrcpy = scrcpy,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+        }
     }
 }
 
@@ -183,6 +201,7 @@ fun DeviceTabPage(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
     scrcpy: Scrcpy,
+    bottomInnerPadding: Dp,
 ) {
     val activity = LocalActivity.current
     val fragmentActivity = remember(activity) { activity as? FragmentActivity }
@@ -943,6 +962,7 @@ fun DeviceTabPage(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
         state = listState,
+        bottomInnerPadding = bottomInnerPadding,
     ) {
         item {
             StatusCard(
@@ -1073,8 +1093,8 @@ fun DeviceTabPage(
                                 recentTasks.isNotEmpty() -> recentTasks.size.toString()
                                 else -> "空"
                             },
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = colorScheme.onSurfaceVariantActions,
+                            fontSize = textStyles.body2.fontSize,
                             modifier = Modifier.padding(end = UiSpacing.ContentVertical),
                         )
                     },
@@ -1180,7 +1200,6 @@ fun DeviceTabPage(
             }
         }
 
-        item { Spacer(Modifier.height(UiSpacing.PageBottom)) }
     }
 
     RecentTasksBottomSheet(
@@ -1224,7 +1243,6 @@ private fun DeviceMenuPopup(
         popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
         alignment = PopupPositionProvider.Align.TopEnd,
         onDismissRequest = onDismissRequest,
-        enableWindowDim = false,
     ) {
         ListPopupColumn {
             DeviceMenuPopupItem(
@@ -1376,7 +1394,7 @@ private fun RecentTaskSheetItem(
                 entry.title?.let {
                     Text(
                         text = it,
-                        fontSize = MiuixTheme.textStyles.body1.fontSize,
+                        fontSize = textStyles.body1.fontSize,
                         fontWeight = FontWeight.Medium,
                         color = spinnerColors.contentColor,
                     )
@@ -1384,7 +1402,7 @@ private fun RecentTaskSheetItem(
                 entry.summary?.let {
                     Text(
                         text = it,
-                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                        fontSize = textStyles.body2.fontSize,
                         color = spinnerColors.summaryColor,
                     )
                 }
@@ -1425,9 +1443,9 @@ private fun DeviceMenuPopupItem(
         if (index == optionSize - 1) UiSpacing.PopupHorizontal else UiSpacing.PageItem
     Text(
         text = text,
-        fontSize = MiuixTheme.textStyles.body1.fontSize,
+        fontSize = textStyles.body1.fontSize,
         fontWeight = FontWeight.Medium,
-        color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+        color = colorScheme.disabledOnSecondaryVariant,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = UiSpacing.PopupHorizontal)

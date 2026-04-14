@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -12,16 +13,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
@@ -36,34 +40,45 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 @Composable
 internal fun VirtualButtonOrderScreen(
     scrollBehavior: ScrollBehavior,
 ) {
     val navigator = LocalRootNavigator.current
+    val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
+    val blurActive = blurBackdrop != null
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = "虚拟按钮排序",
-                navigationIcon = {
-                    IconButton(onClick = navigator.pop) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+            BlurredBar(backdrop = blurBackdrop) {
+                TopAppBar(
+                    title = "虚拟按钮排序",
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface,
+                    navigationIcon = {
+                        IconButton(onClick = navigator.pop) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { pagePadding ->
-        VirtualButtonOrderPage(
-            contentPadding = pagePadding,
-            scrollBehavior = scrollBehavior,
-        )
+        Box(modifier = if (blurActive) Modifier.layerBackdrop(blurBackdrop) else Modifier) {
+            VirtualButtonOrderPage(
+                contentPadding = pagePadding,
+                scrollBehavior = scrollBehavior,
+            )
+        }
     }
 }
 
@@ -72,7 +87,6 @@ internal fun VirtualButtonOrderPage(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
 ) {
-    val scope = rememberCoroutineScope()
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val asBundleShared by appSettings.bundleState.collectAsState()
@@ -105,8 +119,8 @@ internal fun VirtualButtonOrderPage(
     LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
+        bottomInnerPadding = UiSpacing.PageBottom,
     ) {
-        // 按钮显示文本开关
         item {
             Card {
                 SwitchPreference(
@@ -130,8 +144,12 @@ internal fun VirtualButtonOrderPage(
                         ReorderableList.Item(
                             id = action.id,
                             icon = action.icon,
-                            title = if (action.keycode == null) action.title else "${action.title} (${action.keycode})",
-                            subtitle = if (item.showOutside) "显示在外部" else "显示在更多菜单内",
+                            title =
+                                if (action.keycode == null) action.title
+                                else "${action.title} (${action.keycode})",
+                            subtitle =
+                                if (item.showOutside) "显示在外部"
+                                else "显示在更多菜单内",
                             endActions = listOf(
                                 ReorderableList.EndAction.Checkbox(
                                     checked = item.showOutside,
@@ -139,16 +157,13 @@ internal fun VirtualButtonOrderPage(
                                     onClick = {
                                         val checked = !item.showOutside
                                         buttonItems = buttonItems.map { current ->
-                                            if (current.action.id == action.id) {
+                                            if (current.action.id == action.id)
                                                 current.copy(showOutside = checked)
-                                            } else {
-                                                current
-                                            }
+                                            else current
                                         }
                                         asBundle = asBundle.copy(
-                                            virtualButtonsLayout = VirtualButtonActions.encodeStoredLayout(
-                                                buttonItems
-                                            )
+                                            virtualButtonsLayout = VirtualButtonActions
+                                                .encodeStoredLayout(buttonItems)
                                         )
                                     },
                                 )
@@ -158,11 +173,11 @@ internal fun VirtualButtonOrderPage(
                 },
                 orientation = ReorderableList.Orientation.Column,
                 onSettle = { fromIndex, toIndex ->
-                    buttonItems = buttonItems.toMutableList().apply {
-                        add(toIndex, removeAt(fromIndex))
-                    }
+                    buttonItems = buttonItems.toMutableList()
+                        .apply { add(toIndex, removeAt(fromIndex)) }
                     asBundle = asBundle.copy(
-                        virtualButtonsLayout = VirtualButtonActions.encodeStoredLayout(buttonItems)
+                        virtualButtonsLayout = VirtualButtonActions
+                            .encodeStoredLayout(buttonItems)
                     )
                 },
             )()

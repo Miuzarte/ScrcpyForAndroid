@@ -30,7 +30,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 class ReorderableList(
     private val itemsProvider: () -> List<Item>,
@@ -114,12 +114,12 @@ class ReorderableList(
                                         Column {
                                             Text(
                                                 text = item.title,
-                                                color = MiuixTheme.colorScheme.onSurface,
+                                                color = colorScheme.onSurface,
                                                 fontWeight = FontWeight.SemiBold,
                                             )
                                             if (item.subtitle.isNotBlank()) Text(
                                                 text = item.subtitle,
-                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                color = colorScheme.onSurfaceVariantSummary,
                                                 fontSize = 13.sp,
                                             )
                                         }
@@ -152,7 +152,7 @@ class ReorderableList(
                                                 Icon(
                                                     Icons.Rounded.DragIndicator,
                                                     contentDescription = "拖动排序",
-                                                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                    tint = colorScheme.onSurfaceVariantSummary,
                                                 )
                                             }
                                         }
@@ -218,7 +218,7 @@ class ReorderableList(
                                                 Icon(
                                                     Icons.Rounded.DragIndicator,
                                                     contentDescription = "拖动排序",
-                                                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                    tint = colorScheme.onSurfaceVariantSummary,
                                                 )
                                             }
                                         }
@@ -226,13 +226,13 @@ class ReorderableList(
                                     Spacer(Modifier.padding(UiSpacing.ContentVertical))
                                     Text(
                                         text = item.title,
-                                        color = MiuixTheme.colorScheme.onSurface,
+                                        color = colorScheme.onSurface,
                                         fontWeight = FontWeight.SemiBold,
                                     )
                                     if (item.subtitle.isNotBlank()) {
                                         Text(
                                             text = item.subtitle,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                            color = colorScheme.onSurfaceVariantSummary,
                                             fontSize = 13.sp,
                                         )
                                     }
@@ -266,7 +266,7 @@ private fun EndActionView(
                 contentDescription = action.contentDescription.ifBlank {
                     fallbackContentDescription
                 },
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                tint = colorScheme.onSurfaceVariantSummary,
             )
         }
     }

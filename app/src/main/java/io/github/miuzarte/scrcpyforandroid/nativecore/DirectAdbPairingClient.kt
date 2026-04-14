@@ -1,8 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import org.conscrypt.Conscrypt
 import java.io.Closeable
 import java.io.DataInputStream
@@ -131,7 +129,6 @@ private class PairingContext private constructor(private val nativePtr: Long) {
  * keying material using the user-supplied pairing code, and exchanges peer
  * information to complete pairing.
  */
-@RequiresApi(Build.VERSION_CODES.R)
 internal class DirectAdbPairingClient(
     private val host: String,
     private val port: Int,

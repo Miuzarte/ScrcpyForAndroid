@@ -4,12 +4,11 @@ import android.content.Intent
 import android.os.Process
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
@@ -26,8 +25,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.LockscreenPasswordActivity
 import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
@@ -42,6 +43,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,30 +60,48 @@ import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
 
 @Composable
 fun SettingsScreen(
     scrollBehavior: ScrollBehavior,
+    bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
 ) {
+    val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
+    val blurActive = blurBackdrop != null
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = "设置",
-                scrollBehavior = scrollBehavior,
-            )
+            BlurredBar(backdrop = blurBackdrop) {
+                TopAppBar(
+                    title = "设置",
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface,
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { pagePadding ->
-        SettingsPage(
-            contentPadding = pagePadding,
-            scrollBehavior = scrollBehavior,
-            onOpenReorderDevices = onOpenReorderDevices,
-        )
+        Box(
+            modifier =
+                if (blurActive) Modifier.layerBackdrop(blurBackdrop)
+                else Modifier,
+        ) {
+            SettingsPage(
+                contentPadding = pagePadding,
+                scrollBehavior = scrollBehavior,
+                bottomInnerPadding = bottomInnerPadding,
+                onOpenReorderDevices = onOpenReorderDevices,
+            )
+        }
     }
 }
 
@@ -87,6 +109,7 @@ fun SettingsScreen(
 fun SettingsPage(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
+    bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -172,6 +195,7 @@ fun SettingsPage(
     LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
+        bottomInnerPadding = bottomInnerPadding,
     ) {
         item {
             SectionSmallTitle("主题")
@@ -180,29 +204,59 @@ fun SettingsPage(
                     title = "外观模式",
                     summary = ThemeModes.baseOptions
                         .getOrNull(
-                            asBundle.themeBaseIndex.coerceIn(
-                                0,
-                                ThemeModes.baseOptions.lastIndex
-                            )
+                            asBundle.themeBaseIndex
+                                .coerceIn(0, ThemeModes.baseOptions.lastIndex)
                         )
                         ?.label
                         ?: "跟随系统",
                     items = themeItems,
-                    selectedIndex = asBundle.themeBaseIndex.coerceIn(
-                        0,
-                        ThemeModes.baseOptions.lastIndex
-                    ),
+                    selectedIndex = asBundle.themeBaseIndex
+                        .coerceIn(0, ThemeModes.baseOptions.lastIndex),
                     onSelectedIndexChange = {
                         asBundle = asBundle.copy(themeBaseIndex = it)
                     },
                 )
                 SwitchPreference(
-                    title = "Monet",
+                    title = "Monet 颜色",
                     summary = "开启后使用 Monet 动态配色",
                     checked = asBundle.monet,
                     onCheckedChange = {
                         asBundle = asBundle.copy(monet = it)
                     },
+                )
+                SwitchPreference(
+                    title = "模糊",
+                    summary = "启用顶栏和底栏的模糊效果",
+                    checked = asBundle.blur,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(blur = it)
+                    }
+                )
+                SwitchPreference(
+                    title = "悬浮底栏",
+                    summary = "使用 Apple 风格的悬浮底栏",
+                    checked = asBundle.floatingBottomBar,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(floatingBottomBar = it)
+                    }
+                )
+                AnimatedVisibility(asBundle.floatingBottomBar) {
+                    SwitchPreference(
+                        title = "液态玻璃",
+                        summary = "启用悬浮底栏的液态玻璃效果",
+                        checked = asBundle.floatingBottomBarBlur,
+                        onCheckedChange = {
+                            asBundle = asBundle.copy(floatingBottomBarBlur = it)
+                        }
+                    )
+                }
+                SwitchPreference(
+                    title = "平滑圆角",
+                    summary = "启用全局平滑圆角效果",
+                    checked = asBundle.smoothCorner,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(smoothCorner = it)
+                    }
                 )
             }
         }
@@ -500,6 +554,5 @@ fun SettingsPage(
             }
         }
 
-        item { Spacer(Modifier.height(UiSpacing.PageBottom)) }
     }
 }

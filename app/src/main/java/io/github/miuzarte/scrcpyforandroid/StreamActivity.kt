@@ -110,7 +110,6 @@ class StreamActivity : FragmentActivity() {
     //+ onPictureInPictureUiStateChanged
     //- onUserLeaveHint
 
-    // @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
         super.onPictureInPictureUiStateChanged(pipState)
 

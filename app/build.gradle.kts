@@ -40,8 +40,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.1.5"
+        versionCode = 12
+        versionName = "0.1.6"
 
         externalNativeBuild {
             cmake {
@@ -114,6 +114,7 @@ dependencies {
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
     implementation(libs.miuix.navigation3.ui)
+    implementation(libs.backdrop)
     implementation("io.github.vvb2060.ndk:boringssl:20250114")
     implementation("org.lsposed.libcxx:libcxx:27.0.12077973")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")

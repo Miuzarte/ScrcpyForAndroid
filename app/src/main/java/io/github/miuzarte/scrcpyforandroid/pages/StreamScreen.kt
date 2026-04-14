@@ -99,7 +99,10 @@ fun StreamScreen(activity: StreamActivity) {
         SnackbarController(scope = snackbarScope, hostState = snackbarHostState)
     }
 
-    MiuixTheme(controller = themeController) {
+    MiuixTheme(
+        controller = themeController,
+        smoothRounding = asBundle.smoothCorner,
+    ) {
         CompositionLocalProvider(
             LocalSnackbarController provides snackbarController,
             LocalAppHaptics provides haptics,

@@ -1,10 +1,9 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
+import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
@@ -15,7 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
-@RequiresApi(Build.VERSION_CODES.R)
 /**
  * Performs mDNS discovery for ADB TLS pairing/connect services on the local network.
  *
@@ -26,7 +24,7 @@ internal object AdbMdnsDiscoverer {
 
     private lateinit var nsdManager: NsdManager
 
-    fun init(context: android.content.Context) {
+    fun init(context: Context) {
         if (::nsdManager.isInitialized) return
         nsdManager = context.applicationContext.getSystemService(NsdManager::class.java)
     }

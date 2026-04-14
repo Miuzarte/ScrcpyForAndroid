@@ -23,7 +23,7 @@ import top.yukonga.miuix.kmp.basic.SpinnerDefaults
 import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 @Composable
 fun PasswordPickerPopupContent(
@@ -67,7 +67,7 @@ fun PasswordPickerPopupContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(UiSpacing.PopupHorizontal),
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = colorScheme.onSurfaceVariantSummary,
                 fontWeight = FontWeight.Medium,
             )
             return@ListPopupColumn
@@ -79,7 +79,7 @@ fun PasswordPickerPopupContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(UiSpacing.PopupHorizontal),
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = colorScheme.onSurfaceVariantSummary,
                 fontWeight = FontWeight.Medium,
             )
             return@ListPopupColumn

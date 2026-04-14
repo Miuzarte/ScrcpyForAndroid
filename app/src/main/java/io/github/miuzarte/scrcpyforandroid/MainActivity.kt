@@ -1,10 +1,9 @@
 package io.github.miuzarte.scrcpyforandroid
 
-import android.os.Build
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
 import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.pages.MainScreen
 import io.github.miuzarte.scrcpyforandroid.password.BiometricGate
@@ -13,12 +12,10 @@ import io.github.miuzarte.scrcpyforandroid.password.hasAuthenticatedOrigin
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppWakeLocks
 import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
-import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
 
 // 生物认证需要 FragmentActivity
 class MainActivity : FragmentActivity() {
-    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

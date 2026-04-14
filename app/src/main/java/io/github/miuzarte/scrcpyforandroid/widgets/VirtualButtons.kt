@@ -66,7 +66,7 @@ import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 enum class VirtualButtonAction(
     val id: String,
@@ -216,10 +216,10 @@ class VirtualButtonBar(
         passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
     ) {
         val haptics = LocalAppHaptics.current
-        val activeContainerColor = MiuixTheme.colorScheme.primary
-        val disabledContainerColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.35f)
-        val activeContentColor = MiuixTheme.colorScheme.onPrimary
-        val disabledContentColor = MiuixTheme.colorScheme.onPrimary.copy(alpha = 0.45f)
+        val activeContainerColor = colorScheme.primary
+        val disabledContainerColor = colorScheme.primary.copy(alpha = 0.35f)
+        val activeContentColor = colorScheme.onPrimary
+        val disabledContentColor = colorScheme.onPrimary.copy(alpha = 0.45f)
 
         var showMorePopup by remember { mutableStateOf(false) }
         Row(

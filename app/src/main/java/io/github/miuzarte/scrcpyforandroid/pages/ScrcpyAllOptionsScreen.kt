@@ -3,6 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.pages
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -63,6 +65,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
+import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +92,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
@@ -96,7 +102,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import kotlin.math.roundToInt
 
 @Composable
@@ -105,6 +111,8 @@ internal fun ScrcpyAllOptionsScreen(
     scrcpy: Scrcpy,
 ) {
     val navigator = LocalRootNavigator.current
+    val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
+    val blurActive = blurBackdrop != null
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbarController.current
     var showProfileMenu by rememberSaveable { mutableStateOf(false) }
@@ -211,81 +219,92 @@ internal fun ScrcpyAllOptionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = "所有参数",
-                navigationIcon = {
-                    IconButton(onClick = navigator.pop) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
+            BlurredBar(backdrop = blurBackdrop) {
+                TopAppBar(
+                    title = "所有参数",
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface,
+                    navigationIcon = {
+                        IconButton(onClick = navigator.pop) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showProfileMenu = true },
+                            holdDownState = showProfileMenu,
+                        ) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = "配置管理",
+                            )
+                        }
+                        ProfileMenuPopup(
+                            show = showProfileMenu,
+                            onDismissRequest = { showProfileMenu = false },
+                            onManageProfiles = {
+                                showManageProfilesSheet = true
+                                showProfileMenu = false
+                            },
                         )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showProfileMenu = true },
-                        holdDownState = showProfileMenu,
-                    ) {
-                        Icon(
-                            Icons.Rounded.MoreVert,
-                            contentDescription = "配置管理",
-                        )
-                    }
-                    ProfileMenuPopup(
-                        show = showProfileMenu,
-                        onDismissRequest = { showProfileMenu = false },
-                        onManageProfiles = {
-                            showManageProfilesSheet = true
-                            showProfileMenu = false
-                        },
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-                bottomContent = {
-                    TabRow(
-                        tabs = profileTabs,
-                        selectedTabIndex = selectedProfileIndex,
-                        onTabSelected = { index ->
-                            val nextProfileId = profileIds.getOrNull(index)
-                                ?: return@TabRow
-                            if (nextProfileId == selectedProfileId) return@TabRow
-                            scope.launch {
-                                saveBundleForProfile(selectedProfileId, soBundleState.value)
-                                bindCurrentConnectedDevice(nextProfileId)
-                                selectedProfileId = nextProfileId
-                                val profileName = profileTabs.getOrElse(index) { "全局" }
-                                currentConnectedDeviceName?.let { deviceName ->
-                                    snackbar.show("$deviceName 已切换到配置 $profileName")
+                    },
+                    scrollBehavior = scrollBehavior,
+                    bottomContent = {
+                        TabRow(
+                            tabs = profileTabs,
+                            selectedTabIndex = selectedProfileIndex,
+                            onTabSelected = { index ->
+                                val nextProfileId = profileIds.getOrNull(index)
+                                    ?: return@TabRow
+                                if (nextProfileId == selectedProfileId) return@TabRow
+                                scope.launch {
+                                    saveBundleForProfile(selectedProfileId, soBundleState.value)
+                                    bindCurrentConnectedDevice(nextProfileId)
+                                    selectedProfileId = nextProfileId
+                                    val profileName = profileTabs.getOrElse(index) { "全局" }
+                                    currentConnectedDeviceName?.let { deviceName ->
+                                        snackbar.show("$deviceName 已切换到配置 $profileName")
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier
-                            .padding(bottom = UiSpacing.Medium)
-                            .padding(horizontal = UiSpacing.Medium),
-                        minWidth = 96.dp,
-                        maxWidth = 192.dp,
-                        height = 48.dp,
-                        itemSpacing = UiSpacing.Medium,
-                    )
-                }
-            )
+                            },
+                            modifier = Modifier
+                                .padding(bottom = UiSpacing.Medium)
+                                .padding(horizontal = UiSpacing.Medium),
+                            minWidth = 96.dp,
+                            maxWidth = 192.dp,
+                            height = 48.dp,
+                            itemSpacing = UiSpacing.Medium,
+                        )
+                    }
+                )
+            }
         },
         snackbarHost = {
             val snackbar = LocalSnackbarController.current
             SnackbarHost(snackbar.hostState)
         },
     ) { contentPadding ->
-        ScrcpyAllOptionsPage(
-            contentPadding = contentPadding,
-            scrollBehavior = scrollBehavior,
-            scrcpy = scrcpy,
-            soBundleShared = soBundleShared,
-            scrcpyProfilesState = scrcpyProfilesState,
-            selectedProfileIdState = selectedProfileIdState,
-            soBundleState = soBundleState,
-            lastValidSoBundleState = lastValidSoBundleState,
-            onSaveBundleForProfile = ::saveBundleForProfile,
-        )
+        Box(
+            modifier =
+                if (blurActive) Modifier.layerBackdrop(blurBackdrop)
+                else Modifier,
+        ) {
+            ScrcpyAllOptionsPage(
+                contentPadding = contentPadding,
+                scrollBehavior = scrollBehavior,
+                scrcpy = scrcpy,
+                soBundleShared = soBundleShared,
+                scrcpyProfilesState = scrcpyProfilesState,
+                selectedProfileIdState = selectedProfileIdState,
+                soBundleState = soBundleState,
+                lastValidSoBundleState = lastValidSoBundleState,
+                onSaveBundleForProfile = ::saveBundleForProfile,
+            )
+        }
 
         ProfileNameDialog(
             mode = activeProfileDialog,
@@ -752,6 +771,7 @@ internal fun ScrcpyAllOptionsPage(
     LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
+        bottomInnerPadding = UiSpacing.PageBottom,
     ) {
         item {
             Card {
@@ -1854,7 +1874,6 @@ internal fun ScrcpyAllOptionsPage(
             }
         }
 
-        item { Spacer(Modifier.height(UiSpacing.PageBottom)) }
     }
 }
 
@@ -1874,7 +1893,6 @@ private fun ProfileMenuPopup(
         popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
         alignment = PopupPositionProvider.Align.TopEnd,
         onDismissRequest = onDismissRequest,
-        enableWindowDim = false,
     ) {
         ListPopupColumn {
             ProfileMenuPopupItem(
@@ -1915,7 +1933,7 @@ private fun ProfileMenuPopupItem(
                 top = if (index == 0) UiSpacing.PopupHorizontal else UiSpacing.PageItem,
                 bottom = if (index == optionSize - 1) UiSpacing.PopupHorizontal else UiSpacing.PageItem,
             ),
-        color = MiuixTheme.colorScheme.disabledOnSecondaryVariant,
+        color = colorScheme.disabledOnSecondaryVariant,
         fontWeight = FontWeight.Medium,
     )
 }

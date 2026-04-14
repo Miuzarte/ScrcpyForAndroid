@@ -1,7 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.graphics.Rect
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -38,7 +37,6 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp

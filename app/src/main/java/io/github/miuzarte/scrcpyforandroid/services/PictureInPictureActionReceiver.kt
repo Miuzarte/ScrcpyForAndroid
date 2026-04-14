@@ -5,15 +5,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
-import androidx.annotation.RequiresApi
-import io.github.miuzarte.scrcpyforandroid.password.BiometricGate
-import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
 
 // not working in MIUI
 class PictureInPictureActionReceiver : BroadcastReceiver() {
-    @RequiresApi(Build.VERSION_CODES.R)
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_STOP_SCRCPY) return
         val pendingResult = goAsync()

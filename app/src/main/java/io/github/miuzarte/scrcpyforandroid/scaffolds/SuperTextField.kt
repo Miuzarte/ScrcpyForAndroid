@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 
 /**
  * A wrapped [TextField] component with state change callbacks.
@@ -44,7 +45,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * @param onFocusLost The callback to be called when the text field loses focus.
  * @param insideMargin The margin inside the [TextField].
  * @param backgroundColor The background color of the [TextField].
- * @param cornerRadius The corner radius of the [TextField].
  * @param labelColor The color of the label.
  * @param borderColor The color of the border when the [TextField] is focused.
  * @param textStyle The text style to be applied to the [TextField].
@@ -70,12 +70,11 @@ fun SuperTextField(
     onFocusGained: (() -> Unit)? = null,
     onFocusLost: (() -> Unit)? = null,
     insideMargin: DpSize = DpSize(16.dp, 16.dp),
-    backgroundColor: Color = MiuixTheme.colorScheme.secondaryContainer,
-    cornerRadius: Dp = 16.dp,
-    labelColor: Color = MiuixTheme.colorScheme.onSecondaryContainer,
-    borderColor: Color = MiuixTheme.colorScheme.primary,
-    textStyle: TextStyle = MiuixTheme.textStyles.main,
-    cursorBrush: Brush = SolidColor(MiuixTheme.colorScheme.primary),
+    backgroundColor: Color = colorScheme.secondaryContainer,
+    labelColor: Color = colorScheme.onSecondaryContainer,
+    borderColor: Color = colorScheme.primary,
+    textStyle: TextStyle = textStyles.main,
+    cursorBrush: Brush = SolidColor(colorScheme.primary),
     leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -109,7 +108,6 @@ fun SuperTextField(
         visualTransformation = visualTransformation,
         insideMargin = insideMargin,
         backgroundColor = backgroundColor,
-        cornerRadius = cornerRadius,
         labelColor = labelColor,
         borderColor = borderColor,
         textStyle = textStyle,

@@ -22,6 +22,22 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             booleanPreferencesKey("monet"),
             false
         )
+        val BLUR = Pair(
+            booleanPreferencesKey("blur"),
+            true,
+        )
+        val FLOATING_BOTTOM_BAR = Pair(
+            booleanPreferencesKey("floating_bottom_bar"),
+            false,
+        )
+        val FLOATING_BOTTOM_BAR_BLUR = Pair(
+            booleanPreferencesKey("floating_bottom_bar_blur"),
+            false,
+        )
+        val SMOOTH_CORNER = Pair(
+            booleanPreferencesKey("smooth_corner"),
+            false,
+        )
         val FULLSCREEN_DEBUG_INFO = Pair(
             booleanPreferencesKey("fullscreen_debug_info"),
             false
@@ -100,6 +116,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     // Theme Settings
     val themeBaseIndex by setting(THEME_BASE_INDEX)
     val monet by setting(MONET)
+    val blur by setting(BLUR)
+    val floatingBottomBar by setting(FLOATING_BOTTOM_BAR)
+    val floatingBottomBarBlur by setting(FLOATING_BOTTOM_BAR_BLUR)
+    val smoothCorner by setting(SMOOTH_CORNER)
 
     // Scrcpy Settings
     val fullscreenDebugInfo by setting(FULLSCREEN_DEBUG_INFO)
@@ -129,6 +149,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     data class Bundle(
         val themeBaseIndex: Int,
         val monet: Boolean,
+        val blur: Boolean,
+        val floatingBottomBar: Boolean,
+        val floatingBottomBarBlur: Boolean,
+        val smoothCorner: Boolean,
         val fullscreenDebugInfo: Boolean,
         val showFullscreenVirtualButtons: Boolean,
         val showFullscreenFloatingButton: Boolean,
@@ -153,6 +177,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     private val bundleFields = arrayOf(
         bundleField(THEME_BASE_INDEX) { bundle: Bundle -> bundle.themeBaseIndex },
         bundleField(MONET) { bundle: Bundle -> bundle.monet },
+        bundleField(BLUR) { bundle: Bundle -> bundle.blur },
+        bundleField(FLOATING_BOTTOM_BAR) { bundle: Bundle -> bundle.floatingBottomBar },
+        bundleField(FLOATING_BOTTOM_BAR_BLUR) { bundle: Bundle -> bundle.floatingBottomBarBlur },
+        bundleField(SMOOTH_CORNER) { bundle: Bundle -> bundle.smoothCorner },
         bundleField(FULLSCREEN_DEBUG_INFO) { bundle: Bundle -> bundle.fullscreenDebugInfo },
         bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { bundle: Bundle -> bundle.showFullscreenVirtualButtons },
         bundleField(SHOW_FULLSCREEN_FLOATING_BUTTON) { bundle: Bundle -> bundle.showFullscreenFloatingButton },
@@ -178,6 +206,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     private fun bundleFromPreferences(preferences: Preferences) = Bundle(
         themeBaseIndex = preferences.read(THEME_BASE_INDEX),
         monet = preferences.read(MONET),
+        blur = preferences.read(BLUR),
+        floatingBottomBar = preferences.read(FLOATING_BOTTOM_BAR),
+        floatingBottomBarBlur = preferences.read(FLOATING_BOTTOM_BAR_BLUR),
+        smoothCorner = preferences.read(SMOOTH_CORNER),
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         showFullscreenVirtualButtons = preferences.read(SHOW_FULLSCREEN_VIRTUAL_BUTTONS),
         showFullscreenFloatingButton = preferences.read(SHOW_FULLSCREEN_FLOATING_BUTTON),

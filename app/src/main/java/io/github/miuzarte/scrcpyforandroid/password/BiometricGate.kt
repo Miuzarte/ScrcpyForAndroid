@@ -2,16 +2,12 @@ package io.github.miuzarte.scrcpyforandroid.password
 
 import android.app.KeyguardManager
 import android.content.Context
-import android.os.Build
 import android.os.Looper
-import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import io.github.miuzarte.scrcpyforandroid.nativecore.AdbMdnsDiscoverer
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
@@ -30,7 +26,8 @@ object BiometricGate {
     }
 
     fun isDeviceSecure(): Boolean {
-        val manager = AppRuntime.context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val manager = AppRuntime.context
+            .getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         return manager.isDeviceSecure
     }
 

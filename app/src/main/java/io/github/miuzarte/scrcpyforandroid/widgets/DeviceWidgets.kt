@@ -69,6 +69,7 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.haptics.LocalAppHaptics
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
@@ -101,7 +102,7 @@ import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.math.roundToInt
@@ -132,17 +133,17 @@ internal fun StatusCard(
     val spec = when {
         streaming && sessionInfo != null -> {
             val streamCardColor = when {
-                isDynamicColor -> MiuixTheme.colorScheme.secondaryContainer
+                isDynamicColor -> colorScheme.secondaryContainer
                 isDarkTheme -> Color(0xFF1A3825)
                 else -> Color(0xFFDFFAE4)
             }
             val streamTextColor = when {
-                isDynamicColor -> MiuixTheme.colorScheme.onSecondaryContainer
+                isDynamicColor -> colorScheme.onSecondaryContainer
                 isDarkTheme -> Color.White
                 else -> Color(0xFF111111)
             }
             val streamIconColor = if (isDynamicColor) {
-                MiuixTheme.colorScheme.primary.copy(alpha = 0.8f)
+                colorScheme.primary.copy(alpha = 0.8f)
             } else {
                 Color(0xFF36D167)
             }
@@ -171,11 +172,11 @@ internal fun StatusCard(
             big = StatusBigCardSpec(
                 title = "ADB 已连接",
                 subtitle = cleanStatusLine,
-                containerColor = MiuixTheme.colorScheme.primaryContainer,
-                titleColor = MiuixTheme.colorScheme.onPrimaryContainer,
-                subtitleColor = MiuixTheme.colorScheme.onPrimaryContainer,
+                containerColor = colorScheme.primaryContainer,
+                titleColor = colorScheme.onPrimaryContainer,
+                subtitleColor = colorScheme.onPrimaryContainer,
                 icon = Icons.Rounded.Wifi,
-                iconTint = MiuixTheme.colorScheme.primary.copy(alpha = 0.6f),
+                iconTint = colorScheme.primary.copy(alpha = 0.6f),
             ),
             firstSmall = StatusSmallCardSpec(
                 "当前设备",
@@ -191,11 +192,11 @@ internal fun StatusCard(
             big = StatusBigCardSpec(
                 title = "ADB 未连接",
                 subtitle = "",
-                containerColor = MiuixTheme.colorScheme.secondaryContainer,
-                titleColor = MiuixTheme.colorScheme.onSecondaryContainer,
-                subtitleColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                containerColor = colorScheme.secondaryContainer,
+                titleColor = colorScheme.onSecondaryContainer,
+                subtitleColor = colorScheme.onSecondaryContainer,
                 icon = Icons.Rounded.LinkOff,
-                iconTint = MiuixTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+                iconTint = colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
             ),
             firstSmall = StatusSmallCardSpec(
                 "当前设备",
@@ -983,8 +984,8 @@ internal fun DeviceTile(
     Card(
         colors = CardDefaults.defaultColors(
             color =
-                if (isConnected) MiuixTheme.colorScheme.surfaceContainer
-                else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                if (isConnected) colorScheme.surfaceContainer
+                else colorScheme.surfaceContainer.copy(alpha = 0.6f),
         ),
         pressFeedbackType = if (!editing) PressFeedbackType.Sink else PressFeedbackType.None,
         onClick = haptics.contextClick,
@@ -1015,7 +1016,7 @@ internal fun DeviceTile(
                         .background(
                             color =
                                 if (isConnected) Color(0xFF44C74F)
-                                else MiuixTheme.colorScheme.outline,
+                                else colorScheme.outline,
                             shape = CircleShape,
                         ),
                 )
@@ -1027,12 +1028,12 @@ internal fun DeviceTile(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MiuixTheme.colorScheme.onSurface,
+                        color = colorScheme.onSurface,
                     )
                     Text(
                         "${device.host}:${device.port}",
                         fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        color = colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1206,14 +1207,16 @@ internal fun QuickConnectCard(
     onAddDevice: () -> Unit,
     enabled: Boolean = true,
 ) {
+    val haptics = LocalAppHaptics.current
     val focusManager = LocalFocusManager.current
 
     Card(
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.defaultColors(color = colorScheme.primaryContainer),
         pressFeedbackType =
             if (enabled) PressFeedbackType.Tilt
             else PressFeedbackType.None,
         insideMargin = PaddingValues(UiSpacing.Content),
+        onClick = haptics.contextClick,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical)) {
             Row(
@@ -1223,12 +1226,12 @@ internal fun QuickConnectCard(
                 Icon(
                     Icons.Rounded.AddLink,
                     contentDescription = "快速连接",
-                    tint = MiuixTheme.colorScheme.onPrimaryContainer,
+                    tint = colorScheme.onPrimaryContainer,
                 )
                 Text(
                     "快速连接",
                     fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onPrimaryContainer,
+                    color = colorScheme.onPrimaryContainer,
                 )
             }
             SuperTextField(

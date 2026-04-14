@@ -30,7 +30,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 @Immutable
@@ -122,7 +122,7 @@ internal fun StatusCardLayout(
                         Text(
                             text = busyLabel,
                             fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.primary,
+                            color = colorScheme.primary,
                         )
                     }
                 }
@@ -164,13 +164,13 @@ private fun StatusMetricCard(spec: StatusSmallCardSpec, modifier: Modifier) {
             text = spec.title,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = colorScheme.onSurfaceVariantSummary,
         )
         Text(
             text = spec.value,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold,
-            color = MiuixTheme.colorScheme.onSurface,
+            color = colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

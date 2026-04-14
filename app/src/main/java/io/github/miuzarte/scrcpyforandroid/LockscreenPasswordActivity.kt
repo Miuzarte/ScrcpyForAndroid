@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,6 +56,7 @@ import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +82,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
@@ -90,6 +93,8 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 import top.yukonga.miuix.kmp.theme.ThemeController
 
 class LockscreenPasswordActivity : FragmentActivity() {
@@ -114,7 +119,10 @@ class LockscreenPasswordActivity : FragmentActivity() {
                 remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
             val haptics = rememberAppHaptics()
 
-            MiuixTheme(controller = themeController) {
+            MiuixTheme(
+                controller = themeController,
+                smoothRounding = asBundle.smoothCorner,
+            ) {
                 CompositionLocalProvider(
                     LocalSnackbarController provides snackbarController,
                     LocalAppHaptics provides haptics,
@@ -213,10 +221,18 @@ private fun LockscreenPasswordScreen(
         pendingCreate = false
     }
 
+    val blurBackdrop = rememberBlurBackdrop(asBundle.blur)
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = "锁屏密码自动填充",
+                modifier =
+                    if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop)
+                    else Modifier,
+                color =
+                    if (blurBackdrop != null) Color.Transparent
+                    else colorScheme.surface,
                 navigationIcon = {
                     IconButton(onClick = { activity.onBackPressedDispatcher.onBackPressed() }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
@@ -442,6 +458,7 @@ private fun LockscreenPasswordPage(
     LazyColumn(
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
+        bottomInnerPadding = UiSpacing.PageBottom,
     ) {
         item {
             Card {
@@ -514,16 +531,14 @@ private fun LockscreenPasswordPage(
                         "\n2. 在 root / posed / hook / 调试器 / 恶意输入法 等环境下，密码仍可能泄露" +
                         "\n3. 本功能不会绕过系统锁屏认证，仅用于你已合法授权控制的设备" +
                         "\n4. 关闭“填充密码时需要验证”会显著降低安全性，请谨慎选择",
-                fontSize = MiuixTheme.textStyles.body2.fontSize,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = textStyles.body2.fontSize,
+                color = colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = UiSpacing.Large)
                     .padding(horizontal = UiSpacing.Large),
             )
         }
-
-        item { Spacer(Modifier.height(UiSpacing.PageBottom)) }
     }
 }
 
@@ -538,7 +553,6 @@ private fun PasswordMenuPopup(
         popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
         alignment = PopupPositionProvider.Align.TopEnd,
         onDismissRequest = onDismissRequest,
-        enableWindowDim = false,
     ) {
         ListPopupColumn {
             SpinnerItemImpl(
