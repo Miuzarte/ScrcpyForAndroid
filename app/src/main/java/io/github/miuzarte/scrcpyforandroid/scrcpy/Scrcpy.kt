@@ -58,6 +58,7 @@ class Scrcpy(
     private val customServerUri: String? = null,
     private val serverVersion: String = DEFAULT_SERVER_VERSION,
     private val serverRemotePath: String = DEFAULT_REMOTE_PATH,
+    private val lowLatency: Boolean = false,
 ) {
 
     private val session = Session()
@@ -160,7 +161,7 @@ class Scrcpy(
                         info.audioCodecId.toUInt().toString(16)
                     }"
                 )
-                val player = ScrcpyAudioPlayer(info.audioCodecId)
+                val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, lowLatency)
                 audioPlayer = player
                 session.attachAudioConsumer { packet ->
                     player.feedPacket(packet.data, packet.ptsUs, packet.isConfig)

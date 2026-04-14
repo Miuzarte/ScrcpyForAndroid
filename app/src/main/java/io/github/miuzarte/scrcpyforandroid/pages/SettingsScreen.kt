@@ -37,6 +37,7 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -126,6 +127,7 @@ fun SettingsPage(
     val snackbar = LocalSnackbarController.current
     val navigator = LocalRootNavigator.current
     val serverPicker = LocalServerPicker.current
+    val isScrcpyStreaming = AppRuntime.scrcpy?.isStarted() == true
 
     val asBundleShared by appSettings.bundleState.collectAsState()
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
@@ -264,6 +266,18 @@ fun SettingsPage(
         item {
             SectionSmallTitle("投屏")
             Card {
+                SwitchPreference(
+                    title = "低延迟音频（实验性）",
+                    summary = "启用后将尝试使用低延迟音频路径" +
+                            "\n推荐配合 RAW PCM 编解码" +
+                            "\n修改后建议划卡重启应用",
+                    checked = asBundle.lowLatency,
+                    onCheckedChange = {
+                        if (!isScrcpyStreaming)
+                            asBundle = asBundle.copy(lowLatency = it)
+                    },
+                    enabled = !isScrcpyStreaming,
+                )
                 SwitchPreference(
                     title = "启用调试信息",
                     summary = "在全屏界面悬浮显示分辨率、帧率和触点信息",

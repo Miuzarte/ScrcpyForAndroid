@@ -16,6 +16,5 @@
 
 顺序无关
 
-- [音频延迟](https://developer.android.com/ndk/guides/audio/audio-latency)
 - 横屏布局
 - I18N

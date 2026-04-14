@@ -222,17 +222,20 @@ fun MainScreen() {
         .ifBlank { Scrcpy.DEFAULT_SERVER_VERSION }
     val serverRemotePath = asBundle.serverRemotePath
         .ifBlank { AppSettings.SERVER_REMOTE_PATH.defaultValue }
+    val lowLatency = asBundle.lowLatency
     val scrcpy = remember(
         appContext,
         customServerUri,
         customServerVersion,
         serverRemotePath,
+        lowLatency,
     ) {
         Scrcpy(
             appContext = appContext,
             customServerUri = customServerUri,
             serverVersion = customServerVersion,
             serverRemotePath = serverRemotePath,
+            lowLatency = lowLatency,
         ).also {
             AppRuntime.scrcpy = it
         }

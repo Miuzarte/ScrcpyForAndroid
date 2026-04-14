@@ -23,7 +23,11 @@
 
 ## Features
 
+- 低延迟音频链路（默认未启用）
+  - 受控设备播放 `USAGE_MEDIA` 流时（[namidaco/namida](https://github.com/namidaco/namida)），两设备的音频延迟只差半拍（没有具体测量能力）
+  - 受控设备播放 `USAGE_GAME` 流时（明日方舟 Bilibili 服），仍存在 100~200ms 的有感延迟
 - 带生物认证的锁屏密码自动填充 (入口位于虚拟按钮中)
+- 多配置切换，设备绑定配置，连接后直接进入全屏
 - 可替换 scrcpy-server
 - 利用 mDNS 服务实现自动连接启用无线调试的设备、自动发现等待配对设备的IP与端口
 - 自动横竖屏切换（算吗

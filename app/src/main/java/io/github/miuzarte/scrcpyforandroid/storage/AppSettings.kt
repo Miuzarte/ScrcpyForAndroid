@@ -38,6 +38,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             booleanPreferencesKey("smooth_corner"),
             false,
         )
+        val LOW_LATENCY = Pair(
+            booleanPreferencesKey("low_latency"),
+            false,
+        )
         val FULLSCREEN_DEBUG_INFO = Pair(
             booleanPreferencesKey("fullscreen_debug_info"),
             false
@@ -122,6 +126,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     val smoothCorner by setting(SMOOTH_CORNER)
 
     // Scrcpy Settings
+    val lowLatency by setting(LOW_LATENCY)
     val fullscreenDebugInfo by setting(FULLSCREEN_DEBUG_INFO)
     val showFullscreenVirtualButtons by setting(SHOW_FULLSCREEN_VIRTUAL_BUTTONS)
     val showFullscreenFloatingButton by setting(SHOW_FULLSCREEN_FLOATING_BUTTON)
@@ -153,6 +158,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val floatingBottomBar: Boolean,
         val floatingBottomBarBlur: Boolean,
         val smoothCorner: Boolean,
+        val lowLatency: Boolean,
         val fullscreenDebugInfo: Boolean,
         val showFullscreenVirtualButtons: Boolean,
         val showFullscreenFloatingButton: Boolean,
@@ -181,6 +187,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FLOATING_BOTTOM_BAR) { bundle: Bundle -> bundle.floatingBottomBar },
         bundleField(FLOATING_BOTTOM_BAR_BLUR) { bundle: Bundle -> bundle.floatingBottomBarBlur },
         bundleField(SMOOTH_CORNER) { bundle: Bundle -> bundle.smoothCorner },
+        bundleField(LOW_LATENCY) { bundle: Bundle -> bundle.lowLatency },
         bundleField(FULLSCREEN_DEBUG_INFO) { bundle: Bundle -> bundle.fullscreenDebugInfo },
         bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { bundle: Bundle -> bundle.showFullscreenVirtualButtons },
         bundleField(SHOW_FULLSCREEN_FLOATING_BUTTON) { bundle: Bundle -> bundle.showFullscreenFloatingButton },
@@ -210,6 +217,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         floatingBottomBar = preferences.read(FLOATING_BOTTOM_BAR),
         floatingBottomBarBlur = preferences.read(FLOATING_BOTTOM_BAR_BLUR),
         smoothCorner = preferences.read(SMOOTH_CORNER),
+        lowLatency = preferences.read(LOW_LATENCY),
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         showFullscreenVirtualButtons = preferences.read(SHOW_FULLSCREEN_VIRTUAL_BUTTONS),
         showFullscreenFloatingButton = preferences.read(SHOW_FULLSCREEN_FLOATING_BUTTON),

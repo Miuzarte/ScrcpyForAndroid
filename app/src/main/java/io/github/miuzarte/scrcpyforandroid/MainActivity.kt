@@ -1,6 +1,5 @@
 package io.github.miuzarte.scrcpyforandroid
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
