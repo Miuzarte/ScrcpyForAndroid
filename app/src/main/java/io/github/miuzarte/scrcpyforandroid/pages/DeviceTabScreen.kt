@@ -680,9 +680,8 @@ fun DeviceTabPage(
             resolveStartAppRequest(scrcpy, resolvedOptions)
         }.getOrElse { error ->
             logEvent(
-                "启动应用请求无效: ${
-                    error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
-                }",
+                "启动应用请求无效: " +
+                        "${error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName}",
                 Log.WARN,
                 error,
             )
@@ -704,14 +703,15 @@ fun DeviceTabPage(
             }.onSuccess {
                 val appLabelPart = request.matchedAppLabel?.let { " ($it)" }.orEmpty()
                 logEvent(
-                    "已启动应用: ${request.packageName}$appLabelPart" +
-                            request.displayId?.let { " @display=$it" }.orEmpty()
+                    "已启动应用: " +
+                            "${request.packageName}$appLabelPart"
+                            + request.displayId?.let { " @display=$it" }.orEmpty()
                 )
             }.onFailure { error ->
                 logEvent(
-                    "启动应用失败: ${request.packageName} (${
-                        error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
-                    })",
+                    "启动应用失败: " +
+                            "${request.packageName} " +
+                            "(${error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName})",
                     Log.WARN,
                     error,
                 )
@@ -1222,8 +1222,12 @@ fun DeviceTabPage(
         },
         onLaunchTask = { task ->
             showRecentTasksSheet = false
-            runBusy("启动 scrcpy") {
+            if (sessionInfo == null) runBusy("启动 scrcpy") {
                 startScrcpySession(startAppOverride = task.packageName)
+            }
+            else runBusy("启动应用") {
+                adbCoordinator.startApp(packageName = task.packageName)
+                logEvent("已启动应用: ${task.packageName}")
             }
         },
     )
