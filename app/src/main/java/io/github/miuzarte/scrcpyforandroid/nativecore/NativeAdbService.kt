@@ -13,8 +13,9 @@ import kotlin.time.Duration
  * Higher-level ADB service that wraps `DirectAdbTransport` and provides
  * coroutine-based connect/disconnect/shell helpers for callers.
  *
- * Methods use Mutex for thread-safety because the underlying transport is single-connection
- * and may be accessed from multiple coroutines.
+ * The mutex protects connection replacement and lifecycle transitions.
+ * Once a live connection reference is obtained, stream I/O is performed outside
+ * the mutex so long-running operations do not block disconnect or other calls.
  * 
  * All network operations are executed on Dispatchers.IO.
  */
@@ -127,27 +128,29 @@ object NativeAdbService {
     /**
      * Execute a shell command on the connected device and return stdout text.
      */
-    suspend fun shell(command: String): String = mutex.withLock {
-        val response = requireConnection().shell(command)
+    suspend fun shell(command: String): String {
+        val conn = snapshotConnection()
+        val response = conn.shell(command)
         Log.d(TAG, "command: $command, response: $response")
-        response
+        return response
     }
 
     suspend fun startApp(
         packageName: String,
         displayId: Int? = null,
         forceStop: Boolean = false,
-    ): String = mutex.withLock {
+    ): String {
+        val conn = snapshotConnection()
         val normalizedPackageName = packageName.trim()
         require(normalizedPackageName.isNotBlank()) { "package name is blank" }
 
         if (forceStop) {
-            requireConnection().shell(
+            conn.shell(
                 "am force-stop ${quoteShellArg(normalizedPackageName)}"
             )
         }
 
-        val resolveOutput = requireConnection().shell(
+        val resolveOutput = conn.shell(
             "cmd package resolve-activity --brief ${quoteShellArg(normalizedPackageName)}"
         )
         val componentName = resolveOutput
@@ -163,21 +166,21 @@ object NativeAdbService {
             ?.let { " --display $it" }
             .orEmpty()
         val command = "am start-activity$displayArg -n ${quoteShellArg(componentName)}"
-        val response = requireConnection().shell(command)
+        val response = conn.shell(command)
         Log.d(TAG, "startApp(): package=$normalizedPackageName component=$componentName")
-        response
+        return response
     }
 
-    suspend fun openShellStream(command: String): AdbSocketStream = mutex.withLock {
-        requireConnection().openStream("shell:$command")
+    suspend fun openShellStream(command: String): AdbSocketStream {
+        return snapshotConnection().openStream("shell:$command")
     }
 
-    suspend fun push(localPath: Path, remotePath: String) = mutex.withLock {
-        requireConnection().push(localPath.toFile().readBytes(), remotePath)
+    suspend fun push(localPath: Path, remotePath: String) {
+        snapshotConnection().push(localPath.toFile().readBytes(), remotePath)
     }
 
-    suspend fun openAbstractSocket(name: String): AdbSocketStream = mutex.withLock {
-        requireConnection().openStream("localabstract:$name")
+    suspend fun openAbstractSocket(name: String): AdbSocketStream {
+        return snapshotConnection().openStream("localabstract:$name")
     }
 
     suspend fun close() {
@@ -194,6 +197,10 @@ object NativeAdbService {
     private fun requireConnection(): DirectAdbConnection {
         return connection?.takeIf { it.isAlive() }
             ?: throw IllegalStateException("ADB not connected")
+    }
+
+    private suspend fun snapshotConnection(): DirectAdbConnection = mutex.withLock {
+        requireConnection()
     }
 
     private fun quoteShellArg(value: String): String {

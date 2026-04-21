@@ -325,9 +325,6 @@ fun FullscreenControlScreen(
                         { onDismissRequest ->
                             PasswordPickerPopupContent(
                                 onDismissRequest = onDismissRequest,
-                                onMessage = { message ->
-                                    taskScope.launch(Dispatchers.Main) { snackbar.show(message) }
-                                },
                             )
                         }
                     },
@@ -374,9 +371,6 @@ fun FullscreenControlScreen(
                         { onDismissRequest ->
                             PasswordPickerPopupContent(
                                 onDismissRequest = onDismissRequest,
-                                onMessage = { message ->
-                                    taskScope.launch(Dispatchers.Main) { snackbar.show(message) }
-                                },
                             )
                         }
                     },

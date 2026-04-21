@@ -64,6 +64,7 @@ import io.github.miuzarte.scrcpyforandroid.widgets.AppListEntry
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTileList
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
+import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
 import io.github.miuzarte.scrcpyforandroid.widgets.PreviewCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
 import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
@@ -78,7 +79,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
@@ -175,7 +175,6 @@ fun DeviceTabPage(
     bottomInnerPadding: Dp,
 ) {
     val activity = LocalActivity.current
-    val fragmentActivity = remember(activity) { activity as? FragmentActivity }
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
@@ -1092,7 +1091,7 @@ fun DeviceTabPage(
                         }
                     },
                     onOpenAdvanced = { navigator.push(RootScreen.Advanced) },
-                    onStartStopHaptic = { haptics.contextClick() },
+                    onStartStopHaptic = haptics.contextClick,
                     onStart = {
                         runBusy("启动 scrcpy") {
                             startScrcpySession()
@@ -1128,9 +1127,7 @@ fun DeviceTabPage(
                             context.startActivity(StreamActivity.createIntent(context))
                         },
                         imeRequestToken = imeRequestToken,
-                        onImeCommitText = { text ->
-                            commitImeText(text)
-                        },
+                        onImeCommitText = { text -> commitImeText(text) },
                         onImeDeleteSurroundingText = { beforeLength, _ ->
                             withContext(Dispatchers.IO) {
                                 repeat(beforeLength.coerceAtLeast(1)) {
@@ -1195,16 +1192,11 @@ fun DeviceTabPage(
                                 }
                             }
                         },
-                        passwordPopupContent =
-                            if (fragmentActivity == null) null
-                            else { onDismissRequest ->
-                                PasswordPickerPopupContent(
-                                    onDismissRequest = onDismissRequest,
-                                    onMessage = { message ->
-                                        scope.launch { snackbar.show(message) }
-                                    },
-                                )
-                            },
+                        passwordPopupContent = { onDismissRequest ->
+                            PasswordPickerPopupContent(
+                                onDismissRequest = onDismissRequest,
+                            )
+                        },
                     )
                 }
             }
@@ -1341,19 +1333,19 @@ private fun DeviceMenuPopup(
         onDismissRequest = onDismissRequest,
     ) {
         ListPopupColumn {
-            DeviceMenuPopupItem(
+            PopupMenuItem(
                 text = "快速设备排序",
                 optionSize = 3,
                 index = 0,
                 onSelectedIndexChange = { onReorderDevices() },
             )
-            DeviceMenuPopupItem(
+            PopupMenuItem(
                 text = "虚拟按钮排序",
                 optionSize = 3,
                 index = 1,
                 onSelectedIndexChange = { onOpenVirtualButtonOrder() },
             )
-            DeviceMenuPopupItem(
+            PopupMenuItem(
                 text = "清空日志",
                 optionSize = 3,
                 index = 2,
@@ -1364,36 +1356,3 @@ private fun DeviceMenuPopup(
     }
 }
 
-@Composable
-private fun DeviceMenuPopupItem(
-    text: String,
-    optionSize: Int,
-    index: Int,
-    enabled: Boolean = true,
-    onSelectedIndexChange: (Int) -> Unit,
-) {
-    if (enabled) {
-        DropdownImpl(
-            text = text,
-            optionSize = optionSize,
-            isSelected = false,
-            index = index,
-            onSelectedIndexChange = onSelectedIndexChange,
-        )
-        return
-    }
-
-    val additionalTopPadding = if (index == 0) UiSpacing.PopupHorizontal else UiSpacing.PageItem
-    val additionalBottomPadding =
-        if (index == optionSize - 1) UiSpacing.PopupHorizontal else UiSpacing.PageItem
-    Text(
-        text = text,
-        fontSize = textStyles.body1.fontSize,
-        fontWeight = FontWeight.Medium,
-        color = colorScheme.disabledOnSecondaryVariant,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiSpacing.PopupHorizontal)
-            .padding(top = additionalTopPadding, bottom = additionalBottomPadding),
-    )
-}

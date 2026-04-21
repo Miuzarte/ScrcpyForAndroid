@@ -33,6 +33,7 @@
 - 利用 mDNS 服务实现自动连接启用无线调试的设备、自动发现等待配对设备的IP与端口
 - 自动横竖屏切换（算吗
 - 画中画
+- 流式 adb 终端
 
 ## 已知问题
 
@@ -45,18 +46,18 @@
 `keycode 120`，安卓官方([keycodes.h#349](https://android.googlesource.com/platform/frameworks/native/+/master/include/android/keycodes.h#349))的定义为
 `System Request / Print Screen key.`，不同的厂商有不同的实现，在某些类原生(`AxionOS`) 上的行为是软重启
 
-## [TODO](TODO.md)
+## TODO
 
 \> [TODO.md](TODO.md)
+
+## NOT-TODO
+
+应该有东西的但我不记得要写什么了
 
 ## 建议搭配模块
 
 - 密码锁屏无法捕获: [LSPosed/DisableFlagSecure](https://github.com/LSPosed/DisableFlagSecure)
 - 开机自动启用 adb: [gist/906291](https://gist.github.com/Miuzarte/9062915f1615d5eebd363c759fda496c)
-
-## NOT-TODO
-
-应该有东西的但我不记得要写什么了
 
 ## FAQ
 

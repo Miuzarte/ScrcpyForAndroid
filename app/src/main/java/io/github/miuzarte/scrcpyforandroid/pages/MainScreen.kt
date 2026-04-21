@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -99,7 +100,8 @@ private enum class MainBottomTabDestination(
     val label: String,
     val icon: ImageVector,
 ) {
-    Device(label = "设备", icon = Icons.Rounded.Devices),
+    Devices(label = "设备", icon = Icons.Rounded.Devices),
+    Terminal(label = "终端", icon = Icons.Rounded.Terminal),
     Settings(label = "设置", icon = Icons.Rounded.Settings);
 }
 
@@ -135,7 +137,7 @@ fun MainScreen() {
     val saveableStateHolder = rememberSaveableStateHolder()
     val tabs = remember { MainBottomTabDestination.entries }
     val pagerState = rememberPagerState(
-        initialPage = MainBottomTabDestination.Device.ordinal,
+        initialPage = MainBottomTabDestination.Devices.ordinal,
         pageCount = { tabs.size })
     val currentTab = tabs[pagerState.currentPage]
     val rootBackStack = remember { mutableStateListOf<NavKey>(RootScreen.Home) }
@@ -145,7 +147,9 @@ fun MainScreen() {
 
     // Scroll behaviors
     val devicesPageScrollBehavior = MiuixScrollBehavior(
-        canScroll = { currentTab == MainBottomTabDestination.Device })
+        canScroll = { currentTab == MainBottomTabDestination.Devices })
+    val terminalPageScrollBehavior = MiuixScrollBehavior(
+        canScroll = { currentTab == MainBottomTabDestination.Terminal })
     val settingsPageScrollBehavior = MiuixScrollBehavior(
         canScroll = { currentTab == MainBottomTabDestination.Settings })
     val advancedPageScrollBehavior = MiuixScrollBehavior(
@@ -270,7 +274,7 @@ fun MainScreen() {
 
     // Derived flags
     val canNavigateBack = rootBackStack.size > 1
-            || pagerState.currentPage != MainBottomTabDestination.Device.ordinal
+            || pagerState.currentPage != MainBottomTabDestination.Devices.ordinal
 
     LaunchedEffect(asBundle.lastUpdateCheckAt) {
         val now = System.currentTimeMillis()
@@ -284,10 +288,10 @@ fun MainScreen() {
     fun handleBackNavigation() {
         if (rootBackStack.size > 1) {
             rootNavigator.pop()
-        } else if (pagerState.currentPage != MainBottomTabDestination.Device.ordinal) {
+        } else if (pagerState.currentPage != MainBottomTabDestination.Devices.ordinal) {
             scope.launch {
                 pagerState.animateScrollToPage(
-                    page = MainBottomTabDestination.Device.ordinal,
+                    page = MainBottomTabDestination.Devices.ordinal,
                     animationSpec = spring(
                         dampingRatio = UiMotion.PAGE_SWITCH_DAMPING_RATIO,
                         stiffness = UiMotion.PAGE_SWITCH_STIFFNESS,
@@ -415,11 +419,15 @@ fun MainScreen() {
                             val tab = tabs[page]
                             saveableStateHolder.SaveableStateProvider(tab.name) {
                                 when (tab) {
-                                    MainBottomTabDestination.Device -> DeviceTabScreen(
+                                    MainBottomTabDestination.Devices -> DeviceTabScreen(
                                         scrollBehavior = devicesPageScrollBehavior,
                                         scrcpy = scrcpy,
                                         bottomInnerPadding = bottomInnerPadding,
                                         onOpenReorderDevices = { showReorderDevices = true },
+                                    )
+
+                                    MainBottomTabDestination.Terminal -> TerminalScreen(
+                                        bottomInnerPadding = bottomInnerPadding,
                                     )
 
                                     MainBottomTabDestination.Settings -> SettingsScreen(

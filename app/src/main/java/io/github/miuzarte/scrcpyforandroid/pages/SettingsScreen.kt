@@ -268,9 +268,12 @@ fun SettingsPage(
             Card {
                 SwitchPreference(
                     title = "低延迟音频（实验性）",
-                    summary = "启用后将尝试使用低延迟音频路径" +
-                            "\n推荐配合 RAW PCM 编解码" +
-                            "\n修改后建议划卡重启应用",
+                    summary =
+                        """
+                            启用后将尝试使用低延迟音频路径
+                            推荐配合 RAW PCM 编解码
+                            修改后建议划卡重启应用
+                        """.trimIndent(),
                     checked = asBundle.lowLatency,
                     onCheckedChange = {
                         if (!isScrcpyStreaming)
@@ -353,9 +356,12 @@ fun SettingsPage(
                 )
                 SwitchPreference(
                     title = "实时同步剪贴板到受控机",
-                    summary = "本机剪贴板更新后会自动同步到受控机" +
-                            "\n禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容" +
-                            "\nMIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效",
+                    summary =
+                        """
+                            本机剪贴板更新后会自动同步到受控机
+                            禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容
+                            MIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效
+                        """.trimIndent(),
                     checked = asBundle.realtimeClipboardSyncToDevice,
                     onCheckedChange = {
                         asBundle = asBundle.copy(realtimeClipboardSyncToDevice = it)

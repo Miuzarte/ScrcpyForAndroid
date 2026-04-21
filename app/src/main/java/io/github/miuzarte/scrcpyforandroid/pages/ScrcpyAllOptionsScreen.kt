@@ -1588,9 +1588,10 @@ internal fun ScrcpyAllOptionsPage(
                             downsizeOnError = !it
                         )
                         if (it) snackbar.show(
-                            "默认情况下，在 MediaCodec 出错时，" +
-                                    "scrcpy 会自动尝试使用更低的分辨率重新开始" +
-                                    "\n此选项将禁用此行为"
+                            """
+                                默认情况下，在 MediaCodec 出错时，scrcpy 会自动尝试使用更低的分辨率重新开始
+                                此选项将禁用此行为
+                            """.trimIndent()
                         )
                     },
                 )
@@ -1623,9 +1624,10 @@ internal fun ScrcpyAllOptionsPage(
                             cleanup = !it
                         )
                         if (it) snackbar.show(
-                            "默认情况下，scrcpy 会从设备中移除服务器二进制文件，" +
-                                    "并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）" +
-                                    "\n此选项将禁用此清理操作"
+                            """
+                                默认情况下，scrcpy 会从设备中移除服务器二进制文件，并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）
+                                此选项将禁用此清理操作
+                            """.trimIndent()
                         )
                     },
                 )

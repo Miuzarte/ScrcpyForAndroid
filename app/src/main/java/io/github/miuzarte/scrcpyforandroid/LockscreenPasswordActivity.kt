@@ -320,8 +320,11 @@ private fun LockscreenPasswordScreen(
             OverlayDialog(
                 show = true,
                 title = "关闭验证后密码将失去保护",
-                summary = "关闭后每次填充密码时将不再强制认证" +
-                        "\n同时会熔断当前经认证创建的密码",
+                summary =
+                    """
+                        关闭后每次填充密码时将不再强制认证
+                        同时会熔断当前经认证创建的密码
+                    """.trimIndent(),
                 defaultWindowInsetsPadding = false,
                 onDismissRequest = { showDisableDialog = false },
             ) {
@@ -468,8 +471,11 @@ private fun LockscreenPasswordPage(
                 SwitchPreference(
                     title = "填充密码时需要验证",
                     summary =
-                        if (canAuthenticate) "关闭后将允许直接填充锁屏密码" +
-                                "\n同时会熔断当前经认证创建的密码"
+                        if (canAuthenticate)
+                            """
+                                关闭后将允许直接填充锁屏密码
+                                同时会熔断当前经认证创建的密码
+                            """.trimIndent()
                         else "当前设备无认证认证能力",
                     checked = requireAuth,
                     enabled = canAuthenticate || requireAuth,
@@ -528,12 +534,15 @@ private fun LockscreenPasswordPage(
 
         item {
             Text(
-                text = "免责声明" +
-                        "\n0. 无法保证没有 bug" +
-                        "\n1. 本功能的防护边界仅包括加密存储、按需认证和使用后内存清理，不构成绝对安全保证" +
-                        "\n2. 在 root / posed / hook / 调试器 / 恶意输入法 等环境下，密码仍可能泄露" +
-                        "\n3. 本功能不会绕过系统锁屏认证，仅用于你已合法授权控制的设备" +
-                        "\n4. 关闭“填充密码时需要验证”会显著降低安全性，请谨慎选择",
+                text =
+                    """
+                        免责声明
+                        0. 无法保证没有 bug
+                        1. 本功能的防护边界仅包括加密存储、按需认证和使用后内存清理，不构成绝对安全保证
+                        2. 在 root / posed / hook / 调试器 / 恶意输入法 等环境下，密码仍可能泄露
+                        3. 本功能不会绕过系统锁屏认证，仅用于你已合法授权控制的设备
+                        4. 关闭“填充密码时需要验证”会显著降低安全性，请谨慎选择
+                    """.trimIndent(),
                 fontSize = textStyles.body2.fontSize,
                 color = colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier

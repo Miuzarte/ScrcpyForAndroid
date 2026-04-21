@@ -15,7 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
@@ -26,15 +30,15 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 @Composable
-fun PasswordPickerPopupContent(
-    onDismissRequest: () -> Unit,
-    onMessage: (String) -> Unit,
-) {
-    val activity = LocalActivity.current as? FragmentActivity
+fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
+    val fragActivity = LocalActivity.current as? FragmentActivity
+    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val scope = rememberCoroutineScope()
     val passwordUseCase = remember { PasswordUseCase() }
     val entries by PasswordRepository.entriesState.collectAsState()
     val appSettingsBundle by appSettings.bundleState.collectAsState()
+
+    val snackbar = LocalSnackbarController.current
 
     val spinnerEntries = remember(entries) {
         entries.map { entry ->
@@ -60,6 +64,22 @@ fun PasswordPickerPopupContent(
         }
     }
 
+    fun fillPassword(index: Int) {
+        val entry = entries[index]
+        scope.launch {
+            passwordUseCase.preparePassword(
+                activity = fragActivity!!,
+                entry = entry,
+                globalRequiresAuth = appSettingsBundle.passwordRequireAuth,
+            ).onSuccess { password ->
+                InjectionController.inject(password)
+                onDismissRequest()
+            }.onFailure {
+                taskScope.launch { snackbar.show(it.message ?: "密码填充失败") }
+            }
+        }
+    }
+
     ListPopupColumn {
         if (spinnerEntries.isEmpty()) {
             Text(
@@ -73,7 +93,7 @@ fun PasswordPickerPopupContent(
             return@ListPopupColumn
         }
 
-        if (activity == null) {
+        if (fragActivity == null) {
             Text(
                 text = "当前页面无法拉起验证",
                 modifier = Modifier
@@ -93,21 +113,7 @@ fun PasswordPickerPopupContent(
                 index = index,
                 spinnerColors = SpinnerDefaults.spinnerColors(),
                 dialogMode = false,
-                onSelectedIndexChange = { selectedIndex ->
-                    val target = entries[selectedIndex]
-                    scope.launch {
-                        passwordUseCase.preparePassword(
-                            activity = activity,
-                            entry = target,
-                            globalRequiresAuth = appSettingsBundle.passwordRequireAuth,
-                        ).onSuccess { password ->
-                            InjectionController.inject(password)
-                            onDismissRequest()
-                        }.onFailure {
-                            onMessage(it.message ?: "密码填充失败")
-                        }
-                    }
-                },
+                onSelectedIndexChange = ::fillPassword,
             )
         }
     }
