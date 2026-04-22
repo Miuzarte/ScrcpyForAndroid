@@ -1,9 +1,12 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
 import android.util.Log
 import android.view.KeyEvent
+import android.view.Surface
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
@@ -38,8 +41,10 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -51,6 +56,7 @@ import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
+import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.AppListBottomSheet
@@ -69,6 +75,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.Text
 
+@SuppressLint("NewApi")
 @Composable
 fun FullscreenControlScreen(
     scrcpy: Scrcpy,
@@ -80,6 +87,7 @@ fun FullscreenControlScreen(
     BackHandler(enabled = true, onBack = onBack)
 
     val activity = LocalActivity.current
+    val context = LocalContext.current
     val fragmentActivity = remember(activity) { activity as? FragmentActivity }
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
@@ -122,7 +130,94 @@ fun FullscreenControlScreen(
     }
     val fullscreenDebugInfo = asBundle.fullscreenDebugInfo
     val showFullscreenVirtualButtons = asBundle.showFullscreenVirtualButtons
-    val showFullscreenFloatingButton = asBundle.showFullscreenFloatingButton
+    val fullscreenVirtualButtonHeight = asBundle.fullscreenVirtualButtonHeightDp.dp
+    val fullscreenVirtualButtonDockSetting = remember(asBundle.fullscreenVirtualButtonDock) {
+        AppSettings.FullscreenVirtualButtonDock.fromStoredValue(
+            asBundle.fullscreenVirtualButtonDock
+        )
+    }
+    var displayRotation by remember(activity) {
+        mutableIntStateOf(activity?.display?.rotation ?: Surface.ROTATION_0)
+    }
+    DisposableEffect(activity, context) {
+        val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+        if (displayManager == null || activity == null) {
+            onDispose {}
+        } else {
+            val listener = object : DisplayManager.DisplayListener {
+                override fun onDisplayAdded(displayId: Int) = Unit
+
+                override fun onDisplayRemoved(displayId: Int) = Unit
+
+                override fun onDisplayChanged(displayId: Int) {
+                    if (displayId == activity.display?.displayId) {
+                        displayRotation = activity.display?.rotation ?: Surface.ROTATION_0
+                    }
+                }
+            }
+            displayRotation = activity.display?.rotation ?: Surface.ROTATION_0
+            displayManager.registerDisplayListener(listener, null)
+            onDispose {
+                displayManager.unregisterDisplayListener(listener)
+            }
+        }
+    }
+    val fullscreenVirtualButtonPhysicalDock = remember(fullscreenVirtualButtonDockSetting) {
+        when (fullscreenVirtualButtonDockSetting) {
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_TOP,
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_BOTTOM,
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_LEFT,
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_RIGHT -> null
+
+            AppSettings.FullscreenVirtualButtonDock.FIXED_TOP -> VirtualButtonBar.FullscreenDock.TOP
+            AppSettings.FullscreenVirtualButtonDock.FIXED_BOTTOM -> VirtualButtonBar.FullscreenDock.BOTTOM
+            AppSettings.FullscreenVirtualButtonDock.FIXED_LEFT -> VirtualButtonBar.FullscreenDock.LEFT
+            AppSettings.FullscreenVirtualButtonDock.FIXED_RIGHT -> VirtualButtonBar.FullscreenDock.RIGHT
+        }
+    }
+    val fullscreenVirtualButtonDock = remember(
+        fullscreenVirtualButtonDockSetting,
+        displayRotation,
+    ) {
+        when (fullscreenVirtualButtonDockSetting) {
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_TOP -> VirtualButtonBar.FullscreenDock.TOP
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_BOTTOM -> VirtualButtonBar.FullscreenDock.BOTTOM
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_LEFT -> VirtualButtonBar.FullscreenDock.LEFT
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_RIGHT -> VirtualButtonBar.FullscreenDock.RIGHT
+            AppSettings.FullscreenVirtualButtonDock.FIXED_TOP -> dockForFixedPhysicalEdge(
+                physicalDock = VirtualButtonBar.FullscreenDock.TOP,
+                displayRotation = displayRotation,
+            )
+
+            AppSettings.FullscreenVirtualButtonDock.FIXED_BOTTOM -> dockForFixedPhysicalEdge(
+                physicalDock = VirtualButtonBar.FullscreenDock.BOTTOM,
+                displayRotation = displayRotation,
+            )
+
+            AppSettings.FullscreenVirtualButtonDock.FIXED_LEFT -> dockForFixedPhysicalEdge(
+                physicalDock = VirtualButtonBar.FullscreenDock.LEFT,
+                displayRotation = displayRotation,
+            )
+
+            AppSettings.FullscreenVirtualButtonDock.FIXED_RIGHT -> dockForFixedPhysicalEdge(
+                physicalDock = VirtualButtonBar.FullscreenDock.RIGHT,
+                displayRotation = displayRotation,
+            )
+        }
+    }
+    val fullscreenVirtualButtonReverseOrder = remember(
+        fullscreenVirtualButtonPhysicalDock,
+        displayRotation,
+    ) {
+        fullscreenVirtualButtonPhysicalDock
+            ?.let { physicalDock ->
+                isFixedDockOrderReversed(
+                    physicalDock = physicalDock,
+                    displayRotation = displayRotation,
+                )
+            }
+            ?: false
+    }
 
     val bar = remember(buttonItems) {
         VirtualButtonBar(
@@ -269,7 +364,7 @@ fun FullscreenControlScreen(
                 interactive = !isInPip,
                 onVideoBoundsInWindowChanged = onVideoBoundsInWindowChanged,
                 onImeCommitText = ::commitImeText,
-                onInjectTouch = { action, pointerId, x, y, pressure, buttons ->
+                onInjectTouch = { action, pointerId, x, y, pressure, actionButton, buttons ->
                     withContext(Dispatchers.IO) {
                         scrcpy.injectTouch(
                             action = action,
@@ -279,16 +374,31 @@ fun FullscreenControlScreen(
                             screenWidth = session.width,
                             screenHeight = session.height,
                             pressure = pressure,
-                            actionButton = 0,
+                            actionButton = actionButton,
                             buttons = buttons,
                         )
+                    }
+                },
+                onBackOrScreenOn = { action ->
+                    withContext(Dispatchers.IO) {
+                        scrcpy.pressBackOrTurnScreenOn(action)
                     }
                 },
             )
 
             if (showFullscreenVirtualButtons && !isInPip) {
                 bar.Fullscreen(
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    modifier = Modifier.align(
+                        when (fullscreenVirtualButtonDock) {
+                            VirtualButtonBar.FullscreenDock.TOP -> Alignment.TopCenter
+                            VirtualButtonBar.FullscreenDock.BOTTOM -> Alignment.BottomCenter
+                            VirtualButtonBar.FullscreenDock.LEFT -> Alignment.CenterStart
+                            VirtualButtonBar.FullscreenDock.RIGHT -> Alignment.CenterEnd
+                        }
+                    ),
+                    dock = fullscreenVirtualButtonDock,
+                    reverseOrder = fullscreenVirtualButtonReverseOrder,
+                    thickness = fullscreenVirtualButtonHeight,
                     onAction = { action ->
                         when (action) {
                             VirtualButtonAction.RECENT_TASKS -> {
@@ -331,7 +441,7 @@ fun FullscreenControlScreen(
                 )
             }
 
-            if (showFullscreenFloatingButton && !isInPip) {
+            if (asBundle.showFullscreenFloatingButton && !isInPip) {
                 bar.FloatingBall(
                     actions = floatingActions,
                     modifier = Modifier.fillMaxSize(),
@@ -365,15 +475,13 @@ fun FullscreenControlScreen(
                             }
                         }
                     },
-                    passwordPopupContent = if (fragmentActivity == null) {
-                        null
-                    } else {
-                        { onDismissRequest ->
+                    passwordPopupContent =
+                        if (fragmentActivity == null) null
+                        else { onDismissRequest ->
                             PasswordPickerPopupContent(
                                 onDismissRequest = onDismissRequest,
                             )
-                        }
-                    },
+                        },
                 )
             }
 
@@ -451,6 +559,101 @@ fun FullscreenControlScreen(
     }
 }
 
+private fun dockForFixedPhysicalEdge(
+    physicalDock: VirtualButtonBar.FullscreenDock,
+    displayRotation: Int,
+) = when (displayRotation) {
+    Surface.ROTATION_0 -> physicalDock
+    Surface.ROTATION_90 -> when (physicalDock) {
+        VirtualButtonBar.FullscreenDock.TOP -> VirtualButtonBar.FullscreenDock.LEFT
+        VirtualButtonBar.FullscreenDock.BOTTOM -> VirtualButtonBar.FullscreenDock.RIGHT
+        VirtualButtonBar.FullscreenDock.LEFT -> VirtualButtonBar.FullscreenDock.BOTTOM
+        VirtualButtonBar.FullscreenDock.RIGHT -> VirtualButtonBar.FullscreenDock.TOP
+    }
+
+    Surface.ROTATION_180 -> when (physicalDock) {
+        VirtualButtonBar.FullscreenDock.TOP -> VirtualButtonBar.FullscreenDock.BOTTOM
+        VirtualButtonBar.FullscreenDock.BOTTOM -> VirtualButtonBar.FullscreenDock.TOP
+        VirtualButtonBar.FullscreenDock.LEFT -> VirtualButtonBar.FullscreenDock.RIGHT
+        VirtualButtonBar.FullscreenDock.RIGHT -> VirtualButtonBar.FullscreenDock.LEFT
+    }
+
+    Surface.ROTATION_270 -> when (physicalDock) {
+        VirtualButtonBar.FullscreenDock.TOP -> VirtualButtonBar.FullscreenDock.RIGHT
+        VirtualButtonBar.FullscreenDock.BOTTOM -> VirtualButtonBar.FullscreenDock.LEFT
+        VirtualButtonBar.FullscreenDock.LEFT -> VirtualButtonBar.FullscreenDock.TOP
+        VirtualButtonBar.FullscreenDock.RIGHT -> VirtualButtonBar.FullscreenDock.BOTTOM
+    }
+
+    else -> physicalDock
+}
+
+private enum class DockDirection {
+    LEFT_TO_RIGHT,
+    RIGHT_TO_LEFT,
+    TOP_TO_BOTTOM,
+    BOTTOM_TO_TOP,
+}
+
+private fun isFixedDockOrderReversed(
+    physicalDock: VirtualButtonBar.FullscreenDock,
+    displayRotation: Int,
+): Boolean {
+    val visualDock = dockForFixedPhysicalEdge(
+        physicalDock = physicalDock,
+        displayRotation = displayRotation,
+    )
+    val visualDirection = rotateDockDirection(
+        direction = physicalDockBaseDirection(physicalDock),
+        displayRotation = displayRotation,
+    )
+    return when (visualDock) {
+        VirtualButtonBar.FullscreenDock.TOP,
+        VirtualButtonBar.FullscreenDock.BOTTOM -> visualDirection == DockDirection.RIGHT_TO_LEFT
+
+        VirtualButtonBar.FullscreenDock.LEFT,
+        VirtualButtonBar.FullscreenDock.RIGHT -> visualDirection == DockDirection.BOTTOM_TO_TOP
+    }
+}
+
+private fun physicalDockBaseDirection(
+    physicalDock: VirtualButtonBar.FullscreenDock,
+) = when (physicalDock) {
+    VirtualButtonBar.FullscreenDock.TOP -> DockDirection.RIGHT_TO_LEFT
+    VirtualButtonBar.FullscreenDock.BOTTOM -> DockDirection.LEFT_TO_RIGHT
+    VirtualButtonBar.FullscreenDock.LEFT -> DockDirection.TOP_TO_BOTTOM
+    VirtualButtonBar.FullscreenDock.RIGHT -> DockDirection.BOTTOM_TO_TOP
+}
+
+private fun rotateDockDirection(
+    direction: DockDirection,
+    displayRotation: Int,
+) = when (displayRotation) {
+    Surface.ROTATION_0 -> direction
+    Surface.ROTATION_90 -> when (direction) {
+        DockDirection.LEFT_TO_RIGHT -> DockDirection.BOTTOM_TO_TOP
+        DockDirection.RIGHT_TO_LEFT -> DockDirection.TOP_TO_BOTTOM
+        DockDirection.TOP_TO_BOTTOM -> DockDirection.LEFT_TO_RIGHT
+        DockDirection.BOTTOM_TO_TOP -> DockDirection.RIGHT_TO_LEFT
+    }
+
+    Surface.ROTATION_180 -> when (direction) {
+        DockDirection.LEFT_TO_RIGHT -> DockDirection.RIGHT_TO_LEFT
+        DockDirection.RIGHT_TO_LEFT -> DockDirection.LEFT_TO_RIGHT
+        DockDirection.TOP_TO_BOTTOM -> DockDirection.BOTTOM_TO_TOP
+        DockDirection.BOTTOM_TO_TOP -> DockDirection.TOP_TO_BOTTOM
+    }
+
+    Surface.ROTATION_270 -> when (direction) {
+        DockDirection.LEFT_TO_RIGHT -> DockDirection.TOP_TO_BOTTOM
+        DockDirection.RIGHT_TO_LEFT -> DockDirection.BOTTOM_TO_TOP
+        DockDirection.TOP_TO_BOTTOM -> DockDirection.RIGHT_TO_LEFT
+        DockDirection.BOTTOM_TO_TOP -> DockDirection.LEFT_TO_RIGHT
+    }
+
+    else -> direction
+}
+
 /**
  * FullscreenControlScreen
  *
@@ -479,7 +682,16 @@ fun FullscreenControlPage(
     interactive: Boolean = true,
     onVideoBoundsInWindowChanged: (Rect?) -> Unit = {},
     onImeCommitText: suspend (String) -> Unit,
-    onInjectTouch: suspend (action: Int, pointerId: Long, x: Int, y: Int, pressure: Float, buttons: Int) -> Unit,
+    onInjectTouch: suspend (
+        action: Int,
+        pointerId: Long,
+        x: Int,
+        y: Int,
+        pressure: Float,
+        actionButton: Int,
+        buttons: Int,
+    ) -> Unit,
+    onBackOrScreenOn: suspend (action: Int) -> Unit,
 ) {
     BackHandler(enabled = enableBackHandler, onBack = onDismiss)
 
@@ -506,7 +718,9 @@ fun FullscreenControlPage(
             activePointerDevicePositions = activePointerDevicePositions,
             pointerLabels = pointerLabels,
             nextPointerLabel = nextPointerLabel,
+            mouseHoverEnabled = session.mouseHover,
             onInjectTouch = onInjectTouch,
+            onBackOrScreenOn = onBackOrScreenOn,
             onActiveTouchCountChanged = { activeTouchCount = it },
             onActiveTouchDebugChanged = { activeTouchDebug = it },
             onNextPointerLabelChanged = { nextPointerLabel = it },

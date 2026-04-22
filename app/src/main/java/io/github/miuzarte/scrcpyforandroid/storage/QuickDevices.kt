@@ -29,9 +29,9 @@ class QuickDevices(context: Context) : Settings(context, "QuickDevices") {
     ) : Parcelable {
     }
 
-    private val bundleFields = arrayOf(
-        bundleField(QUICK_DEVICES_LIST) { bundle: Bundle -> bundle.quickDevicesList },
-        bundleField(QUICK_CONNECT_INPUT) { bundle: Bundle -> bundle.quickConnectInput },
+    private val bundleFields = arrayOf<BundleField<Bundle>>(
+        bundleField(QUICK_DEVICES_LIST) { it.quickDevicesList },
+        bundleField(QUICK_CONNECT_INPUT) { it.quickConnectInput },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)

@@ -10,7 +10,6 @@ import io.github.miuzarte.scrcpyforandroid.password.PasswordRepository
 import io.github.miuzarte.scrcpyforandroid.password.hasAuthenticatedOrigin
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppWakeLocks
-import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
 import kotlinx.coroutines.runBlocking
 
 // 生物认证需要 FragmentActivity
@@ -21,12 +20,7 @@ class MainActivity : FragmentActivity() {
         AppRuntime.init(applicationContext)
         AppWakeLocks.init(applicationContext)
 
-        val migration = PreferenceMigration(applicationContext)
         runBlocking {
-            // 旧版设置迁移
-            if (migration.needsMigration())
-                migration.migrate(clearSharedPrefs = true)
-
             PasswordRepository.refresh()
             // 认证不可用时, 清除经认证创建的密码
             if (!BiometricGate.canAuthenticate()) {

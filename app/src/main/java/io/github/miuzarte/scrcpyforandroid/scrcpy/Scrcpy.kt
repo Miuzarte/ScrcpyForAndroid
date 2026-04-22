@@ -166,7 +166,11 @@ class Scrcpy(
             }
 
             // Create session info
-            _currentSessionState.value = info.copy(legacyPaste = options.legacyPaste)
+            _currentSessionState.value = info.copy(
+                legacyPaste = options.legacyPaste,
+                mouseHover = options.mouseHover,
+                killAdbOnClose = options.killAdbOnClose,
+            )
             isRunning = true
             startClipboardSync()
 
@@ -296,6 +300,9 @@ class Scrcpy(
         vScroll = vScroll,
         buttons = buttons,
     )
+
+    suspend fun pressBackOrTurnScreenOn(action: Int = KeyEvent.ACTION_DOWN) =
+        session.pressBackOrTurnScreenOn(action)
 
     fun updateCurrentSessionSize(width: Int, height: Int) {
         val current = _currentSessionState.value ?: return
@@ -1362,6 +1369,8 @@ class Scrcpy(
             val audioCodecId: Int = 0,
             val controlEnabled: Boolean,
             val legacyPaste: Boolean = false,
+            val mouseHover: Boolean = true,
+            val killAdbOnClose: Boolean = false,
             val host: String = "",
             val port: Int = Defaults.ADB_PORT,
         )

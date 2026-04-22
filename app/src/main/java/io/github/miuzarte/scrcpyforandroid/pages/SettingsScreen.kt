@@ -1,7 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.content.Intent
-import android.os.Process
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,17 +42,20 @@ import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
-import io.github.miuzarte.scrcpyforandroid.storage.PreferenceMigration
+import io.github.miuzarte.scrcpyforandroid.storage.AppSettings.FullscreenVirtualButtonDock
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
+import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdownGroup
+import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdownPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -67,9 +69,20 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import java.io.File
 import kotlin.math.roundToInt
-import kotlin.system.exitProcess
 import android.provider.Settings as AndroidSettings
+
+private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
+
+private fun terminalFontFile(context: android.content.Context): File {
+    return File(context.filesDir, TERMINAL_FONT_RELATIVE_PATH)
+}
+
+private fun clearTerminalFont(context: android.content.Context): Boolean {
+    val target = terminalFontFile(context)
+    return target.exists() && target.delete()
+}
 
 @Composable
 fun SettingsScreen(
@@ -117,11 +130,7 @@ fun SettingsPage(
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
-    var needMigration by remember { mutableStateOf(false) }
     val updateState by AppUpdateChecker.state.collectAsState()
-    LaunchedEffect(Unit) {
-        needMigration = PreferenceMigration(appContext).needsMigration()
-    }
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val scope = rememberCoroutineScope()
@@ -129,6 +138,7 @@ fun SettingsPage(
     val snackbar = LocalSnackbarController.current
     val navigator = LocalRootNavigator.current
     val serverPicker = LocalServerPicker.current
+    val terminalFontPicker = LocalTerminalFontPicker.current
     val isScrcpyStreaming = AppRuntime.scrcpy?.isStarted() == true
 
     val asBundleShared by appSettings.bundleState.collectAsState()
@@ -155,6 +165,10 @@ fun SettingsPage(
     }
 
     val themeItems = rememberSaveable { ThemeModes.baseOptions.map { it.label } }
+
+    val fullscreenVirtualButtonDock = remember(asBundle.fullscreenVirtualButtonDock) {
+        FullscreenVirtualButtonDock.fromStoredValue(asBundle.fullscreenVirtualButtonDock)
+    }
 
     val customServerVersionShowInput = rememberSaveable(asBundle.customServerUri) {
         asBundle.customServerUri.isNotBlank()
@@ -206,13 +220,7 @@ fun SettingsPage(
             Card {
                 OverlayDropdownPreference(
                     title = "外观模式",
-                    summary = ThemeModes.baseOptions
-                        .getOrNull(
-                            asBundle.themeBaseIndex
-                                .coerceIn(0, ThemeModes.baseOptions.lastIndex)
-                        )
-                        ?.label
-                        ?: "跟随系统",
+                    summary = "选择应用的外观模式",
                     items = themeItems,
                     selectedIndex = asBundle.themeBaseIndex
                         .coerceIn(0, ThemeModes.baseOptions.lastIndex),
@@ -305,11 +313,12 @@ fun SettingsPage(
                     value = asBundle.devicePreviewCardHeightDp.toFloat(),
                     onValueChange = {
                         asBundle = asBundle.copy(
-                            devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
+                            devicePreviewCardHeightDp =
+                                it.roundToInt().coerceAtLeast(120)
                         )
                     },
                     valueRange = 160f..600f,
-                    steps = 600 - 160 - 2,
+                    steps = 600 - 160 - 1,
                     unit = "dp",
                     displayFormatter = { it.roundToInt().toString() },
                     inputInitialValue = asBundle.devicePreviewCardHeightDp.toString(),
@@ -341,21 +350,177 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
+                    title = "全屏时不跟随系统旋转锁定",
+                    summary = "启用后使用传感器方向，忽略系统自动旋转锁定状态",
+                    checked = asBundle.fullscreenControlIgnoreSystemRotationLock,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            fullscreenControlIgnoreSystemRotationLock = it
+                        )
+                    },
+                )
+                SwitchPreference(
                     title = "全屏显示虚拟按钮",
-                    summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
+                    summary = "在全屏控制页中显示返回键、主页键等虚拟按钮",
                     checked = asBundle.showFullscreenVirtualButtons,
                     onCheckedChange = {
                         asBundle = asBundle.copy(showFullscreenVirtualButtons = it)
                     },
                 )
+                AnimatedVisibility(asBundle.showFullscreenVirtualButtons) {
+                    Column {
+                        MultiGroupsDropdownPreference(
+                            title = "全屏虚拟按钮方向",
+                            summary = fullscreenVirtualButtonDock.summary,
+                            groups = listOf(
+                                MultiGroupsDropdownGroup(
+                                    options = FullscreenVirtualButtonDock.modeItems,
+                                    selectedIndex = fullscreenVirtualButtonDock.modeIndex,
+                                    onSelectedIndexChange = { modeIndex ->
+                                        asBundle = asBundle.copy(
+                                            fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
+                                                .fromModeAndDirection(
+                                                    modeIndex = modeIndex,
+                                                    directionIndex = fullscreenVirtualButtonDock.directionIndex,
+                                                )
+                                                .toStoredValue()
+                                        )
+                                    },
+                                ),
+                                MultiGroupsDropdownGroup(
+                                    options = FullscreenVirtualButtonDock.directionItems,
+                                    selectedIndex = fullscreenVirtualButtonDock.directionIndex,
+                                    onSelectedIndexChange = { directionIndex ->
+                                        asBundle = asBundle.copy(
+                                            fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
+                                                .fromModeAndDirection(
+                                                    modeIndex = fullscreenVirtualButtonDock.modeIndex,
+                                                    directionIndex = directionIndex,
+                                                )
+                                                .toStoredValue()
+                                        )
+                                    },
+                                ),
+                            ),
+                        )
+                        SuperSlider(
+                            title = "全屏虚拟按钮高度",
+                            summary = "调整全屏控制页中虚拟按钮栏的高度",
+                            value = asBundle.fullscreenVirtualButtonHeightDp.toFloat(),
+                            onValueChange = {
+                                asBundle = asBundle.copy(
+                                    fullscreenVirtualButtonHeightDp =
+                                        it.roundToInt().coerceIn(16, 80)
+                                )
+                            },
+                            valueRange = 16f..80f,
+                            steps = 80 - 16 - 1,
+                            unit = "dp",
+                            displayFormatter = { it.roundToInt().toString() },
+                            inputInitialValue = asBundle.fullscreenVirtualButtonHeightDp.toString(),
+                            inputFilter = { it.filter(Char::isDigit) },
+                            inputValueRange = 1f..160f,
+                            onInputConfirm = { input ->
+                                input.toIntOrNull()?.let {
+                                    asBundle = asBundle.copy(
+                                        fullscreenVirtualButtonHeightDp =
+                                            it.coerceIn(1, 160)
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
                 SwitchPreference(
                     title = "全屏显示悬浮球",
-                    summary = "在全屏控制页显示可拖动的悬浮球，点击后弹出完整虚拟按键菜单",
+                    summary = "在全屏控制页中显示可拖动的悬浮球，点击后弹出完整虚拟按键菜单",
                     checked = asBundle.showFullscreenFloatingButton,
                     onCheckedChange = {
                         asBundle = asBundle.copy(showFullscreenFloatingButton = it)
                     },
                 )
+                AnimatedVisibility(asBundle.showFullscreenFloatingButton) {
+                    Column {
+                        SuperSlider(
+                            title = "全屏悬浮球尺寸",
+                            summary = "调整全屏控制页悬浮球大小",
+                            value = asBundle.fullscreenFloatingButtonSizeDp.toFloat(),
+                            onValueChange = {
+                                asBundle = asBundle.copy(
+                                    fullscreenFloatingButtonSizeDp =
+                                        it.roundToInt().coerceIn(32, 64)
+                                )
+                            },
+                            valueRange = 32f..64f,
+                            steps = 64 - 32 - 1,
+                            unit = "dp",
+                            displayFormatter = { it.roundToInt().toString() },
+                            inputInitialValue = asBundle.fullscreenFloatingButtonSizeDp.toString(),
+                            inputFilter = { it.filter(Char::isDigit) },
+                            inputValueRange = 16f..96f,
+                            onInputConfirm = { input ->
+                                input.toIntOrNull()?.let {
+                                    asBundle = asBundle.copy(
+                                        fullscreenFloatingButtonSizeDp =
+                                            it.coerceIn(16, 96)
+                                    )
+                                }
+                            },
+                        )
+                        SuperSlider(
+                            title = "悬浮球背景透明度",
+                            summary = "调整悬浮球背景透明度",
+                            value = asBundle.fullscreenFloatingButtonBackgroundAlphaPercent.toFloat(),
+                            onValueChange = {
+                                asBundle = asBundle.copy(
+                                    fullscreenFloatingButtonBackgroundAlphaPercent =
+                                        it.roundToInt().coerceIn(10, 100)
+                                )
+                            },
+                            valueRange = 10f..100f,
+                            steps = 100 - 10 - 1,
+                            unit = "%",
+                            displayFormatter = { it.roundToInt().toString() },
+                            inputInitialValue = asBundle.fullscreenFloatingButtonBackgroundAlphaPercent.toString(),
+                            inputFilter = { it.filter(Char::isDigit) },
+                            inputValueRange = 10f..100f,
+                            onInputConfirm = { input ->
+                                input.toIntOrNull()?.let {
+                                    asBundle = asBundle.copy(
+                                        fullscreenFloatingButtonBackgroundAlphaPercent =
+                                            it.coerceIn(10, 100)
+                                    )
+                                }
+                            },
+                        )
+                        SuperSlider(
+                            title = "白环透明度",
+                            summary = "调整悬浮球白环透明度",
+                            value = asBundle.fullscreenFloatingButtonRingAlphaPercent.toFloat(),
+                            onValueChange = {
+                                asBundle = asBundle.copy(
+                                    fullscreenFloatingButtonRingAlphaPercent =
+                                        it.roundToInt().coerceIn(0, 100)
+                                )
+                            },
+                            valueRange = 0f..100f,
+                            steps = 100 - 0 - 1,
+                            unit = "%",
+                            displayFormatter = { it.roundToInt().toString() },
+                            inputInitialValue = asBundle.fullscreenFloatingButtonRingAlphaPercent.toString(),
+                            inputFilter = { it.filter(Char::isDigit) },
+                            inputValueRange = 0f..100f,
+                            onInputConfirm = { input ->
+                                input.toIntOrNull()?.let {
+                                    asBundle = asBundle.copy(
+                                        fullscreenFloatingButtonRingAlphaPercent =
+                                            it.coerceIn(0, 100)
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
                 SwitchPreference(
                     title = "实时同步剪贴板到受控机",
                     summary =
@@ -366,7 +531,9 @@ fun SettingsPage(
                         """.trimIndent(),
                     checked = asBundle.realtimeClipboardSyncToDevice,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(realtimeClipboardSyncToDevice = it)
+                        asBundle = asBundle.copy(
+                            realtimeClipboardSyncToDevice = it
+                        )
                     },
                 )
             }
@@ -592,38 +759,90 @@ fun SettingsPage(
             }
         }
 
-        if (needMigration) item {
-            // 这部分应该不会显示出来,
-            // 应用启动时就会执行迁移与旧数据的删除
-            SectionSmallTitle("应用")
+        item {
+            SectionSmallTitle("终端")
             Card {
-                ArrowPreference(
-                    title = "恢复旧版本配置",
-                    summary = "从旧版本的 SharedPreferences 恢复至 DataStore",
-                    onClick = {
-                        scope.launch {
-                            val migration = PreferenceMigration(appContext)
-                            migration.migrate(clearSharedPrefs = false)
-                            snackbar.show("迁移完成，应用将重启")
-
-                            delay(1000)
-
-                            val intent = context.packageManager.getLaunchIntentForPackage(
-                                context.packageName
+                SuperSlider(
+                    title = "终端字号",
+                    summary = "也可以在终端上双指缩放调整",
+                    value = asBundle.terminalFontSizeSp,
+                    onValueChange = {
+                        asBundle = asBundle.copy(
+                            terminalFontSizeSp = it.roundToInt().toFloat()
+                        )
+                    },
+                    valueRange = 1f..32f,
+                    steps = 32 - 1 - 1,
+                    unit = "sp",
+                    displayFormatter = { it.roundToInt().toString() },
+                    inputInitialValue = asBundle.terminalFontSizeSp.roundToInt().toString(),
+                    inputFilter = { input -> input.filter(Char::isDigit) },
+                    inputValueRange = 1f..32f,
+                    onInputConfirm = { input ->
+                        input.toIntOrNull()?.let {
+                            asBundle = asBundle.copy(
+                                terminalFontSizeSp = it.coerceIn(1, 32).toFloat()
                             )
-                            intent?.apply {
-                                addFlags(
-                                    Intent.FLAG_ACTIVITY_NEW_TASK
-                                            or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                )
-                            }
-                            context.startActivity(intent)
-
-                            Process.killProcess(Process.myPid())
-                            exitProcess(0)
                         }
                     },
                 )
+                Column(
+                    modifier = Modifier.padding(vertical = UiSpacing.Large),
+                    verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        Text(
+                            text = "自定义终端字体",
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextField(
+                            value = asBundle.terminalFontDisplayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = "系统等宽字体",
+                            useLabelAsPlaceholder = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                Row(
+                                    modifier = Modifier.padding(end = UiSpacing.Medium),
+                                ) {
+                                    if (asBundle.terminalFontDisplayName.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    val cleared = withContext(Dispatchers.IO) {
+                                                        clearTerminalFont(context)
+                                                    }
+                                                    asBundle = asBundle.copy(
+                                                        terminalFontDisplayName = ""
+                                                    )
+                                                    snackbar.show(
+                                                        if (cleared) "已恢复默认终端字体"
+                                                        else "当前没有可清除的自定义字体"
+                                                    )
+                                                }
+                                            },
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Clear,
+                                                contentDescription = "清空",
+                                            )
+                                        }
+                                    }
+                                    IconButton(onClick = terminalFontPicker.pick) {
+                                        Icon(
+                                            Icons.Rounded.FileOpen,
+                                            contentDescription = "选择字体",
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
 

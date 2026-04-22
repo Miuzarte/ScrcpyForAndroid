@@ -200,6 +200,10 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
             booleanPreferencesKey("downsize_on_error"),
             true,
         )
+        val MOUSE_HOVER = Pair(
+            booleanPreferencesKey("mouse_hover"),
+            true,
+        )
         val CLEANUP = Pair(
             booleanPreferencesKey("cleanup"),
             true,
@@ -305,6 +309,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
             legacyPaste = LEGACY_PASTE.defaultValue,
             clipboardAutosync = CLIPBOARD_AUTOSYNC.defaultValue,
             downsizeOnError = DOWNSIZE_ON_ERROR.defaultValue,
+            mouseHover = MOUSE_HOVER.defaultValue,
             cleanup = CLEANUP.defaultValue,
             powerOn = POWER_ON.defaultValue,
             video = VIDEO.defaultValue,
@@ -322,62 +327,6 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
             vdSystemDecorations = VD_SYSTEM_DECORATIONS.defaultValue,
         )
     }
-
-    val crop by setting(CROP)
-    val recordFilename by setting(RECORD_FILENAME)
-    val videoCodecOptions by setting(VIDEO_CODEC_OPTIONS)
-    val audioCodecOptions by setting(AUDIO_CODEC_OPTIONS)
-    val videoEncoder by setting(VIDEO_ENCODER)
-    val audioEncoder by setting(AUDIO_ENCODER)
-    val cameraId by setting(CAMERA_ID)
-    val cameraSize by setting(CAMERA_SIZE)
-    val cameraSizeCustom by setting(CAMERA_SIZE_CUSTOM)
-    val cameraSizeUseCustom by setting(CAMERA_SIZE_USE_CUSTOM)
-    val cameraAr by setting(CAMERA_AR)
-    val cameraFps by setting(CAMERA_FPS)
-    val logLevel by setting(LOG_LEVEL)
-    val videoCodec by setting(VIDEO_CODEC)
-    val audioCodec by setting(AUDIO_CODEC)
-    val videoSource by setting(VIDEO_SOURCE)
-    val audioSource by setting(AUDIO_SOURCE)
-    val recordFormat by setting(RECORD_FORMAT)
-    val cameraFacing by setting(CAMERA_FACING)
-    val maxSize by setting(MAX_SIZE)
-    val videoBitRate by setting(VIDEO_BIT_RATE)
-    val audioBitRate by setting(AUDIO_BIT_RATE)
-    val maxFps by setting(MAX_FPS)
-    val angle by setting(ANGLE)
-    val captureOrientation by setting(CAPTURE_ORIENTATION)
-    val captureOrientationLock by setting(CAPTURE_ORIENTATION_LOCK)
-    val displayOrientation by setting(DISPLAY_ORIENTATION)
-    val recordOrientation by setting(RECORD_ORIENTATION)
-    val displayImePolicy by setting(DISPLAY_IME_POLICY)
-    val displayId by setting(DISPLAY_ID)
-    val screenOffTimeout by setting(SCREEN_OFF_TIMEOUT)
-    val showTouches by setting(SHOW_TOUCHES)
-    val fullscreen by setting(FULLSCREEN)
-    val control by setting(CONTROL)
-    val videoPlayback by setting(VIDEO_PLAYBACK)
-    val audioPlayback by setting(AUDIO_PLAYBACK)
-    val turnScreenOff by setting(TURN_SCREEN_OFF)
-    val stayAwake by setting(STAY_AWAKE)
-    val disableScreensaver by setting(DISABLE_SCREENSAVER)
-    val powerOffOnClose by setting(POWER_OFF_ON_CLOSE)
-    val legacyPaste by setting(LEGACY_PASTE)
-    val clipboardAutosync by setting(CLIPBOARD_AUTOSYNC)
-    val cleanup by setting(CLEANUP)
-    val powerOn by setting(POWER_ON)
-    val video by setting(VIDEO)
-    val audio by setting(AUDIO)
-    val requireAudio by setting(REQUIRE_AUDIO)
-    val killAdbOnClose by setting(KILL_ADB_ON_CLOSE)
-    val cameraHighSpeed by setting(CAMERA_HIGH_SPEED)
-    val list by setting(LIST)
-    val audioDup by setting(AUDIO_DUP)
-    val newDisplay by setting(NEW_DISPLAY)
-    val startApp by setting(START_APP)
-    val vdDestroyContent by setting(VD_DESTROY_CONTENT)
-    val vdSystemDecorations by setting(VD_SYSTEM_DECORATIONS)
 
     @Parcelize
     data class Bundle(
@@ -424,6 +373,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         val legacyPaste: Boolean,
         val clipboardAutosync: Boolean,
         val downsizeOnError: Boolean,
+        val mouseHover: Boolean,
         val cleanup: Boolean,
         val powerOn: Boolean,
         val video: Boolean,
@@ -442,64 +392,65 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
     ) : Parcelable {
     }
 
-    private val bundleFields = arrayOf(
-        bundleField(CROP) { bundle: Bundle -> bundle.crop },
-        bundleField(RECORD_FILENAME) { bundle: Bundle -> bundle.recordFilename },
-        bundleField(VIDEO_CODEC_OPTIONS) { bundle: Bundle -> bundle.videoCodecOptions },
-        bundleField(AUDIO_CODEC_OPTIONS) { bundle: Bundle -> bundle.audioCodecOptions },
-        bundleField(VIDEO_ENCODER) { bundle: Bundle -> bundle.videoEncoder },
-        bundleField(AUDIO_ENCODER) { bundle: Bundle -> bundle.audioEncoder },
-        bundleField(CAMERA_ID) { bundle: Bundle -> bundle.cameraId },
-        bundleField(CAMERA_SIZE) { bundle: Bundle -> bundle.cameraSize },
-        bundleField(CAMERA_SIZE_CUSTOM) { bundle: Bundle -> bundle.cameraSizeCustom },
-        bundleField(CAMERA_SIZE_USE_CUSTOM) { bundle: Bundle -> bundle.cameraSizeUseCustom },
-        bundleField(CAMERA_AR) { bundle: Bundle -> bundle.cameraAr },
-        bundleField(CAMERA_FPS) { bundle: Bundle -> bundle.cameraFps },
-        bundleField(LOG_LEVEL) { bundle: Bundle -> bundle.logLevel },
-        bundleField(VIDEO_CODEC) { bundle: Bundle -> bundle.videoCodec },
-        bundleField(AUDIO_CODEC) { bundle: Bundle -> bundle.audioCodec },
-        bundleField(VIDEO_SOURCE) { bundle: Bundle -> bundle.videoSource },
-        bundleField(AUDIO_SOURCE) { bundle: Bundle -> bundle.audioSource },
-        bundleField(RECORD_FORMAT) { bundle: Bundle -> bundle.recordFormat },
-        bundleField(CAMERA_FACING) { bundle: Bundle -> bundle.cameraFacing },
-        bundleField(MAX_SIZE) { bundle: Bundle -> bundle.maxSize },
-        bundleField(VIDEO_BIT_RATE) { bundle: Bundle -> bundle.videoBitRate },
-        bundleField(AUDIO_BIT_RATE) { bundle: Bundle -> bundle.audioBitRate },
-        bundleField(MAX_FPS) { bundle: Bundle -> bundle.maxFps },
-        bundleField(ANGLE) { bundle: Bundle -> bundle.angle },
-        bundleField(CAPTURE_ORIENTATION) { bundle: Bundle -> bundle.captureOrientation },
-        bundleField(CAPTURE_ORIENTATION_LOCK) { bundle: Bundle -> bundle.captureOrientationLock },
-        bundleField(DISPLAY_ORIENTATION) { bundle: Bundle -> bundle.displayOrientation },
-        bundleField(RECORD_ORIENTATION) { bundle: Bundle -> bundle.recordOrientation },
-        bundleField(DISPLAY_IME_POLICY) { bundle: Bundle -> bundle.displayImePolicy },
-        bundleField(DISPLAY_ID) { bundle: Bundle -> bundle.displayId },
-        bundleField(SCREEN_OFF_TIMEOUT) { bundle: Bundle -> bundle.screenOffTimeout },
-        bundleField(SHOW_TOUCHES) { bundle: Bundle -> bundle.showTouches },
-        bundleField(FULLSCREEN) { bundle: Bundle -> bundle.fullscreen },
-        bundleField(CONTROL) { bundle: Bundle -> bundle.control },
-        bundleField(VIDEO_PLAYBACK) { bundle: Bundle -> bundle.videoPlayback },
-        bundleField(AUDIO_PLAYBACK) { bundle: Bundle -> bundle.audioPlayback },
-        bundleField(TURN_SCREEN_OFF) { bundle: Bundle -> bundle.turnScreenOff },
-        bundleField(STAY_AWAKE) { bundle: Bundle -> bundle.stayAwake },
-        bundleField(DISABLE_SCREENSAVER) { bundle: Bundle -> bundle.disableScreensaver },
-        bundleField(POWER_OFF_ON_CLOSE) { bundle: Bundle -> bundle.powerOffOnClose },
-        bundleField(LEGACY_PASTE) { bundle: Bundle -> bundle.legacyPaste },
-        bundleField(CLIPBOARD_AUTOSYNC) { bundle: Bundle -> bundle.clipboardAutosync },
-        bundleField(CLEANUP) { bundle: Bundle -> bundle.cleanup },
-        bundleField(POWER_ON) { bundle: Bundle -> bundle.powerOn },
-        bundleField(VIDEO) { bundle: Bundle -> bundle.video },
-        bundleField(AUDIO) { bundle: Bundle -> bundle.audio },
-        bundleField(REQUIRE_AUDIO) { bundle: Bundle -> bundle.requireAudio },
-        bundleField(KILL_ADB_ON_CLOSE) { bundle: Bundle -> bundle.killAdbOnClose },
-        bundleField(CAMERA_HIGH_SPEED) { bundle: Bundle -> bundle.cameraHighSpeed },
-        bundleField(LIST) { bundle: Bundle -> bundle.list },
-        bundleField(AUDIO_DUP) { bundle: Bundle -> bundle.audioDup },
-        bundleField(NEW_DISPLAY) { bundle: Bundle -> bundle.newDisplay },
-        bundleField(START_APP) { bundle: Bundle -> bundle.startApp },
-        bundleField(START_APP_CUSTOM) { bundle: Bundle -> bundle.startAppCustom },
-        bundleField(START_APP_USE_CUSTOM) { bundle: Bundle -> bundle.startAppUseCustom },
-        bundleField(VD_DESTROY_CONTENT) { bundle: Bundle -> bundle.vdDestroyContent },
-        bundleField(VD_SYSTEM_DECORATIONS) { bundle: Bundle -> bundle.vdSystemDecorations },
+    private val bundleFields = arrayOf<BundleField<Bundle>>(
+        bundleField(CROP) { it.crop },
+        bundleField(RECORD_FILENAME) { it.recordFilename },
+        bundleField(VIDEO_CODEC_OPTIONS) { it.videoCodecOptions },
+        bundleField(AUDIO_CODEC_OPTIONS) { it.audioCodecOptions },
+        bundleField(VIDEO_ENCODER) { it.videoEncoder },
+        bundleField(AUDIO_ENCODER) { it.audioEncoder },
+        bundleField(CAMERA_ID) { it.cameraId },
+        bundleField(CAMERA_SIZE) { it.cameraSize },
+        bundleField(CAMERA_SIZE_CUSTOM) { it.cameraSizeCustom },
+        bundleField(CAMERA_SIZE_USE_CUSTOM) { it.cameraSizeUseCustom },
+        bundleField(CAMERA_AR) { it.cameraAr },
+        bundleField(CAMERA_FPS) { it.cameraFps },
+        bundleField(LOG_LEVEL) { it.logLevel },
+        bundleField(VIDEO_CODEC) { it.videoCodec },
+        bundleField(AUDIO_CODEC) { it.audioCodec },
+        bundleField(VIDEO_SOURCE) { it.videoSource },
+        bundleField(AUDIO_SOURCE) { it.audioSource },
+        bundleField(RECORD_FORMAT) { it.recordFormat },
+        bundleField(CAMERA_FACING) { it.cameraFacing },
+        bundleField(MAX_SIZE) { it.maxSize },
+        bundleField(VIDEO_BIT_RATE) { it.videoBitRate },
+        bundleField(AUDIO_BIT_RATE) { it.audioBitRate },
+        bundleField(MAX_FPS) { it.maxFps },
+        bundleField(ANGLE) { it.angle },
+        bundleField(CAPTURE_ORIENTATION) { it.captureOrientation },
+        bundleField(CAPTURE_ORIENTATION_LOCK) { it.captureOrientationLock },
+        bundleField(DISPLAY_ORIENTATION) { it.displayOrientation },
+        bundleField(RECORD_ORIENTATION) { it.recordOrientation },
+        bundleField(DISPLAY_IME_POLICY) { it.displayImePolicy },
+        bundleField(DISPLAY_ID) { it.displayId },
+        bundleField(SCREEN_OFF_TIMEOUT) { it.screenOffTimeout },
+        bundleField(SHOW_TOUCHES) { it.showTouches },
+        bundleField(FULLSCREEN) { it.fullscreen },
+        bundleField(CONTROL) { it.control },
+        bundleField(VIDEO_PLAYBACK) { it.videoPlayback },
+        bundleField(AUDIO_PLAYBACK) { it.audioPlayback },
+        bundleField(TURN_SCREEN_OFF) { it.turnScreenOff },
+        bundleField(STAY_AWAKE) { it.stayAwake },
+        bundleField(DISABLE_SCREENSAVER) { it.disableScreensaver },
+        bundleField(POWER_OFF_ON_CLOSE) { it.powerOffOnClose },
+        bundleField(LEGACY_PASTE) { it.legacyPaste },
+        bundleField(CLIPBOARD_AUTOSYNC) { it.clipboardAutosync },
+        bundleField(MOUSE_HOVER) { it.mouseHover },
+        bundleField(CLEANUP) { it.cleanup },
+        bundleField(POWER_ON) { it.powerOn },
+        bundleField(VIDEO) { it.video },
+        bundleField(AUDIO) { it.audio },
+        bundleField(REQUIRE_AUDIO) { it.requireAudio },
+        bundleField(KILL_ADB_ON_CLOSE) { it.killAdbOnClose },
+        bundleField(CAMERA_HIGH_SPEED) { it.cameraHighSpeed },
+        bundleField(LIST) { it.list },
+        bundleField(AUDIO_DUP) { it.audioDup },
+        bundleField(NEW_DISPLAY) { it.newDisplay },
+        bundleField(START_APP) { it.startApp },
+        bundleField(START_APP_CUSTOM) { it.startAppCustom },
+        bundleField(START_APP_USE_CUSTOM) { it.startAppUseCustom },
+        bundleField(VD_DESTROY_CONTENT) { it.vdDestroyContent },
+        bundleField(VD_SYSTEM_DECORATIONS) { it.vdSystemDecorations },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)
@@ -548,6 +499,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         legacyPaste = preferences.read(LEGACY_PASTE),
         clipboardAutosync = preferences.read(CLIPBOARD_AUTOSYNC),
         downsizeOnError = preferences.read(DOWNSIZE_ON_ERROR),
+        mouseHover = preferences.read(MOUSE_HOVER),
         cleanup = preferences.read(CLEANUP),
         powerOn = preferences.read(POWER_ON),
         video = preferences.read(VIDEO),
@@ -625,6 +577,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         legacyPaste = bundle.legacyPaste,
         clipboardAutosync = bundle.clipboardAutosync,
         downsizeOnError = bundle.downsizeOnError,
+        mouseHover = bundle.mouseHover,
         cleanup = bundle.cleanup,
         powerOn = bundle.powerOn,
         video = bundle.video,

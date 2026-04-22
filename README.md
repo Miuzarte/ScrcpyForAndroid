@@ -11,8 +11,8 @@
   <img src="https://github.com/user-attachments/assets/a423cf0e-5514-423e-8daf-818add2b5558" height="300" alt="Recent Tasks" />
   <img src="https://github.com/user-attachments/assets/f1271cc7-ce45-46d2-8a01-0f4a367c0e4a" height="300" alt="Streaming" />
   <img src="https://github.com/user-attachments/assets/220fc973-f3b7-4bec-8733-95bbddf95a7a" height="300" alt="Scrcpy All Options" />
-  <img src="https://github.com/user-attachments/assets/fb4a6b66-862b-41ee-8542-f56de4891e03" height="300" alt="Terminal" />
-  <img src="https://github.com/user-attachments/assets/aa895441-9719-45f5-aea3-661ade94ea22" height="300" alt="Files" />
+  <img src="https://github.com/user-attachments/assets/6d4cff1b-1277-44e4-bcfa-18201738a703" height="300" alt="Terminal" />
+  <img src="https://github.com/user-attachments/assets/886ba6db-d6a7-4528-96fb-bb0ce4deb953" height="300" alt="Files" />
   <img src="https://github.com/user-attachments/assets/d3b29861-6e86-4301-9b1d-1f7836ad9b7e" height="300" alt="Settings" />
   <img src="https://github.com/user-attachments/assets/f513b7ba-0389-4176-8382-c1a08c4eba99" height="300" alt="Multi Touch Test" />
   <img src="https://github.com/user-attachments/assets/7a50bd1f-8095-4269-8e58-88316d86e3d8" height="300" alt="Virtual Buttons Reorder" />

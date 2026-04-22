@@ -37,6 +37,9 @@
 		},
 		{
 			"path": "../termux-app"
+		},
+		{
+			"path": "../termux-kotlin-app"
 		}
 	],
 }

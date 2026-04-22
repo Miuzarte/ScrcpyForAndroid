@@ -714,8 +714,19 @@ fun DeviceTabPage(
         val options = scrcpyOptions.toClientOptions(activeBundle).fix()
         scrcpy.stop()
         if (options.killAdbOnClose) {
-            // TODO
-            disconnectAdbConnection()
+            currentTarget?.host?.let { sessionReconnectBlacklistHosts += it }
+            disconnectAdbConnection(
+                clearQuickOnlineForTarget = currentTarget,
+                logMessage = "scrcpy 已停止，ADB 已断开",
+                showSnackMessage = "scrcpy 已停止，ADB 已断开",
+            )
+        } else {
+            AppWakeLocks.release()
+            adbSession = adbSession.copy(
+                statusLine = "${currentTarget!!.host}:${currentTarget.port}"
+            )
+            logEvent("scrcpy 已停止")
+            snackbar.show("scrcpy 已停止")
         }
     }
 
@@ -805,7 +816,7 @@ fun DeviceTabPage(
     ) {
         if (adbConnected || !asBundle.adbAutoReconnectPairedDevice) return@LaunchedEffect
         adbBackgroundRunner.runAutoReconnectLoop(
-            isConnected = { adbConnected },
+            isConnected = { false },
             isForeground = { isAppInForeground },
             isAutoReconnectEnabled = { asBundle.adbAutoReconnectPairedDevice },
             isBusy = { busy },
@@ -1093,13 +1104,7 @@ fun DeviceTabPage(
                     },
                     onStop = {
                         runBusy("停止 scrcpy") {
-                            scrcpy.stop()
-                            AppWakeLocks.release()
-                            adbSession = adbSession.copy(
-                                statusLine = "${currentTarget!!.host}:${currentTarget.port}"
-                            )
-                            logEvent("scrcpy 已停止")
-                            snackbar.show("scrcpy 已停止")
+                            stopScrcpySession()
                         }
                     },
                     sessionInfo = sessionInfo,

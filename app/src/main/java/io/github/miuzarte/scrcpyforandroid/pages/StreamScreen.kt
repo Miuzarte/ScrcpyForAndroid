@@ -53,6 +53,12 @@ fun StreamScreen(activity: StreamActivity) {
         }
     }
 
+    DisposableEffect(activity) {
+        onDispose {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     LaunchedEffect(
         activity, isInPip,
         currentSession?.width, currentSession?.height,
@@ -112,11 +118,20 @@ fun StreamScreen(activity: StreamActivity) {
                 onBack = activity::finish,
                 isInPip = isInPip,
                 onVideoSizeChanged = { width, height ->
-                    // 只在全屏时跟随视频方向
-                    if (!isInPip)
+                    if (!isInPip) {
                         activity.requestedOrientation =
-                            if (width >= height) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            if (width >= height) {
+                                if (asBundle.fullscreenControlIgnoreSystemRotationLock)
+                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                else
+                                    ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+                            } else {
+                                if (asBundle.fullscreenControlIgnoreSystemRotationLock)
+                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                                else
+                                    ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+                            }
+                    }
                 },
                 onVideoBoundsInWindowChanged = {
                     // 记录下一次进入 PiP 时可用的 sourceRectHint

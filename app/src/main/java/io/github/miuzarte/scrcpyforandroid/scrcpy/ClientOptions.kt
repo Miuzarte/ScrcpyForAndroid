@@ -195,7 +195,7 @@ data class ClientOptions(
     // var window: Boolean,
 
     // --no-mouse-hover
-    // var mouseHover: Boolean = true,
+    var mouseHover: Boolean = true,
 
     // --audio-dup
     var audioDup: Boolean = false, // to server

@@ -1008,11 +1008,7 @@ internal fun ScrcpyAllOptionsPage(
                         soBundle = soBundle.copy(
                             killAdbOnClose = it
                         )
-                        if (it) snackbar.show(
-                            "未实现"
-                        )
                     },
-                    enabled = false,
                 )
             }
         }
@@ -1612,6 +1608,16 @@ internal fun ScrcpyAllOptionsPage(
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             clipboardAutosync = !it
+                        )
+                    },
+                )
+                SwitchPreference(
+                    title = "禁用鼠标悬停转发",
+                    summary = "--no-mouse-hover",
+                    checked = !soBundle.mouseHover,
+                    onCheckedChange = {
+                        soBundle = soBundle.copy(
+                            mouseHover = !it
                         )
                     },
                 )

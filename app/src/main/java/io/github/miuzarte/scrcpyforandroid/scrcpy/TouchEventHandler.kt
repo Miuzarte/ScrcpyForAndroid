@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.scrcpy
 
 import android.util.Log
+import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
@@ -24,13 +25,24 @@ class TouchEventHandler(
     private val activePointerDevicePositions: LinkedHashMap<Int, Pair<Int, Int>>,
     private val pointerLabels: LinkedHashMap<Int, Int>,
     private var nextPointerLabel: Int,
-    private val onInjectTouch: suspend (action: Int, pointerId: Long, x: Int, y: Int, pressure: Float, buttons: Int) -> Unit,
+    private val mouseHoverEnabled: Boolean,
+    private val onInjectTouch: suspend (
+        action: Int,
+        pointerId: Long,
+        x: Int,
+        y: Int,
+        pressure: Float,
+        actionButton: Int,
+        buttons: Int,
+    ) -> Unit,
+    private val onBackOrScreenOn: suspend (action: Int) -> Unit,
     private val onActiveTouchCountChanged: (Int) -> Unit,
     private val onActiveTouchDebugChanged: (String) -> Unit,
     private val onNextPointerLabelChanged: (Int) -> Unit,
 ) {
     companion object {
         private const val FULLSCREEN_TOUCH_LOG_TAG = "FullscreenTouch"
+        private const val POINTER_ID_MOUSE = -1L
     }
 
     private object UiMotionActions {
@@ -54,6 +66,10 @@ class TouchEventHandler(
 
         val bounds = calculateContentBounds()
 
+        if (isMouseLikeEvent(event)) {
+            return handleMouseEvent(event, bounds)
+        }
+
         if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
             return handleCancelAction(bounds)
         }
@@ -69,6 +85,14 @@ class TouchEventHandler(
         onActiveTouchCountChanged(activePointerIds.size)
         refreshTouchDebug()
         return true
+    }
+
+    private fun isMouseLikeEvent(event: MotionEvent): Boolean {
+        return event.isFromSource(InputDevice.SOURCE_MOUSE) ||
+                event.actionMasked == MotionEvent.ACTION_HOVER_ENTER ||
+                event.actionMasked == MotionEvent.ACTION_HOVER_MOVE ||
+                event.actionMasked == MotionEvent.ACTION_HOVER_EXIT ||
+                event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE
     }
 
     private data class ContentBounds(
@@ -149,13 +173,97 @@ class TouchEventHandler(
         onActiveTouchDebugChanged(debug)
     }
 
+    private fun handleMouseEvent(
+        event: MotionEvent,
+        bounds: ContentBounds,
+    ): Boolean {
+        val rawX = event.getX(0)
+        val rawY = event.getY(0)
+        val (x, y) = mapToDevice(rawX, rawY, bounds)
+        val pressure = event.getPressure(0).coerceIn(0f, 1f)
+        val buttons = event.buttonState
+        val actionButton = event.actionButton
+        val isHoverMotion = when (event.actionMasked) {
+            MotionEvent.ACTION_HOVER_ENTER,
+            MotionEvent.ACTION_HOVER_MOVE,
+            MotionEvent.ACTION_HOVER_EXIT -> true
+
+            MotionEvent.ACTION_MOVE -> buttons == 0
+            else -> false
+        }
+
+        if (!mouseHoverEnabled && isHoverMotion) {
+            return true
+        }
+
+        if (actionButton == MotionEvent.BUTTON_SECONDARY ||
+            buttons and MotionEvent.BUTTON_SECONDARY != 0
+        ) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN,
+                MotionEvent.ACTION_BUTTON_PRESS -> {
+                    coroutineScope.launch {
+                        runCatching {
+                            onBackOrScreenOn(0)
+                        }.onFailure { e ->
+                            Log.w(FULLSCREEN_TOUCH_LOG_TAG, "mouse secondary down failed", e)
+                        }
+                    }
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_BUTTON_RELEASE -> {
+                    coroutineScope.launch {
+                        runCatching {
+                            onBackOrScreenOn(1)
+                        }.onFailure { e ->
+                            Log.w(FULLSCREEN_TOUCH_LOG_TAG, "mouse secondary up failed", e)
+                        }
+                    }
+                }
+            }
+            return true
+        }
+
+        val injectAction = when (event.actionMasked) {
+            MotionEvent.ACTION_HOVER_ENTER -> MotionEvent.ACTION_HOVER_ENTER
+            MotionEvent.ACTION_HOVER_MOVE -> MotionEvent.ACTION_HOVER_MOVE
+            MotionEvent.ACTION_HOVER_EXIT -> MotionEvent.ACTION_HOVER_EXIT
+            MotionEvent.ACTION_DOWN -> MotionEvent.ACTION_DOWN
+            MotionEvent.ACTION_UP -> MotionEvent.ACTION_UP
+            MotionEvent.ACTION_MOVE -> MotionEvent.ACTION_MOVE
+
+            MotionEvent.ACTION_BUTTON_PRESS,
+            MotionEvent.ACTION_BUTTON_RELEASE -> return true
+
+            else -> return true
+        }
+
+        coroutineScope.launch {
+            runCatching {
+                onInjectTouch(
+                    injectAction,
+                    POINTER_ID_MOUSE,
+                    x,
+                    y,
+                    pressure,
+                    actionButton,
+                    buttons,
+                )
+            }.onFailure { e ->
+                Log.w(FULLSCREEN_TOUCH_LOG_TAG, "handleMouseEvent failed", e)
+            }
+        }
+        return true
+    }
+
     private fun releasePointer(pointerId: Int, bounds: ContentBounds) {
         if (!activePointerIds.contains(pointerId)) return
         val pos = activePointerPositions[pointerId] ?: Offset.Zero
         val (x, y) = mapToDevice(pos.x, pos.y, bounds)
         coroutineScope.launch {
             runCatching {
-                onInjectTouch(UiMotionActions.UP, pointerId.toLong(), x, y, 0f, 0)
+                onInjectTouch(UiMotionActions.UP, pointerId.toLong(), x, y, 0f, 0, 0)
             }.onFailure { e ->
                 Log.w(FULLSCREEN_TOUCH_LOG_TAG, "releasePointer failed for pointerId=$pointerId", e)
             }
@@ -222,7 +330,7 @@ class TouchEventHandler(
                 justPressedPointerIds += pointerId
                 coroutineScope.launch {
                     runCatching {
-                        onInjectTouch(UiMotionActions.DOWN, pointerId.toLong(), x, y, pressure, 0)
+                        onInjectTouch(UiMotionActions.DOWN, pointerId.toLong(), x, y, pressure, 0, 0)
                     }.onFailure { e ->
                         Log.w(
                             FULLSCREEN_TOUCH_LOG_TAG,
@@ -252,7 +360,7 @@ class TouchEventHandler(
             activePointerDevicePositions[pointerId] = x to y
             coroutineScope.launch {
                 runCatching {
-                    onInjectTouch(UiMotionActions.MOVE, pointerId.toLong(), x, y, pressure, 0)
+                    onInjectTouch(UiMotionActions.MOVE, pointerId.toLong(), x, y, pressure, 0, 0)
                 }.onFailure { e ->
                     Log.w(
                         FULLSCREEN_TOUCH_LOG_TAG,

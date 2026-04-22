@@ -5,11 +5,14 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
@@ -229,6 +233,13 @@ class VirtualButtonBar(
     private val outsideActions: List<VirtualButtonAction>,
     private val moreActions: List<VirtualButtonAction>,
 ) {
+    enum class FullscreenDock {
+        TOP,
+        BOTTOM,
+        LEFT,
+        RIGHT,
+    }
+
     private enum class ActionPopupDestination {
         Actions,
         Passwords,
@@ -331,6 +342,9 @@ class VirtualButtonBar(
     fun Fullscreen(
         onAction: suspend (VirtualButtonAction) -> Unit,
         modifier: Modifier = Modifier,
+        dock: FullscreenDock = FullscreenDock.BOTTOM,
+        reverseOrder: Boolean = false,
+        thickness: Dp = 16.dp,
         passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
     ) {
         val scope = rememberCoroutineScope()
@@ -338,11 +352,30 @@ class VirtualButtonBar(
         var showMorePopup by remember { mutableStateOf(false) }
         var showPasswordPopup by remember { mutableStateOf(false) }
 
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
+        val isVertical = dock == FullscreenDock.LEFT || dock == FullscreenDock.RIGHT
+        val visibleActions =
+            if (reverseOrder) outsideActions.asReversed()
+            else outsideActions
+        val containerModifier =
+            if (isVertical) modifier
+                .width(thickness)
+                .fillMaxHeight()
+            else modifier
+                .fillMaxWidth()
+                .height(thickness)
+
+        val buttonModifier =
+            if (isVertical) Modifier
+                .fillMaxSize()
+            else Modifier
+                .fillMaxWidth()
+                .height(thickness)
+
+        if (isVertical) Column(
+            modifier = containerModifier,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            outsideActions.forEach { action ->
+            visibleActions.forEach { action ->
                 Box(modifier = Modifier.weight(1f)) {
                     Button(
                         onClick = {
@@ -360,9 +393,62 @@ class VirtualButtonBar(
                                 else -> scope.launch { onAction(action) }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = buttonModifier,
                         cornerRadius = 0.dp,
-                        minHeight = 16.dp,
+                        minHeight = thickness,
+                        insideMargin = PaddingValues(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            color = Color.Black.copy(alpha = 0.1f),
+                        ),
+                    ) {
+                        Icon(action.icon, contentDescription = action.title, tint = Color.White)
+                    }
+
+                    if (action == VirtualButtonAction.MORE) {
+                        ActionPopup(
+                            show = showMorePopup,
+                            actions = moreActions,
+                            onDismiss = { showMorePopup = false },
+                            onAction = {
+                                if (it == VirtualButtonAction.PASSWORD_INPUT
+                                    && passwordPopupContent != null
+                                ) showPasswordPopup = true
+                                else onAction(it)
+
+                                showMorePopup = false
+                            },
+                            passwordPopupContent = passwordPopupContent,
+                            renderInRootScaffold = true,
+                        )
+                    }
+                }
+            }
+        }
+        else Row(
+            modifier = containerModifier,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            visibleActions.forEach { action ->
+                Box(modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = {
+                            haptics.contextClick()
+                            when (action) {
+                                VirtualButtonAction.MORE -> {
+                                    showMorePopup = true
+                                }
+
+                                VirtualButtonAction.PASSWORD_INPUT
+                                    if passwordPopupContent != null -> {
+                                    showPasswordPopup = true
+                                }
+
+                                else -> scope.launch { onAction(action) }
+                            }
+                        },
+                        modifier = buttonModifier,
+                        cornerRadius = 0.dp,
+                        minHeight = thickness,
                         insideMargin = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(
                             color = Color.Black.copy(alpha = 0.1f),
@@ -448,9 +534,15 @@ class VirtualButtonBar(
         BoxWithConstraints(
             modifier = modifier.fillMaxSize(),
         ) {
-            val ballSize = 48.dp
-            val ringSize = 24.dp
-            val ringWidth = 2.dp
+            val ballSize = asBundleShared.fullscreenFloatingButtonSizeDp.dp
+            val ringSize = ballSize / 2
+            val ringWidth = ballSize / 24
+            val backgroundAlpha =
+                (asBundleShared.fullscreenFloatingButtonBackgroundAlphaPercent / 100f)
+                    .coerceIn(0.1f, 1f)
+            val ringAlpha =
+                (asBundleShared.fullscreenFloatingButtonRingAlphaPercent / 100f)
+                    .coerceIn(0f, 1f)
             val maxX = (maxWidth - ballSize).coerceAtLeast(0.dp)
             val maxY = (maxHeight - ballSize).coerceAtLeast(0.dp)
             val currentX =
@@ -507,14 +599,24 @@ class VirtualButtonBar(
                     minHeight = ballSize,
                     insideMargin = PaddingValues(0.dp),
                     colors = ButtonDefaults.buttonColors(
-                        color = Color.Black.copy(alpha = 0.24f),
+                        color = Color.Black.copy(alpha = backgroundAlpha),
                     ),
                 ) {
                     Box(
                         modifier = Modifier
                             .size(ringSize)
                             .clip(CircleShape)
-                            .border(ringWidth, Color.White, CircleShape),
+                            .then(
+                                if (ringAlpha > 0f) {
+                                    Modifier.border(
+                                        ringWidth,
+                                        Color.White.copy(alpha = ringAlpha),
+                                        CircleShape,
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            ),
                     )
                 }
 

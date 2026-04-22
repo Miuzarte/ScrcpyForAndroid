@@ -29,9 +29,9 @@ class AdbClientData(context: Context) : Settings(context, "AdbClient") {
     ) : Parcelable {
     }
 
-    private val bundleFields = arrayOf(
-        bundleField(RSA_PRIVATE_KEY) { bundle: Bundle -> bundle.rsaPrivateKey },
-        bundleField(RSA_PUBLIC_KEY_X509) { bundle: Bundle -> bundle.rsaPublicKeyX509 },
+    private val bundleFields = arrayOf<BundleField<Bundle>>(
+        bundleField(RSA_PRIVATE_KEY) { it.rsaPrivateKey },
+        bundleField(RSA_PUBLIC_KEY_X509) { it.rsaPublicKeyX509 },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)

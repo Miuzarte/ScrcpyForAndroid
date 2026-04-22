@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -98,6 +100,37 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.blur.layerBackdrop as miuixLayerBackdrop
+import java.io.File
+
+private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
+
+private fun terminalFontFile(context: android.content.Context): File {
+    return File(context.filesDir, TERMINAL_FONT_RELATIVE_PATH)
+}
+
+private fun copyTerminalFontToPrivate(context: android.content.Context, uri: Uri) {
+    val target = terminalFontFile(context)
+    target.parentFile?.mkdirs()
+    context.contentResolver.openInputStream(uri).use { input ->
+        requireNotNull(input) { "无法读取字体文件" }
+        target.outputStream().use { output ->
+            input.copyTo(output)
+        }
+    }
+}
+
+private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
+    return context.contentResolver
+        .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (columnIndex >= 0 && cursor.moveToFirst()) {
+                cursor.getString(columnIndex)
+            } else {
+                null
+            }
+        }
+}
 
 private enum class MainBottomTabDestination(
     val label: String,
@@ -155,6 +188,7 @@ fun MainScreen() {
     var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
     var fileTabCanNavigateUp by remember { mutableStateOf(false) }
     var fileTabNavigateUp by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    var terminalGestureLock by remember { mutableStateOf(false) }
 
     // Scroll behaviors
     val devicesPageScrollBehavior = MiuixScrollBehavior(
@@ -278,6 +312,43 @@ fun MainScreen() {
                     "application/java-archive",
                     "application/octet-stream",
                     "*/*"
+                )
+            )
+        }
+    }
+    val terminalFontDocumentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        taskScope.launch {
+            val result = runCatching {
+                val displayName = queryDisplayName(context, uri)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "font.ttf"
+                copyTerminalFontToPrivate(context, uri)
+                displayName
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { displayName ->
+                    asBundle = asBundle.copy(terminalFontDisplayName = displayName)
+                    snackbarController.show("终端字体导入成功")
+                }.onFailure { error ->
+                    snackbarController.show(
+                        "终端字体导入失败: ${error.message ?: error.javaClass.simpleName}"
+                    )
+                }
+            }
+        }
+    }
+    val terminalFontPicker = remember(terminalFontDocumentPicker) {
+        TerminalFontPicker {
+            terminalFontDocumentPicker.launch(
+                arrayOf(
+                    "font/ttf",
+                    "font/otf",
+                    "application/x-font-ttf",
+                    "application/x-font-otf",
+                    "*/*",
                 )
             )
         }
@@ -451,6 +522,7 @@ fun MainScreen() {
                                 ),
                             state = pagerState,
                             beyondViewportPageCount = 1,
+                            userScrollEnabled = !(selectedTabIndex == MainBottomTabDestination.Terminal.ordinal && terminalGestureLock),
                         ) { page ->
                             val tab = tabs[page]
                             saveableStateHolder.SaveableStateProvider(tab.name) {
@@ -464,6 +536,10 @@ fun MainScreen() {
 
                                     MainBottomTabDestination.Terminal -> TerminalScreen(
                                         bottomInnerPadding = bottomInnerPadding,
+                                        isActive = selectedTabIndex == MainBottomTabDestination.Terminal.ordinal,
+                                        onTerminalGestureLockChanged = { locked ->
+                                            terminalGestureLock = locked
+                                        },
                                     )
 
                                     MainBottomTabDestination.Files -> FileManagerScreen(
@@ -575,6 +651,7 @@ fun MainScreen() {
             LocalSnackbarController provides snackbarController,
             LocalAppHaptics provides haptics,
             LocalServerPicker provides serverPicker,
+            LocalTerminalFontPicker provides terminalFontPicker,
         ) {
             NavDisplay(
                 entries = rootEntries,
@@ -582,4 +659,20 @@ fun MainScreen() {
             )
         }
     }
+}
+
+class ServerPicker(
+    val pick: () -> Unit,
+)
+
+class TerminalFontPicker(
+    val pick: () -> Unit,
+)
+
+val LocalServerPicker = staticCompositionLocalOf<ServerPicker> {
+    error("No ServerPicker provided")
+}
+
+val LocalTerminalFontPicker = staticCompositionLocalOf<TerminalFontPicker> {
+    error("No TerminalFontPicker provided")
 }
