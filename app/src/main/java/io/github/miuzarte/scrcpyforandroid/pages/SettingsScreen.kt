@@ -844,7 +844,7 @@ fun SettingsPage(
                             value = asBundle.terminalFontDisplayName,
                             onValueChange = {},
                             readOnly = true,
-                            label = "系统等宽字体",
+                            label = "内置等宽字体",
                             useLabelAsPlaceholder = true,
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {

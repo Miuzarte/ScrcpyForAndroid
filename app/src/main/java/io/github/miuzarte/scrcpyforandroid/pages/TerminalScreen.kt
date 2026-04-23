@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +57,7 @@ import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
 import kotlinx.coroutines.CoroutineScope
@@ -208,6 +210,7 @@ private fun TerminalPage(
     val context = LocalContext.current
     val density = LocalDensity.current
     val snackbar = LocalSnackbarController.current
+    val haptic = LocalHapticFeedback.current
     val asBundleShared by appSettings.bundleState.collectAsState()
     val uiScope = rememberCoroutineScope()
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
@@ -348,7 +351,8 @@ private fun TerminalPage(
         view: TerminalView,
         event: MotionEvent,
     ): Boolean {
-        val shouldLock = event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
+        val shouldLock =
+            event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
         if (shouldLock) {
             view.parent?.requestDisallowInterceptTouchEvent(true)
             if (!pinchGestureLock) {
@@ -714,31 +718,52 @@ private fun TerminalPage(
             TerminalExtraKeyButton(
                 label = "ESC",
                 modifier = Modifier.weight(1f),
-            ) { writeLiteralKey("\u001B") }
+            ) {
+                haptic.contextClick()
+                writeLiteralKey("\u001B")
+            }
             TerminalExtraKeyButton(
                 label = "/",
                 modifier = Modifier.weight(1f),
-            ) { writeLiteralKey("/") }
+            ) {
+                haptic.contextClick()
+                writeLiteralKey("/")
+            }
             TerminalExtraKeyButton(
                 label = "-",
                 modifier = Modifier.weight(1f),
-            ) { writeLiteralKey("-") }
+            ) {
+                haptic.contextClick()
+                writeLiteralKey("-")
+            }
             TerminalExtraKeyButton(
                 label = "HOME",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_MOVE_HOME) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_MOVE_HOME)
+            }
             TerminalExtraKeyButton(
                 label = "↑",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_DPAD_UP) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_DPAD_UP)
+            }
             TerminalExtraKeyButton(
                 label = "END",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_MOVE_END) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_MOVE_END)
+            }
             TerminalExtraKeyButton(
                 label = "PGUP",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_PAGE_UP) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_PAGE_UP)
+            }
         }
 
         Row(
@@ -747,33 +772,54 @@ private fun TerminalPage(
             TerminalExtraKeyButton(
                 label = "TAB",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_TAB) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_TAB)
+            }
             TerminalExtraKeyButton(
                 label = "CTRL",
                 active = ctrlLatched,
                 modifier = Modifier.weight(1f),
-            ) { ctrlLatched = !ctrlLatched }
+            ) {
+                haptic.contextClick()
+                ctrlLatched = !ctrlLatched
+            }
             TerminalExtraKeyButton(
                 label = "ALT",
                 active = altLatched,
                 modifier = Modifier.weight(1f),
-            ) { altLatched = !altLatched }
+            ) {
+                haptic.contextClick()
+                altLatched = !altLatched
+            }
             TerminalExtraKeyButton(
                 label = "←",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_DPAD_LEFT) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_DPAD_LEFT)
+            }
             TerminalExtraKeyButton(
                 label = "↓",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_DPAD_DOWN) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_DPAD_DOWN)
+            }
             TerminalExtraKeyButton(
                 label = "→",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+            }
             TerminalExtraKeyButton(
                 label = "PGDN",
                 modifier = Modifier.weight(1f),
-            ) { writeSpecialKey(KeyEvent.KEYCODE_PAGE_DOWN) }
+            ) {
+                haptic.contextClick()
+                writeSpecialKey(KeyEvent.KEYCODE_PAGE_DOWN)
+            }
         }
     }
 }
