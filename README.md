@@ -1,10 +1,20 @@
+<!-- markdownlint-disable MD033 -->
+
 # Scrcpy For Android
+
+<a href="https://github.com/Genymobile/scrcpy/blob/master/app/data/icon.svg" title="Modified from the original version">
+  <img src="app/src/main/assets/icon/icon.svg" width="128" height="128" alt="scrcpy" align="right" />
+</a>
 
 [Scrcpy](https://github.com/Genymobile/scrcpy) android client
 
-## 截图
+从通过
+[ADB Wireless](https://developer.android.com/tools/adb?hl=zh-cn#connect-to-a-device-over-wi-fi)
+连接的 Android 设备镜像视频与音频，并允许使用触摸屏与键盘鼠标进行控制
 
-<!-- markdownlint-disable MD033 -->
+不需要 root 权限，也无需在设备上安装应用程序
+
+## 截图
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/00bf5e7c-2e37-4e99-976e-06a56232a628" height="300" alt="Devices" />
@@ -67,8 +77,6 @@
 - ADB 安装应用 / adb install
   - 需要大改 JNI 的实现因此不做
   - 可以推送文件之后使用终端安装或手动控制安装
-- 应用图标
-  - 我做不来
 - 有线控制 / fastboot
   - 左转甲壳虫
 
@@ -119,13 +127,13 @@ specific abi:
 
 ## Credits
 
-- [Genymobile/scrcpy](https://github.com/Genymobile/scrcpy)
+- [Genymobile/scrcpy](https://github.com/Genymobile/scrcpy) (包括图标)
 - JNI ADB 实现: [rikkaapps/shizuku](https://github.com/rikkaapps/shizuku), [vvb2060/ndk.boringssl](https://github.com/vvb2060), [lsposed/libcxx](https://github.com/lsposed/libcxx)
 - 界面组件: [YuKongA/miuix](https://github.com/compose-miuix-ui/miuix)
 - 界面设计参考: [tiann/KernelSU/manager](https://github.com/tiann/KernelSU/tree/main/manager), [miuix/example](https://github.com/compose-miuix-ui/miuix/tree/main/example)
 - 画中画实现参考: [ClassicOldSong/moonlight-android](https://github.com/ClassicOldSong/moonlight-android)
 - 原生应用设置页跳转: [YifePlayte/WOMMO](https://github.com/YifePlayte/WOMMO)
-- 终端实现: [reapercanuk39/termux-kotlin-app](https://github.com/reapercanuk39/termux-kotlin-app) (仅 Apache 2 部分)
+- 终端实现: [reapercanuk39/termux-kotlin-app](https://github.com/reapercanuk39/termux-kotlin-app) (仅 Apache 2.0 部分)
 
 ## License
 
