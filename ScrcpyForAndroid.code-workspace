@@ -40,6 +40,9 @@
 		},
 		{
 			"path": "../termux-kotlin-app"
+		},
+		{
+			"path": "../Android-DataBackup"
 		}
 	],
 }

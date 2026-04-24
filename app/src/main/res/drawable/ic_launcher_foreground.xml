@@ -1,18 +1,3 @@
-<!--
-  ~ Copyright (C) 2026 The Android Open Source Project
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~      http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -29,13 +14,13 @@
         android:fillAlpha="0.2"/>
     <path
         android:pathData="M13.5,6c-1.1,0 -2,0.9 -2,2v35c0,1.1 0.9,2 2,2h21c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2H13.5z"
-        android:fillColor="#E4E4E4"/>
+        android:fillColor="@color/ic_launcher_device"/>
     <path
         android:pathData="M13.5,2c-1.1,0 -2,0.9 -2,2v35c0,1.1 0.9,2 2,2h21c1.1,0 2,-0.9 2,-2V4c0,-1.1 -0.9,-2 -2,-2H13.5z"
-        android:fillColor="#E4E4E4"/>
+        android:fillColor="@color/ic_launcher_device"/>
     <path
         android:pathData="M36.5,6h-25v35h25V6z"
-        android:fillColor="#077063"/>
+        android:fillColor="@color/ic_launcher_foreground_sub"/>
     <path
         android:fillColor="#FF000000"
         android:pathData="M15,28.1c-0.2,0 -0.4,0.1 -0.6,0.2c-0.5,0.3 -0.6,1 -0.3,1.5l2.3,3.3c-2.1,1.9 -3.6,4.5 -3.9,7.5c-0.1,1.1 1.1,1.1 1.1,1.1h20.7c0,0 1.2,0 1.1,-1.2c-0.3,-3 -1.7,-5.6 -3.9,-7.5l2.2,-3.3c0.3,-0.5 0.2,-1.2 -0.3,-1.5c-0.2,-0.2 -0.5,-0.2 -0.8,-0.2c-0.3,0.1 -0.5,0.2 -0.7,0.5l-2.2,3.3c-1.7,-1 -3.7,-1.6 -5.9,-1.6c-2.1,0 -4.2,0.6 -5.9,1.6l-2.2,-3.3c-0.2,-0.2 -0.4,-0.4 -0.7,-0.5C15.2,28.1 15.1,28.1 15,28.1z"
@@ -45,17 +30,17 @@
         android:pathData="M17.7,32.4l-2.7,-4"
         android:strokeWidth="3"
         android:fillColor="#00000000"
-        android:strokeColor="#30DD81"
+        android:strokeColor="@color/ic_launcher_foreground_main"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M30.3,32.4l2.7,-4"
         android:strokeWidth="3"
         android:fillColor="#00000000"
-        android:strokeColor="#30DD81"
+        android:strokeColor="@color/ic_launcher_foreground_main"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M24,29.5c-6,0 -10.9,4.6 -11.5,10.4C12.4,41 13.6,41 13.6,41h20.7c0,0 1.2,0 1.1,-1.2C34.9,34 30,29.5 24,29.5z"
-        android:fillColor="#30DD81"/>
+        android:fillColor="@color/ic_launcher_foreground_main"/>
     <path
         android:fillColor="#FF000000"
         android:pathData="M18.3,35.2c-0.8,0 -1.4,0.6 -1.4,1.4c0,0 0,0 0,0c0,0.8 0.6,1.4 1.4,1.4c0,0 0,0 0,0c0.8,0 1.4,-0.6 1.4,-1.4c0,0 0,0 0,0C19.7,35.9 19,35.2 18.3,35.2C18.3,35.2 18.3,35.2 18.3,35.2zM29.7,35.2c-0.8,0 -1.4,0.6 -1.4,1.4c0,0 0,0 0,0c0,0.8 0.6,1.4 1.4,1.4c0,0 0,0 0,0c0.8,0 1.4,-0.6 1.4,-1.4c0,0 0,0 0,0C31.2,35.9 30.5,35.2 29.7,35.2C29.7,35.2 29.7,35.2 29.7,35.2z"
@@ -63,14 +48,14 @@
         android:fillAlpha="0.2"/>
     <path
         android:pathData="M18.3,34.5c0.8,0 1.4,0.6 1.4,1.4l0,0c0,0.8 -0.6,1.4 -1.4,1.4c0,0 0,0 0,0c-0.8,0 -1.4,-0.6 -1.4,-1.4l0,0C16.8,35.2 17.5,34.5 18.3,34.5L18.3,34.5z"
-        android:fillColor="#FFFFFF"/>
+        android:fillColor="@color/colorOnPrimary"/>
     <path
         android:pathData="M29.7,34.5c0.8,0 1.4,0.6 1.4,1.4l0,0c0,0.8 -0.6,1.4 -1.4,1.4l0,0c-0.8,0 -1.4,-0.6 -1.4,-1.4l0,0C28.3,35.2 29,34.5 29.7,34.5L29.7,34.5z"
-        android:fillColor="#FFFFFF"/>
+        android:fillColor="@color/colorOnPrimary"/>
     <path
         android:pathData="M15,27.3c-0.2,0 -0.4,0.1 -0.6,0.2c-0.4,0.3 -0.6,0.8 -0.4,1.3c0.1,-0.2 0.2,-0.4 0.4,-0.5c0.2,-0.1 0.4,-0.2 0.6,-0.2c0.1,0 0.1,0 0.2,0c0.3,0.1 0.5,0.2 0.7,0.5l2.2,3.3c1.7,-1 3.7,-1.6 5.9,-1.6c2.1,0 4.2,0.6 5.9,1.6l2.2,-3.3c0.2,-0.2 0.4,-0.4 0.7,-0.5c0.3,-0.1 0.6,0 0.8,0.2c0.2,0.1 0.3,0.3 0.4,0.5c0.2,-0.5 0,-1 -0.4,-1.3c-0.2,-0.2 -0.5,-0.2 -0.8,-0.2c-0.3,0.1 -0.5,0.2 -0.7,0.5l-2.2,3.3c-1.7,-1 -3.7,-1.6 -5.9,-1.6c-2.1,0 -4.2,0.6 -5.9,1.6l-2.2,-3.3c-0.2,-0.2 -0.4,-0.4 -0.7,-0.5C15.2,27.3 15.1,27.3 15,27.3zM31.9,32.6l-0.3,0.4c2.1,1.8 3.5,4.3 3.8,7.2c0,-0.1 0,-0.2 0,-0.4C35.2,37 33.9,34.5 31.9,32.6zM16.1,32.6c-2,1.9 -3.3,4.4 -3.6,7.3c0,0.1 0,0.3 0,0.4c0.4,-2.9 1.8,-5.4 3.8,-7.2L16.1,32.6z"
         android:strokeAlpha="0.2"
-        android:fillColor="#FFFFFF"
+        android:fillColor="@color/colorOnPrimary"
         android:fillAlpha="0.2"/>
   </group>
 </vector>

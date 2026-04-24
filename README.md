@@ -6,13 +6,15 @@
   <img src="app/src/main/assets/icon/icon.svg" width="128" height="128" alt="scrcpy" align="right" />
 </a>
 
-[Scrcpy](https://github.com/Genymobile/scrcpy) android client
+[scrcpy](https://github.com/Genymobile/scrcpy) android client
 
 从通过
 [ADB Wireless](https://developer.android.com/tools/adb?hl=zh-cn#connect-to-a-device-over-wi-fi)
 连接的 Android 设备镜像视频与音频，并允许使用触摸屏与键盘鼠标进行控制
 
 不需要 root 权限，也无需在设备上安装应用程序
+
+> 本项目基于 scrcpy，但并非其官方版本，与原作者及维护团队不存在任何隶属或合作关系
 
 ## 截图
 
