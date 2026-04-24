@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +29,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
-import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
@@ -57,6 +54,7 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
+import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import io.github.miuzarte.scrcpyforandroid.widgets.AppListBottomSheet
 import io.github.miuzarte.scrcpyforandroid.widgets.AppListEntry
@@ -88,6 +86,8 @@ import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
@@ -129,32 +129,54 @@ internal fun DeviceTabScreen(
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
                     actions = {
-                        IconButton(
-                            onClick = { showThreePointMenu = true },
-                            holdDownState = showThreePointMenu,
-                        ) {
-                            Icon(
-                                Icons.Rounded.MoreVert,
-                                contentDescription = "更多"
-                            )
+                        Box {
+                            IconButton(
+                                onClick = { showThreePointMenu = true },
+                                holdDownState = showThreePointMenu,
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.More,
+                                    contentDescription = "更多"
+                                )
+                            }
+                            OverlayListPopup(
+                                show = showThreePointMenu,
+                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+                                alignment = PopupPositionProvider.Align.TopEnd,
+                                onDismissRequest = { showThreePointMenu = false },
+                            ) {
+                                ListPopupColumn {
+                                    PopupMenuItem(
+                                        text = "快速设备排序",
+                                        optionSize = 3,
+                                        index = 0,
+                                        onSelectedIndexChange = {
+                                            onOpenReorderDevices()
+                                            showThreePointMenu = false
+                                        },
+                                    )
+                                    PopupMenuItem(
+                                        text = "虚拟按钮排序",
+                                        optionSize = 3,
+                                        index = 1,
+                                        onSelectedIndexChange = {
+                                            navigator.push(RootScreen.VirtualButtonOrder)
+                                            showThreePointMenu = false
+                                        },
+                                    )
+                                    PopupMenuItem(
+                                        text = "清空日志",
+                                        optionSize = 3,
+                                        index = 2,
+                                        enabled = EventLogger.hasLogs(),
+                                        onSelectedIndexChange = {
+                                            EventLogger.clearLogs()
+                                            showThreePointMenu = false
+                                        },
+                                    )
+                                }
+                            }
                         }
-                        DeviceMenuPopup(
-                            show = showThreePointMenu,
-                            onDismissRequest = { showThreePointMenu = false },
-                            onReorderDevices = {
-                                onOpenReorderDevices()
-                                showThreePointMenu = false
-                            },
-                            onOpenVirtualButtonOrder = {
-                                navigator.push(RootScreen.VirtualButtonOrder)
-                                showThreePointMenu = false
-                            },
-                            canClearLogs = EventLogger.hasLogs(),
-                            onClearLogs = {
-                                EventLogger.clearLogs()
-                                showThreePointMenu = false
-                            },
-                        )
                     },
                     scrollBehavior = scrollBehavior,
                 )
@@ -325,7 +347,8 @@ internal fun DeviceTabPage(
             adbSession.connectedScrcpyProfileId
 
     val connectedScrcpyBundle = resolveScrcpyBundle(connectedScrcpyProfileId)
-    val connectedVideoPlaybackEnabled = connectedScrcpyBundle.video && connectedScrcpyBundle.videoPlayback
+    val connectedVideoPlaybackEnabled =
+        connectedScrcpyBundle.video && connectedScrcpyBundle.videoPlayback
     val connectedScrcpyProfileName = remember(connectedScrcpyProfileId, scrcpyProfilesState) {
         scrcpyProfilesState.profiles
             .firstOrNull { it.id == connectedScrcpyProfileId }

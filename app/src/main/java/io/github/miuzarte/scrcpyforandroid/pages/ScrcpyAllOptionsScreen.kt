@@ -22,7 +22,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -101,6 +100,7 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -240,23 +240,35 @@ internal fun ScrcpyAllOptionsScreen(
                         }
                     },
                     actions = {
-                        IconButton(
-                            onClick = { showProfileMenu = true },
-                            holdDownState = showProfileMenu,
-                        ) {
-                            Icon(
-                                Icons.Rounded.MoreVert,
-                                contentDescription = "配置管理",
-                            )
+                        Box {
+                            IconButton(
+                                onClick = { showProfileMenu = true },
+                                holdDownState = showProfileMenu,
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.More,
+                                    contentDescription = "配置管理",
+                                )
+                            }
+                            OverlayListPopup(
+                                show = showProfileMenu,
+                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+                                alignment = PopupPositionProvider.Align.TopEnd,
+                                onDismissRequest = { showProfileMenu = false },
+                            ) {
+                                ListPopupColumn {
+                                    ProfileMenuPopupItem(
+                                        text = "管理配置",
+                                        optionSize = 1,
+                                        index = 0,
+                                        onSelectedIndexChange = {
+                                            showManageProfilesSheet = true
+                                            showProfileMenu = false
+                                        },
+                                    )
+                                }
+                            }
                         }
-                        ProfileMenuPopup(
-                            show = showProfileMenu,
-                            onDismissRequest = { showProfileMenu = false },
-                            onManageProfiles = {
-                                showManageProfilesSheet = true
-                                showProfileMenu = false
-                            },
-                        )
                     },
                     scrollBehavior = scrollBehavior,
                     bottomContent = {
@@ -1891,7 +1903,9 @@ internal fun ScrcpyAllOptionsPage(
                         }
                     }
                     BoxWithConstraints(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = UiSpacing.Large),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = UiSpacing.Large),
                     ) {
                         val gap = UiSpacing.ContentHorizontal
                         val inputWidth = (maxWidth - gap * 2) / 3
@@ -2096,29 +2110,6 @@ internal fun ScrcpyAllOptionsPage(
 private enum class ProfileDialogMode {
     Create,
     Rename,
-}
-
-@Composable
-private fun ProfileMenuPopup(
-    show: Boolean,
-    onDismissRequest: () -> Unit,
-    onManageProfiles: () -> Unit,
-) {
-    OverlayListPopup(
-        show = show,
-        popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-        alignment = PopupPositionProvider.Align.TopEnd,
-        onDismissRequest = onDismissRequest,
-    ) {
-        ListPopupColumn {
-            ProfileMenuPopupItem(
-                text = "管理配置",
-                optionSize = 1,
-                index = 0,
-                onSelectedIndexChange = { onManageProfiles() },
-            )
-        }
-    }
 }
 
 @Composable

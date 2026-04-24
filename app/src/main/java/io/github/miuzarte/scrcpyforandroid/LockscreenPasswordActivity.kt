@@ -7,6 +7,7 @@ import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,7 +22,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Password
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,7 +42,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.fragment.app.FragmentActivity
-import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.BiometricGate
 import io.github.miuzarte.scrcpyforandroid.password.PasswordCreatedState
@@ -84,6 +83,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -234,17 +234,37 @@ private fun LockscreenPasswordScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "更多")
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = "更多",
+                            )
+                        }
+                        OverlayListPopup(
+                            show = showMenu,
+                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+                            alignment = PopupPositionProvider.Align.TopEnd,
+                            onDismissRequest = { showMenu = false },
+                        ) {
+                            ListPopupColumn {
+                                SpinnerItemImpl(
+                                    entry = SpinnerEntry(title = "创建新密码"),
+                                    entryCount = 1,
+                                    isSelected = false,
+                                    index = 0,
+                                    spinnerColors = SpinnerDefaults.spinnerColors(),
+                                    dialogMode = false,
+                                    onSelectedIndexChange = {
+                                        showMenu = false
+                                        pendingCreate = true
+                                    },
+                                )
+                            }
+                        }
                     }
-                    PasswordMenuPopup(
-                        show = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        onCreate = {
-                            showMenu = false
-                            pendingCreate = true
-                        },
-                    )
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -544,32 +564,6 @@ private fun LockscreenPasswordPage(
                     .fillMaxWidth()
                     .padding(top = UiSpacing.Large)
                     .padding(horizontal = UiSpacing.Large),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PasswordMenuPopup(
-    show: Boolean,
-    onDismissRequest: () -> Unit,
-    onCreate: (Int) -> Unit,
-) {
-    OverlayListPopup(
-        show = show,
-        popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-        alignment = PopupPositionProvider.Align.TopEnd,
-        onDismissRequest = onDismissRequest,
-    ) {
-        ListPopupColumn {
-            SpinnerItemImpl(
-                entry = SpinnerEntry(title = "创建新密码"),
-                entryCount = 1,
-                isSelected = false,
-                index = 0,
-                spinnerColors = SpinnerDefaults.spinnerColors(),
-                dialogMode = false,
-                onSelectedIndexChange = onCreate,
             )
         }
     }

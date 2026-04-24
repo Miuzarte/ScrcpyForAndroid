@@ -5,6 +5,7 @@ import android.graphics.Typeface
 import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -79,11 +79,14 @@ import top.yukonga.miuix.kmp.basic.SnackbarResult
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import java.io.File
 import java.nio.charset.StandardCharsets
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -131,11 +134,10 @@ fun TerminalScreen(
                                 holdDownState = showMenu,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.MoreVert,
+                                    imageVector = MiuixIcons.More,
                                     contentDescription = "更多",
                                 )
                             }
-
                             OverlayListPopup(
                                 show = showMenu,
                                 popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
@@ -227,6 +229,11 @@ private fun TerminalPage(
     var altLatched by rememberSaveable { mutableStateOf(false) }
     var pendingLatchedConsume by remember { mutableStateOf(false) }
     var pinchGestureLock by remember { mutableStateOf(false) }
+    var terminalTouchStartX by remember { mutableFloatStateOf(0f) }
+    var terminalTouchStartY by remember { mutableFloatStateOf(0f) }
+    val terminalTouchSlop = remember(context) {
+        ViewConfiguration.get(context).scaledTouchSlop
+    }
     var customTypeface by remember { mutableStateOf(loadTerminalTypeface(context)) }
     val sessionHolder = remember { arrayOfNulls<TerminalSession>(1) }
     val terminalSurfaceColorArgb = colorScheme.surface.toArgb()
@@ -351,15 +358,33 @@ private fun TerminalPage(
         view: TerminalView,
         event: MotionEvent,
     ): Boolean {
-        val shouldLock =
-            event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
-        if (shouldLock) {
-            view.parent?.requestDisallowInterceptTouchEvent(true)
-            if (!pinchGestureLock) {
-                pinchGestureLock = true
-                onTerminalGestureLockChanged(true)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                terminalTouchStartX = event.x
+                terminalTouchStartY = event.y
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (!pinchGestureLock && event.pointerCount == 1) {
+                    val dx = abs(event.x - terminalTouchStartX)
+                    val dy = abs(event.y - terminalTouchStartY)
+                    if (dy > terminalTouchSlop && dy > dx) {
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                        pinchGestureLock = true
+                        onTerminalGestureLockChanged(true)
+                    }
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                if (!pinchGestureLock) {
+                    pinchGestureLock = true
+                    onTerminalGestureLockChanged(true)
+                }
             }
         }
+
         val shouldUnlock = event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_CANCEL ||
                 (event.actionMasked == MotionEvent.ACTION_POINTER_UP && event.pointerCount <= 2)
