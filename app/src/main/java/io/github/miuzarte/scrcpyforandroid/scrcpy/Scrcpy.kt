@@ -99,10 +99,13 @@ class Scrcpy(
 
     @Volatile
     private var audioPlayer: ScrcpyAudioPlayer? = null
+
     @Volatile
     private var mp4Recorder: NativeMp4Recorder? = null
+
     @Volatile
     private var wavRecorder: NativeWavRecorder? = null
+
     @Volatile
     private var aacRecorder: NativeAacRecorder? = null
 
@@ -228,8 +231,7 @@ class Scrcpy(
                 val recordFile = RecordingFileResolver.resolve(options, info)
                 when (options.recordFormat) {
                     ClientOptions.RecordFormat.MP4,
-                    ClientOptions.RecordFormat.M4A,
-                    -> {
+                    ClientOptions.RecordFormat.M4A -> {
                         val recorder = NativeMp4Recorder(
                             outputFile = recordFile,
                             includeVideo = options.video,

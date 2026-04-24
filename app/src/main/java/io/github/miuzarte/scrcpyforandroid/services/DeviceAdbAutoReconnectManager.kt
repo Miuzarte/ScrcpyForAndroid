@@ -21,7 +21,9 @@ internal class DeviceAdbAutoReconnectManager(
             isForeground = isForeground,
             intervalMs = intervalMs,
             keepAliveCheck = { _, _ -> controller.keepAliveCheck(keepAliveTimeoutMs) },
-            reconnect = { host, port -> controller.connectWithTimeout(host, port, connectTimeoutMs) },
+            reconnect = { host, port ->
+                controller.connectWithTimeout(host, port, connectTimeoutMs)
+            },
             onReconnectSuccess = { host, port ->
                 controller.markKeepAliveReconnectSuccess(host, port)
                 onReconnectSuccess(host, port)

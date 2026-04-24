@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD033 -->
 
-# Scrcpy For Android
+# Scrcpy for Android
 
 <a href="https://github.com/Genymobile/scrcpy/blob/master/app/data/icon.svg" title="Modified from the original version">
   <img src="app/src/main/assets/icon/icon.svg" width="128" height="128" alt="scrcpy" align="right" />
@@ -48,6 +48,8 @@
 - 可替换 scrcpy-server
 - 利用 mDNS 服务实现自动连接启用无线调试的设备、自动发现等待配对设备的IP与端口
 - 自动横竖屏切换（算吗
+- 横屏布局
+  - 仅屏幕比例小于 16:9 的设备
 - 画中画
 - 双向文件传输
 - 流式 adb 终端
@@ -111,6 +113,9 @@
 4. 录制/下载的文件在哪
    - /sdcard/Movies/Scrcpy/
    - /sdcard/Download/Scrcpy/
+
+5. 横屏模式对左撇子不太友好
+   - 右上角有按钮可以对调方向
 
 ## 构建
 

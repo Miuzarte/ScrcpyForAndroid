@@ -306,67 +306,250 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
         val defaults = ScrcpyOptions.defaultBundle()
         val json = bundleJson ?: return defaults
         return defaults.copy(
-            crop = json.optStringOrDefault("crop", defaults.crop),
-            recordFilename = json.optStringOrDefault("recordFilename", defaults.recordFilename),
-            videoCodecOptions = json.optStringOrDefault("videoCodecOptions", defaults.videoCodecOptions),
-            audioCodecOptions = json.optStringOrDefault("audioCodecOptions", defaults.audioCodecOptions),
-            videoEncoder = json.optStringOrDefault("videoEncoder", defaults.videoEncoder),
-            audioEncoder = json.optStringOrDefault("audioEncoder", defaults.audioEncoder),
-            cameraId = json.optStringOrDefault("cameraId", defaults.cameraId),
-            cameraSize = json.optStringOrDefault("cameraSize", defaults.cameraSize),
-            cameraSizeCustom = json.optStringOrDefault("cameraSizeCustom", defaults.cameraSizeCustom),
-            cameraSizeUseCustom = json.optBooleanOrDefault("cameraSizeUseCustom", defaults.cameraSizeUseCustom),
-            cameraAr = json.optStringOrDefault("cameraAr", defaults.cameraAr),
-            cameraFps = json.optIntOrDefault("cameraFps", defaults.cameraFps),
-            logLevel = json.optStringOrDefault("logLevel", defaults.logLevel),
-            videoCodec = json.optStringOrDefault("videoCodec", defaults.videoCodec),
-            audioCodec = json.optStringOrDefault("audioCodec", defaults.audioCodec),
-            videoSource = json.optStringOrDefault("videoSource", defaults.videoSource),
-            audioSource = json.optStringOrDefault("audioSource", defaults.audioSource),
-            recordFormat = json.optStringOrDefault("recordFormat", defaults.recordFormat),
-            cameraFacing = json.optStringOrDefault("cameraFacing", defaults.cameraFacing),
-            maxSize = json.optIntOrDefault("maxSize", defaults.maxSize),
-            videoBitRate = json.optIntOrDefault("videoBitRate", defaults.videoBitRate),
-            audioBitRate = json.optIntOrDefault("audioBitRate", defaults.audioBitRate),
-            maxFps = json.optStringOrDefault("maxFps", defaults.maxFps),
-            angle = json.optStringOrDefault("angle", defaults.angle),
-            captureOrientation = json.optIntOrDefault("captureOrientation", defaults.captureOrientation),
-            captureOrientationLock = json.optStringOrDefault("captureOrientationLock", defaults.captureOrientationLock),
-            displayOrientation = json.optIntOrDefault("displayOrientation", defaults.displayOrientation),
-            recordOrientation = json.optIntOrDefault("recordOrientation", defaults.recordOrientation),
-            displayImePolicy = json.optStringOrDefault("displayImePolicy", defaults.displayImePolicy),
-            displayId = json.optIntOrDefault("displayId", defaults.displayId),
-            screenOffTimeout = json.optLongOrDefault("screenOffTimeout", defaults.screenOffTimeout),
-            showTouches = json.optBooleanOrDefault("showTouches", defaults.showTouches),
-            fullscreen = json.optBooleanOrDefault("fullscreen", defaults.fullscreen),
-            control = json.optBooleanOrDefault("control", defaults.control),
-            videoPlayback = json.optBooleanOrDefault("videoPlayback", defaults.videoPlayback),
-            audioPlayback = json.optBooleanOrDefault("audioPlayback", defaults.audioPlayback),
-            turnScreenOff = json.optBooleanOrDefault("turnScreenOff", defaults.turnScreenOff),
-            keyInjectMode = json.optStringOrDefault("keyInjectMode", defaults.keyInjectMode),
-            forwardKeyRepeat = json.optBooleanOrDefault("forwardKeyRepeat", defaults.forwardKeyRepeat),
-            stayAwake = json.optBooleanOrDefault("stayAwake", defaults.stayAwake),
-            disableScreensaver = json.optBooleanOrDefault("disableScreensaver", defaults.disableScreensaver),
-            powerOffOnClose = json.optBooleanOrDefault("powerOffOnClose", defaults.powerOffOnClose),
-            legacyPaste = json.optBooleanOrDefault("legacyPaste", defaults.legacyPaste),
-            clipboardAutosync = json.optBooleanOrDefault("clipboardAutosync", defaults.clipboardAutosync),
-            downsizeOnError = json.optBooleanOrDefault("downsizeOnError", defaults.downsizeOnError),
-            mouseHover = json.optBooleanOrDefault("mouseHover", defaults.mouseHover),
-            cleanup = json.optBooleanOrDefault("cleanup", defaults.cleanup),
-            powerOn = json.optBooleanOrDefault("powerOn", defaults.powerOn),
-            video = json.optBooleanOrDefault("video", defaults.video),
-            audio = json.optBooleanOrDefault("audio", defaults.audio),
-            requireAudio = json.optBooleanOrDefault("requireAudio", defaults.requireAudio),
-            killAdbOnClose = json.optBooleanOrDefault("killAdbOnClose", defaults.killAdbOnClose),
-            cameraHighSpeed = json.optBooleanOrDefault("cameraHighSpeed", defaults.cameraHighSpeed),
-            list = json.optStringOrDefault("list", defaults.list),
-            audioDup = json.optBooleanOrDefault("audioDup", defaults.audioDup),
-            newDisplay = json.optStringOrDefault("newDisplay", defaults.newDisplay),
-            startApp = json.optStringOrDefault("startApp", defaults.startApp),
-            startAppCustom = json.optStringOrDefault("startAppCustom", defaults.startAppCustom),
-            startAppUseCustom = json.optBooleanOrDefault("startAppUseCustom", defaults.startAppUseCustom),
-            vdDestroyContent = json.optBooleanOrDefault("vdDestroyContent", defaults.vdDestroyContent),
-            vdSystemDecorations = json.optBooleanOrDefault("vdSystemDecorations", defaults.vdSystemDecorations),
+            crop = json.optStringOrDefault(
+                "crop",
+                defaults.crop,
+            ),
+            recordFilename = json.optStringOrDefault(
+                "recordFilename",
+                defaults.recordFilename,
+            ),
+            videoCodecOptions = json.optStringOrDefault(
+                "videoCodecOptions",
+                defaults.videoCodecOptions,
+            ),
+            audioCodecOptions = json.optStringOrDefault(
+                "audioCodecOptions",
+                defaults.audioCodecOptions,
+            ),
+            videoEncoder = json.optStringOrDefault(
+                "videoEncoder",
+                defaults.videoEncoder,
+            ),
+            audioEncoder = json.optStringOrDefault(
+                "audioEncoder",
+                defaults.audioEncoder,
+            ),
+            cameraId = json.optStringOrDefault(
+                "cameraId",
+                defaults.cameraId,
+            ),
+            cameraSize = json.optStringOrDefault(
+                "cameraSize",
+                defaults.cameraSize,
+            ),
+            cameraSizeCustom = json.optStringOrDefault(
+                "cameraSizeCustom",
+                defaults.cameraSizeCustom,
+            ),
+            cameraSizeUseCustom = json.optBooleanOrDefault(
+                "cameraSizeUseCustom",
+                defaults.cameraSizeUseCustom,
+            ),
+            cameraAr = json.optStringOrDefault(
+                "cameraAr",
+                defaults.cameraAr,
+            ),
+            cameraFps = json.optIntOrDefault(
+                "cameraFps",
+                defaults.cameraFps,
+            ),
+            logLevel = json.optStringOrDefault(
+                "logLevel",
+                defaults.logLevel,
+            ),
+            videoCodec = json.optStringOrDefault(
+                "videoCodec",
+                defaults.videoCodec,
+            ),
+            audioCodec = json.optStringOrDefault(
+                "audioCodec",
+                defaults.audioCodec,
+            ),
+            videoSource = json.optStringOrDefault(
+                "videoSource",
+                defaults.videoSource,
+            ),
+            audioSource = json.optStringOrDefault(
+                "audioSource",
+                defaults.audioSource,
+            ),
+            recordFormat = json.optStringOrDefault(
+                "recordFormat",
+                defaults.recordFormat,
+            ),
+            cameraFacing = json.optStringOrDefault(
+                "cameraFacing",
+                defaults.cameraFacing,
+            ),
+            maxSize = json.optIntOrDefault(
+                "maxSize",
+                defaults.maxSize,
+            ),
+            videoBitRate = json.optIntOrDefault(
+                "videoBitRate",
+                defaults.videoBitRate,
+            ),
+            audioBitRate = json.optIntOrDefault(
+                "audioBitRate",
+                defaults.audioBitRate,
+            ),
+            maxFps = json.optStringOrDefault(
+                "maxFps",
+                defaults.maxFps,
+            ),
+            angle = json.optStringOrDefault(
+                "angle",
+                defaults.angle,
+            ),
+            captureOrientation = json.optIntOrDefault(
+                "captureOrientation",
+                defaults.captureOrientation,
+            ),
+            captureOrientationLock = json.optStringOrDefault(
+                "captureOrientationLock",
+                defaults.captureOrientationLock,
+            ),
+            displayOrientation = json.optIntOrDefault(
+                "displayOrientation",
+                defaults.displayOrientation,
+            ),
+            recordOrientation = json.optIntOrDefault(
+                "recordOrientation",
+                defaults.recordOrientation,
+            ),
+            displayImePolicy = json.optStringOrDefault(
+                "displayImePolicy",
+                defaults.displayImePolicy,
+            ),
+            displayId = json.optIntOrDefault(
+                "displayId",
+                defaults.displayId,
+            ),
+            screenOffTimeout = json.optLongOrDefault(
+                "screenOffTimeout",
+                defaults.screenOffTimeout,
+            ),
+            showTouches = json.optBooleanOrDefault(
+                "showTouches",
+                defaults.showTouches,
+            ),
+            fullscreen = json.optBooleanOrDefault(
+                "fullscreen",
+                defaults.fullscreen,
+            ),
+            control = json.optBooleanOrDefault(
+                "control",
+                defaults.control,
+            ),
+            videoPlayback = json.optBooleanOrDefault(
+                "videoPlayback",
+                defaults.videoPlayback,
+            ),
+            audioPlayback = json.optBooleanOrDefault(
+                "audioPlayback",
+                defaults.audioPlayback,
+            ),
+            turnScreenOff = json.optBooleanOrDefault(
+                "turnScreenOff",
+                defaults.turnScreenOff,
+            ),
+            keyInjectMode = json.optStringOrDefault(
+                "keyInjectMode",
+                defaults.keyInjectMode,
+            ),
+            forwardKeyRepeat = json.optBooleanOrDefault(
+                "forwardKeyRepeat",
+                defaults.forwardKeyRepeat,
+            ),
+            stayAwake = json.optBooleanOrDefault(
+                "stayAwake",
+                defaults.stayAwake,
+            ),
+            disableScreensaver = json.optBooleanOrDefault(
+                "disableScreensaver",
+                defaults.disableScreensaver,
+            ),
+            powerOffOnClose = json.optBooleanOrDefault(
+                "powerOffOnClose",
+                defaults.powerOffOnClose,
+            ),
+            legacyPaste = json.optBooleanOrDefault(
+                "legacyPaste",
+                defaults.legacyPaste,
+            ),
+            clipboardAutosync = json.optBooleanOrDefault(
+                "clipboardAutosync",
+                defaults.clipboardAutosync,
+            ),
+            downsizeOnError = json.optBooleanOrDefault(
+                "downsizeOnError",
+                defaults.downsizeOnError,
+            ),
+            mouseHover = json.optBooleanOrDefault(
+                "mouseHover",
+                defaults.mouseHover,
+            ),
+            cleanup = json.optBooleanOrDefault(
+                "cleanup",
+                defaults.cleanup,
+            ),
+            powerOn = json.optBooleanOrDefault(
+                "powerOn",
+                defaults.powerOn,
+            ),
+            video = json.optBooleanOrDefault(
+                "video",
+                defaults.video,
+            ),
+            audio = json.optBooleanOrDefault(
+                "audio",
+                defaults.audio,
+            ),
+            requireAudio = json.optBooleanOrDefault(
+                "requireAudio",
+                defaults.requireAudio,
+            ),
+            killAdbOnClose = json.optBooleanOrDefault(
+                "killAdbOnClose",
+                defaults.killAdbOnClose,
+            ),
+            cameraHighSpeed = json.optBooleanOrDefault(
+                "cameraHighSpeed",
+                defaults.cameraHighSpeed,
+            ),
+            list = json.optStringOrDefault(
+                "list",
+                defaults.list,
+            ),
+            audioDup = json.optBooleanOrDefault(
+                "audioDup",
+                defaults.audioDup,
+            ),
+            newDisplay = json.optStringOrDefault(
+                "newDisplay",
+                defaults.newDisplay,
+            ),
+            startApp = json.optStringOrDefault(
+                "startApp",
+                defaults.startApp,
+            ),
+            startAppCustom = json.optStringOrDefault(
+                "startAppCustom",
+                defaults.startAppCustom,
+            ),
+            startAppUseCustom = json.optBooleanOrDefault(
+                "startAppUseCustom",
+                defaults.startAppUseCustom,
+            ),
+            vdDestroyContent = json.optBooleanOrDefault(
+                "vdDestroyContent",
+                defaults.vdDestroyContent,
+            ),
+            vdSystemDecorations = json.optBooleanOrDefault(
+                "vdSystemDecorations",
+                defaults.vdSystemDecorations,
+            ),
         )
     }
 

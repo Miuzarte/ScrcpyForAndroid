@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.widgets
 
 import android.annotation.SuppressLint
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
 import androidx.compose.animation.AnimatedVisibility
@@ -41,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,14 +53,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -69,17 +76,18 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
-import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
+import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -255,16 +263,35 @@ internal fun PreviewCard(
     sessionInfo: Scrcpy.Session.SessionInfo?,
     previewHeightDp: Int,
     onOpenFullscreen: () -> Unit,
+    directControlEnabled: Boolean = false,
+    onInjectTouch: (suspend (
+        action: Int,
+        pointerId: Long,
+        x: Int,
+        y: Int,
+        pressure: Float,
+        actionButton: Int,
+        buttons: Int,
+    ) -> Unit)? = null,
+    onBackOrScreenOn: (suspend (action: Int) -> Unit)? = null,
     imeRequestToken: Int = 0,
     onImeCommitText: (suspend (String) -> Unit)? = null,
     onImeDeleteSurroundingText: (suspend (beforeLength: Int, afterLength: Int) -> Unit)? = null,
     onImeKeyEvent: (suspend (KeyEvent) -> Boolean)? = null,
     autoBringIntoView: Boolean = false,
     onAutoBringIntoViewConsumed: () -> Unit = {},
+    onTouchActiveChanged: (Boolean) -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
 
     var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
+    var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
+    val activePointerIds = remember { linkedSetOf<Int>() }
+    val activePointerPositions = remember { linkedMapOf<Int, Offset>() }
+    val activePointerDevicePositions = remember { linkedMapOf<Int, Pair<Int, Int>>() }
+    val pointerLabels = remember { linkedMapOf<Int, Int>() }
+    var nextPointerLabel by rememberSaveable { mutableIntStateOf(1) }
     val alpha by animateFloatAsState(
         if (previewControlsVisible) 1f else 0f,
         label = "preview-controls"
@@ -276,6 +303,34 @@ internal fun PreviewCard(
         if (!autoBringIntoView) return@LaunchedEffect
         bringIntoViewRequester.bringIntoView()
         onAutoBringIntoViewConsumed()
+    }
+
+    val touchEventHandler = remember(
+        directControlEnabled,
+        sessionInfo,
+        touchAreaSize,
+        onInjectTouch,
+        onBackOrScreenOn,
+    ) {
+        if (!directControlEnabled || sessionInfo == null || onInjectTouch == null)
+            null
+        else TouchEventHandler(
+            coroutineScope = coroutineScope,
+            session = sessionInfo,
+            touchAreaSize = touchAreaSize,
+            activePointerIds = activePointerIds,
+            activePointerPositions = activePointerPositions,
+            activePointerDevicePositions = activePointerDevicePositions,
+            pointerLabels = pointerLabels,
+            nextPointerLabel = nextPointerLabel,
+            mouseHoverEnabled = sessionInfo.mouseHover,
+            onInjectTouch = onInjectTouch,
+            onBackOrScreenOn = onBackOrScreenOn ?: {},
+            onActiveTouchCountChanged = {},
+            onActiveTouchDebugChanged = {},
+            onNextPointerLabelChanged = { nextPointerLabel = it },
+        )
+
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -294,6 +349,7 @@ internal fun PreviewCard(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            onTouchActiveChanged(false)
             lifecycleOwner.lifecycle.removeObserver(observer)
             if (VideoOutputTargetState.current.value == VideoOutputTarget.PREVIEW) {
                 VideoOutputTargetState.set(VideoOutputTarget.NONE)
@@ -310,11 +366,25 @@ internal fun PreviewCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(previewHeightDp.coerceAtLeast(120).dp)
-                .pointerInput(sessionInfo) {
-                    detectTapGestures(onTap = {
-                        previewControlsVisible = !previewControlsVisible
-                    })
-                },
+                .then(
+                    if (directControlEnabled && touchEventHandler != null) {
+                        Modifier.pointerInteropFilter { event ->
+                            when (event.actionMasked) {
+                                MotionEvent.ACTION_DOWN -> onTouchActiveChanged(true)
+                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_CANCEL -> onTouchActiveChanged(false)
+                            }
+                            touchEventHandler.handleMotionEvent(event)
+                        }
+                    } else {
+                        Modifier.pointerInput(sessionInfo) {
+                            detectTapGestures(onTap = {
+                                previewControlsVisible = !previewControlsVisible
+                            })
+                        }
+                    }
+                )
+                .onSizeChanged { touchAreaSize = it },
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val sessionAspect =
@@ -379,12 +449,14 @@ internal fun PreviewCard(
 
 @Composable
 internal fun VirtualButtonCard(
+    modifier: Modifier = Modifier,
     busy: Boolean,
     outsideActions: List<VirtualButtonAction>,
     moreActions: List<VirtualButtonAction>,
     showText: Boolean,
     onAction: (VirtualButtonAction) -> Unit,
     passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
+    popupBottomPadding: Dp = 0.dp,
 ) {
     val bar = remember(outsideActions, moreActions) {
         VirtualButtonBar(
@@ -393,12 +465,13 @@ internal fun VirtualButtonCard(
         )
     }
 
-    Card {
+    Card(modifier = modifier) {
         bar.Preview(
-            enabled = !busy,
+            enabled = true,
             showText = showText,
-            onAction = onAction,
+            onAction = { if (!busy) onAction(it) },
             passwordPopupContent = passwordPopupContent,
+            popupBottomPadding = popupBottomPadding,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(UiSpacing.ContentVertical),
@@ -427,6 +500,9 @@ internal fun ConfigPanel(
     onStop: () -> Unit,
     sessionInfo: Scrcpy.Session.SessionInfo?,
     onDisconnect: () -> Unit = {},
+    showFullscreenAction: Boolean = false,
+    onOpenFullscreen: () -> Unit = {},
+    reverseSideActions: Boolean = false,
 ) {
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
@@ -646,34 +722,71 @@ internal fun ConfigPanel(
                 .padding(all = UiSpacing.ContentVertical),
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
         ) {
-            if (isQuickConnected) TextButton(
-                text = "断开",
-                onClick = {
-                    onStartStopHaptic()
-                    onDisconnect()
-                },
-                modifier = Modifier.weight(1f / 4f),
-                enabled = !busy,
-            )
-            if (!sessionStarted) TextButton(
-                text = "启动",
-                onClick = {
-                    onStartStopHaptic()
-                    onStart()
-                },
-                modifier = Modifier.weight(if (isQuickConnected) 3f / 4f else 1f),
-                enabled = !busy,
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-            )
-            if (sessionStarted) TextButton(
-                text = "停止",
-                onClick = {
-                    onStartStopHaptic()
-                    onStop()
-                },
-                modifier = Modifier.weight(if (isQuickConnected) 3f / 4f else 1f),
-                enabled = !busy,
-            )
+            val sideButtonWeight = 1f / 4f
+            val mainButtonWeight = 1f -
+                    if (isQuickConnected || showFullscreenAction)
+                        sideButtonWeight * listOf(isQuickConnected, showFullscreenAction)
+                            .count { it }
+                    else 0f
+
+            @Composable
+            fun DisconnectButton() {
+                if (isQuickConnected) TextButton(
+                    text = "断开",
+                    onClick = {
+                        onStartStopHaptic()
+                        onDisconnect()
+                    },
+                    modifier = Modifier.weight(sideButtonWeight),
+                    enabled = !busy,
+                )
+            }
+
+            @Composable
+            fun MainButton() {
+                if (!sessionStarted) TextButton(
+                    text = "启动",
+                    onClick = {
+                        onStartStopHaptic()
+                        onStart()
+                    },
+                    modifier = Modifier.weight(mainButtonWeight),
+                    enabled = !busy,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+                if (sessionStarted) TextButton(
+                    text = "停止",
+                    onClick = {
+                        onStartStopHaptic()
+                        onStop()
+                    },
+                    modifier = Modifier.weight(mainButtonWeight),
+                    enabled = !busy,
+                )
+            }
+
+            @Composable
+            fun FullscreenButton() {
+                if (showFullscreenAction) TextButton(
+                    text = "全屏",
+                    onClick = {
+                        onStartStopHaptic()
+                        onOpenFullscreen()
+                    },
+                    modifier = Modifier.weight(sideButtonWeight),
+                    enabled = !busy,
+                )
+            }
+
+            if (reverseSideActions) {
+                FullscreenButton()
+                MainButton()
+                DisconnectButton()
+            } else {
+                DisconnectButton()
+                MainButton()
+                FullscreenButton()
+            }
         }
     }
 }

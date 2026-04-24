@@ -2,9 +2,9 @@
 
 # TODO
 
-## PARAMS
+- 新的原创图标而非从 scrcpy 的图标派生
 
-### LOWER PRIORITY
+## PARAMS
 
 - ~~orientation locking~~
 
@@ -14,5 +14,4 @@
 
 顺序无关
 
-- 横屏布局
 - I18N

@@ -294,6 +294,7 @@ class NativeMp4Recorder(
                 MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     registerTrackLocked(TrackType.AUDIO, currentEncoder.outputFormat)
                 }
+
                 else -> {
                     if (index < 0) continue
                     val outputBuffer = currentEncoder.getOutputBuffer(index)
@@ -329,6 +330,7 @@ class NativeMp4Recorder(
                 MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     registerTrackLocked(TrackType.VIDEO, currentEncoder.outputFormat)
                 }
+
                 else -> {
                     if (index < 0) continue
                     val outputBuffer = currentEncoder.getOutputBuffer(index)
@@ -362,6 +364,7 @@ class NativeMp4Recorder(
                 if (audioTrackIndex >= 0) return
                 audioTrackIndex = muxer.addTrack(format)
             }
+
             TrackType.VIDEO -> {
                 if (videoTrackIndex >= 0) return
                 videoTrackIndex = muxer.addTrack(format)
@@ -451,6 +454,7 @@ class NativeMp4Recorder(
                 val normalized = (presentationTimeUs - base).coerceAtLeast(0L)
                 normalized.coerceAtLeast(lastAudioPtsUs).also { lastAudioPtsUs = it }
             }
+
             TrackType.VIDEO -> {
                 val base = videoBasePtsUs ?: presentationTimeUs.also {
                     videoBasePtsUs = it

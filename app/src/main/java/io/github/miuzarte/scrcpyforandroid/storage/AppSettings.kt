@@ -122,6 +122,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             intPreferencesKey("device_preview_card_height_dp"),
             1080 / 3,
         )
+        val DEVICE_TWO_PANE_CONFIG_ON_RIGHT = Pair(
+            booleanPreferencesKey("device_two_pane_config_on_right"),
+            false,
+        )
         val FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK = Pair(
             booleanPreferencesKey("fullscreen_control_ignore_system_rotation_lock"),
             true,
@@ -274,6 +278,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenDebugInfo: Boolean,
         val hideSimpleConfigItems: Boolean,
         val devicePreviewCardHeightDp: Int,
+        val deviceTwoPaneConfigOnRight: Boolean,
         val fullscreenControlIgnoreSystemRotationLock: Boolean,
         val showFullscreenVirtualButtons: Boolean,
         val fullscreenVirtualButtonHeightDp: Int,
@@ -330,6 +335,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_DEBUG_INFO) { it.fullscreenDebugInfo },
         bundleField(HIDE_SIMPLE_CONFIG_ITEMS) { it.hideSimpleConfigItems },
         bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { it.devicePreviewCardHeightDp },
+        bundleField(DEVICE_TWO_PANE_CONFIG_ON_RIGHT) { it.deviceTwoPaneConfigOnRight },
         bundleField(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK) { it.fullscreenControlIgnoreSystemRotationLock },
         bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { it.showFullscreenVirtualButtons },
         bundleField(FULLSCREEN_VIRTUAL_BUTTON_HEIGHT_DP) { it.fullscreenVirtualButtonHeightDp },
@@ -387,6 +393,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         hideSimpleConfigItems = preferences.read(HIDE_SIMPLE_CONFIG_ITEMS),
         devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
+        deviceTwoPaneConfigOnRight = preferences.read(DEVICE_TWO_PANE_CONFIG_ON_RIGHT),
         fullscreenControlIgnoreSystemRotationLock =
             preferences.read(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK),
         showFullscreenVirtualButtons = preferences.read(SHOW_FULLSCREEN_VIRTUAL_BUTTONS),

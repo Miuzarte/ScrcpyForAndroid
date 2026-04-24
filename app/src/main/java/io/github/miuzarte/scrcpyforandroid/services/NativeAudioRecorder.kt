@@ -207,6 +207,7 @@ class NativeAudioRecorder(
                     muxer.start()
                     muxerStarted = true
                 }
+
                 else -> {
                     if (index < 0) continue
                     val outputBuffer = currentEncoder.getOutputBuffer(index)

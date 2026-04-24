@@ -58,12 +58,11 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
-import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.services.AppScreenOn
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
+import io.github.miuzarte.scrcpyforandroid.services.AppScreenOn
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
 import io.github.miuzarte.scrcpyforandroid.services.ConnectionController
 import io.github.miuzarte.scrcpyforandroid.services.ConnectionStateStore
@@ -75,13 +74,13 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
-import io.github.miuzarte.scrcpyforandroid.ui.createThemeController
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableFloatingBottomBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableFloatingBottomBarBlur
 import io.github.miuzarte.scrcpyforandroid.ui.component.FloatingBottomBar
 import io.github.miuzarte.scrcpyforandroid.ui.component.FloatingBottomBarItem
+import io.github.miuzarte.scrcpyforandroid.ui.createThemeController
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -101,8 +100,8 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import top.yukonga.miuix.kmp.blur.layerBackdrop as miuixLayerBackdrop
 import java.io.File
+import top.yukonga.miuix.kmp.blur.layerBackdrop as miuixLayerBackdrop
 
 private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 
@@ -191,6 +190,7 @@ fun MainScreen() {
     var fileTabCanNavigateUp by remember { mutableStateOf(false) }
     var fileTabNavigateUp by remember { mutableStateOf<(() -> Boolean)?>(null) }
     var terminalGestureLock by remember { mutableStateOf(false) }
+    var devicePreviewGestureLock by remember { mutableStateOf(false) }
 
     // Scroll behaviors
     val devicesPageScrollBehavior = MiuixScrollBehavior(
@@ -538,6 +538,12 @@ fun MainScreen() {
                             .fillMaxSize()
                             .then(if (blurBackdrop != null) Modifier.miuixLayerBackdrop(blurBackdrop) else Modifier),
                     ) {
+                        val pagerGestureLocked =
+                            selectedTabIndex == MainBottomTabDestination.Terminal.ordinal
+                                    && terminalGestureLock
+                                    || selectedTabIndex == MainBottomTabDestination.Devices.ordinal
+                                    && devicePreviewGestureLock
+
                         HorizontalPager(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -550,7 +556,7 @@ fun MainScreen() {
                                 ),
                             state = pagerState,
                             beyondViewportPageCount = 1,
-                            userScrollEnabled = !(selectedTabIndex == MainBottomTabDestination.Terminal.ordinal && terminalGestureLock),
+                            userScrollEnabled = !pagerGestureLocked,
                         ) { page ->
                             val tab = tabs[page]
                             saveableStateHolder.SaveableStateProvider(tab.name) {
@@ -561,6 +567,9 @@ fun MainScreen() {
                                         connectionServices = deviceConnectionServices,
                                         bottomInnerPadding = bottomInnerPadding,
                                         onOpenReorderDevices = { showReorderDevices = true },
+                                        onPreviewGestureLockChanged = { locked ->
+                                            devicePreviewGestureLock = locked
+                                        },
                                     )
 
                                     MainBottomTabDestination.Terminal -> TerminalScreen(

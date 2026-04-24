@@ -52,6 +52,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -255,6 +258,7 @@ class VirtualButtonBar(
         onAction: (VirtualButtonAction) -> Unit,
         modifier: Modifier = Modifier,
         passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
+        popupBottomPadding: Dp = 0.dp,
     ) {
         val haptic = LocalHapticFeedback.current
 
@@ -321,6 +325,7 @@ class VirtualButtonBar(
                             },
                             passwordPopupContent = passwordPopupContent,
                             renderInRootScaffold = false,
+                            popupBottomPadding = popupBottomPadding,
                         )
                     }
                     if (
@@ -329,7 +334,8 @@ class VirtualButtonBar(
                     ) {
                         OverlayListPopup(
                             show = showPasswordPopup,
-                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+                            popupPositionProvider =
+                                rememberBottomSafeContextMenuPositionProvider(popupBottomPadding),
                             alignment = PopupPositionProvider.Align.TopEnd,
                             onDismissRequest = { showPasswordPopup = false },
                             renderInRootScaffold = false,
@@ -667,6 +673,7 @@ class VirtualButtonBar(
         passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
         renderInRootScaffold: Boolean,
         popupAlignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
+        popupBottomPadding: Dp = 0.dp,
     ) {
         val scope = rememberCoroutineScope()
         val haptic = LocalHapticFeedback.current
@@ -692,6 +699,7 @@ class VirtualButtonBar(
             popupAlignment = popupAlignment,
             onDismiss = onDismiss,
             renderInRootScaffold = renderInRootScaffold,
+            popupBottomPadding = popupBottomPadding,
         ) { destination, navigateTo, dismiss ->
             ListPopupColumn {
                 if (destination == ActionPopupDestination.Actions)
@@ -733,6 +741,7 @@ class VirtualButtonBar(
         popupAlignment: PopupPositionProvider.Align,
         onDismiss: () -> Unit,
         renderInRootScaffold: Boolean,
+        popupBottomPadding: Dp = 0.dp,
         content: @Composable (
             destination: Destination,
             navigateTo: (Destination) -> Unit,
@@ -742,7 +751,8 @@ class VirtualButtonBar(
         var destination by remember(show, startDestination) { mutableStateOf(startDestination) }
         OverlayListPopup(
             show = show,
-            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+            popupPositionProvider =
+                rememberBottomSafeContextMenuPositionProvider(popupBottomPadding),
             alignment = popupAlignment,
             onDismissRequest = onDismiss,
             renderInRootScaffold = renderInRootScaffold,
@@ -750,5 +760,40 @@ class VirtualButtonBar(
         ) {
             content(destination, { destination = it }, onDismiss)
         }
+    }
+
+    @Composable
+    private fun rememberBottomSafeContextMenuPositionProvider(
+        bottomPadding: Dp,
+    ): PopupPositionProvider = remember(bottomPadding) {
+        if (bottomPadding <= 0.dp) {
+            ListPopupDefaults.ContextMenuPositionProvider
+        } else {
+            BottomSafeContextMenuPositionProvider(bottomPadding)
+        }
+    }
+
+    private class BottomSafeContextMenuPositionProvider(
+        private val bottomPadding: Dp,
+    ) : PopupPositionProvider {
+        private val delegate = ListPopupDefaults.ContextMenuPositionProvider
+
+        override fun calculatePosition(
+            anchorBounds: IntRect,
+            windowBounds: IntRect,
+            layoutDirection: LayoutDirection,
+            popupContentSize: IntSize,
+            popupMargin: IntRect,
+            alignment: PopupPositionProvider.Align,
+        ): IntOffset = delegate.calculatePosition(
+            anchorBounds = anchorBounds,
+            windowBounds = windowBounds,
+            layoutDirection = layoutDirection,
+            popupContentSize = popupContentSize,
+            popupMargin = popupMargin,
+            alignment = alignment,
+        )
+
+        override fun getMargins(): PaddingValues = PaddingValues(bottom = bottomPadding)
     }
 }

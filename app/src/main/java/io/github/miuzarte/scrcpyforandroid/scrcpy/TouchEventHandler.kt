@@ -330,7 +330,15 @@ class TouchEventHandler(
                 justPressedPointerIds += pointerId
                 coroutineScope.launch {
                     runCatching {
-                        onInjectTouch(UiMotionActions.DOWN, pointerId.toLong(), x, y, pressure, 0, 0)
+                        onInjectTouch(
+                            UiMotionActions.DOWN,
+                            pointerId.toLong(),
+                            x,
+                            y,
+                            pressure,
+                            0,
+                            0,
+                        )
                     }.onFailure { e ->
                         Log.w(
                             FULLSCREEN_TOUCH_LOG_TAG,

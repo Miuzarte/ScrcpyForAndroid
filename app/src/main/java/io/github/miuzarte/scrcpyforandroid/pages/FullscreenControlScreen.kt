@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.util.Log
-import android.view.KeyEvent
 import android.view.Surface
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity

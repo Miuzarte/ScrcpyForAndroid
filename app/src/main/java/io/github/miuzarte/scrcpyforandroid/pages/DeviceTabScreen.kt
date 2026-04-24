@@ -3,10 +3,24 @@ package io.github.miuzarte.scrcpyforandroid.pages
 import android.annotation.SuppressLint
 import android.util.Log
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,15 +34,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
+import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
@@ -83,6 +100,7 @@ import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -114,72 +132,111 @@ internal fun DeviceTabScreen(
     connectionServices: DeviceConnectionServices,
     bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
+    onPreviewGestureLockChanged: (Boolean) -> Unit = {},
 ) {
     val navigator = LocalRootNavigator.current
     var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
+    var useCompactTopAppBar by remember { mutableStateOf(false) }
+    var showTwoPaneSideAction by remember { mutableStateOf(false) }
+    var configPanelOnLeft by remember { mutableStateOf(true) }
+    var twoPaneSideToggleRequest by remember { mutableIntStateOf(0) }
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
+
+    fun setTopAppBarCompact(compact: Boolean) {
+        useCompactTopAppBar = compact
+    }
+
+    fun setTwoPaneSideAction(
+        visible: Boolean,
+        configOnLeft: Boolean,
+    ) {
+        showTwoPaneSideAction = visible
+        configPanelOnLeft = configOnLeft
+    }
 
     Scaffold(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
-                TopAppBar(
-                    title = "设备",
-                    color =
-                        if (blurActive) Color.Transparent
-                        else colorScheme.surface,
-                    actions = {
-                        Box {
-                            IconButton(
-                                onClick = { showThreePointMenu = true },
-                                holdDownState = showThreePointMenu,
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.More,
-                                    contentDescription = "更多"
+                val topAppBarColor =
+                    if (blurActive) Color.Transparent
+                    else colorScheme.surface
+                val topAppBarActions: @Composable RowScope.() -> Unit = {
+                    if (showTwoPaneSideAction) {
+                        IconButton(
+                            onClick = { twoPaneSideToggleRequest++ },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.SwapHoriz,
+                                contentDescription =
+                                    if (configPanelOnLeft) "配置显示在右侧"
+                                    else "配置显示在左侧"
+                            )
+                        }
+                    }
+                    Box {
+                        IconButton(
+                            onClick = { showThreePointMenu = true },
+                            holdDownState = showThreePointMenu,
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = "更多"
+                            )
+                        }
+                        OverlayListPopup(
+                            show = showThreePointMenu,
+                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
+                            alignment = PopupPositionProvider.Align.TopEnd,
+                            onDismissRequest = { showThreePointMenu = false },
+                        ) {
+                            ListPopupColumn {
+                                PopupMenuItem(
+                                    text = "快速设备排序",
+                                    optionSize = 3,
+                                    index = 0,
+                                    onSelectedIndexChange = {
+                                        onOpenReorderDevices()
+                                        showThreePointMenu = false
+                                    },
+                                )
+                                PopupMenuItem(
+                                    text = "虚拟按钮排序",
+                                    optionSize = 3,
+                                    index = 1,
+                                    onSelectedIndexChange = {
+                                        navigator.push(RootScreen.VirtualButtonOrder)
+                                        showThreePointMenu = false
+                                    },
+                                )
+                                PopupMenuItem(
+                                    text = "清空日志",
+                                    optionSize = 3,
+                                    index = 2,
+                                    enabled = EventLogger.hasLogs(),
+                                    onSelectedIndexChange = {
+                                        EventLogger.clearLogs()
+                                        showThreePointMenu = false
+                                    },
                                 )
                             }
-                            OverlayListPopup(
-                                show = showThreePointMenu,
-                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                alignment = PopupPositionProvider.Align.TopEnd,
-                                onDismissRequest = { showThreePointMenu = false },
-                            ) {
-                                ListPopupColumn {
-                                    PopupMenuItem(
-                                        text = "快速设备排序",
-                                        optionSize = 3,
-                                        index = 0,
-                                        onSelectedIndexChange = {
-                                            onOpenReorderDevices()
-                                            showThreePointMenu = false
-                                        },
-                                    )
-                                    PopupMenuItem(
-                                        text = "虚拟按钮排序",
-                                        optionSize = 3,
-                                        index = 1,
-                                        onSelectedIndexChange = {
-                                            navigator.push(RootScreen.VirtualButtonOrder)
-                                            showThreePointMenu = false
-                                        },
-                                    )
-                                    PopupMenuItem(
-                                        text = "清空日志",
-                                        optionSize = 3,
-                                        index = 2,
-                                        enabled = EventLogger.hasLogs(),
-                                        onSelectedIndexChange = {
-                                            EventLogger.clearLogs()
-                                            showThreePointMenu = false
-                                        },
-                                    )
-                                }
-                            }
                         }
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
+                    }
+                }
+                if (useCompactTopAppBar) {
+                    SmallTopAppBar(
+                        title = "设备",
+                        color = topAppBarColor,
+                        actions = topAppBarActions,
+                    )
+                } else {
+                    TopAppBar(
+                        title = "设备",
+                        color = topAppBarColor,
+                        actions = topAppBarActions,
+                        scrollBehavior = scrollBehavior,
+                    )
+                }
             }
         },
     ) { pagePadding ->
@@ -190,11 +247,16 @@ internal fun DeviceTabScreen(
                 scrcpy = scrcpy,
                 connectionServices = connectionServices,
                 bottomInnerPadding = bottomInnerPadding,
+                twoPaneSideToggleRequest = twoPaneSideToggleRequest,
+                onPreviewGestureLockChanged = onPreviewGestureLockChanged,
+                onCompactTopAppBarChanged = ::setTopAppBarCompact,
+                onTwoPaneSideActionChanged = ::setTwoPaneSideAction,
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 internal fun DeviceTabPage(
     contentPadding: PaddingValues,
@@ -202,8 +264,13 @@ internal fun DeviceTabPage(
     scrcpy: Scrcpy,
     connectionServices: DeviceConnectionServices,
     bottomInnerPadding: Dp,
+    twoPaneSideToggleRequest: Int = 0,
+    onPreviewGestureLockChanged: (Boolean) -> Unit = {},
+    onCompactTopAppBarChanged: (Boolean) -> Unit = {},
+    onTwoPaneSideActionChanged: (Boolean, Boolean) -> Unit = { _, _ -> },
 ) {
     val activity = LocalActivity.current
+    val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
@@ -222,9 +289,19 @@ internal fun DeviceTabPage(
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
     var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
     val asBundleLatest by rememberUpdatedState(asBundle)
+    var handledTwoPaneSideToggleRequest by rememberSaveable {
+        mutableIntStateOf(twoPaneSideToggleRequest)
+    }
     LaunchedEffect(asBundleShared) {
         if (asBundle != asBundleShared) {
             asBundle = asBundleShared
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            onPreviewGestureLockChanged(false)
+            onCompactTopAppBarChanged(false)
+            onTwoPaneSideActionChanged(false, true)
         }
     }
     LaunchedEffect(asBundle) {
@@ -923,288 +1000,512 @@ internal fun DeviceTabPage(
         setActiveDeviceActionId = { activeDeviceActionId = it },
     )
 
-    // 设备
-    LazyColumn(
-        contentPadding = contentPadding,
-        scrollBehavior = scrollBehavior,
-        state = listState,
-        bottomInnerPadding = bottomInnerPadding,
-    ) {
-        item {
-            StatusCard(
-                statusLine = statusLine,
-                adbConnected = adbConnected,
-                streaming = sessionInfo != null,
-                sessionInfo = sessionInfo,
-                busyLabel = null,
-                connectedDeviceLabel = connectedDeviceLabel,
-            )
-        }
-
-        item {
-            DeviceTileList(
-                devices = savedShortcuts,
-                isConnected = { device ->
-                    adbConnected
-                            && currentTarget?.host == device.host
-                            && currentTarget.port == device.port
-                },
-                actionEnabled = !busy && !adbConnecting,
-                actionInProgress = { device ->
-                    adbConnecting && activeDeviceActionId == device.id
-                },
-                editingDeviceId = editingDeviceId,
-                onClick = { device ->
-                    if (editingDeviceId != device.id)
-                        snackbar.show("长按可编辑")
-                },
-                onLongClick = { device ->
-                    val connected = adbConnected
-                            && currentTarget?.host == device.host
-                            && currentTarget.port == device.port
-                    if (connected) {
-                        snackbar.show("无法修改已连接的设备")
-                    } else {
-                        editingDeviceId =
-                            if (editingDeviceId != device.id) device.id
-                            else null
-                    }
-                },
-                onAction = { device ->
-                    haptic.contextClick()
-                    if (editingDeviceId == device.id) editingDeviceId = null
-                    adbCallbacks.onDeviceAction(device)
-                },
-                onEditorSave = { device, updated ->
-                    savedShortcuts = savedShortcuts.update(
-                        id = device.id,
-                        name = updated.name,
-                        host = updated.host,
-                        port = updated.port,
-                        startScrcpyOnConnect = updated.startScrcpyOnConnect,
-                        openFullscreenOnStart = updated.openFullscreenOnStart,
-                        scrcpyProfileId = updated.scrcpyProfileId,
-                    )
-                },
-                onEditorDelete = { device ->
-                    savedShortcuts = savedShortcuts.remove(id = device.id)
-                    editingDeviceId = null
-                },
-                onEditorCancel = { editingDeviceId = null },
-            )
-        }
-
-        if (!adbConnected) {
-            // "快速连接"
-            item {
-                QuickConnectCard(
-                    input = quickConnectInputTemp,
-                    onValueChange = {
-                        quickConnectInputTemp = it
-                    },
-                    onFocusLost = {
-                        qdBundle = qdBundle.copy(
-                            quickConnectInput = quickConnectInputTemp
-                        )
-                    },
-                    enabled = !adbConnecting,
-                    onAddDevice = {
-                        val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
-                            ?: return@QuickConnectCard
-
-                        savedShortcuts = savedShortcuts.upsert(
-                            DeviceShortcut(host = target.host, port = target.port)
-                        )
-
-                        Log.d(
-                            "SavedShortcuts",
-                            "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
-                        )
-                        snackbar.show("已添加设备: ${target.host}:${target.port}")
-                    },
-                    onConnect = {
-                        val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
-                            ?: return@QuickConnectCard
-
-                        adbCallbacks.onQuickConnect(target)
-                    },
-                )
-            }
-
-            item {
-                SectionSmallTitle("无线配对")
-                // "使用配对码配对设备"
-                PairingCard(
-                    busy = busy,
-                    autoDiscoverOnDialogOpen = asBundle.adbPairingAutoDiscoverOnDialogOpen,
-                    onDiscoverTarget = adbCallbacks::onDiscoverPairingTarget,
-                    onPair = adbCallbacks::onPair,
-                )
-            }
-        }
-
-        if (adbConnected) {
-            item {
-                SectionSmallTitle("Scrcpy")
-                ConfigPanel(
-                    busy = busy,
-                    activeProfileId = connectedScrcpyProfileId,
-                    activeBundle = connectedScrcpyBundle,
-                    hideSimpleConfigItems = asBundle.hideSimpleConfigItems,
-                    audioForwardingSupported = adbSession.audioForwardingSupported,
-                    cameraMirroringSupported = adbSession.cameraMirroringSupported,
-                    adbConnecting = adbConnecting,
-                    isQuickConnected = isQuickConnected,
-                    advancedEndActionText = connectedScrcpyProfileName,
-                    allAppsEndActionText = when {
-                        listingsRefreshBusy -> "..."
-                        apps.isNotEmpty() -> apps.size.toString()
-                        else -> "空"
-                    },
-                    onOpenAllApps = {
-                        showAllAppsSheet = true
-                        if (apps.isEmpty() && !listingsRefreshBusy) {
-                            scope.launch(Dispatchers.IO) { refreshApps() }
-                        }
-                    },
-                    recentTasksEndActionText = when {
-                        listingsRefreshBusy -> "..."
-                        recentTasks.isNotEmpty() -> recentTasks.size.toString()
-                        else -> "空"
-                    },
-                    onOpenRecentTasks = {
-                        showRecentTasksSheet = true
-                        if (recentTasks.isEmpty() && !listingsRefreshBusy) {
-                            scope.launch(Dispatchers.IO) {
-                                runCatching {
-                                    scrcpy.listings.getRecentTasks(forceRefresh = true)
-                                }.onFailure { error ->
-                                    logEvent("获取最近任务失败: ${error.message}", Log.WARN, error)
-                                    withContext(Dispatchers.Main) {
-                                        snackbar.show("获取最近任务失败")
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    onOpenAdvanced = { navigator.push(RootScreen.Advanced) },
-                    onStartStopHaptic = haptic::contextClick,
-                    onStart = {
-                        runBusy("启动 scrcpy") {
-                            startScrcpySession()
-                        }
-                    },
-                    onStop = {
-                        runBusy("停止 scrcpy") {
-                            stopScrcpySession()
-                        }
-                    },
-                    sessionInfo = sessionInfo,
-                    onDisconnect = { adbCallbacks.onDisconnectCurrent(currentTarget) },
-                )
-            }
-
-            if (
+    val canShowPreviewControls =
+        adbConnected &&
                 connectedVideoPlaybackEnabled &&
                 sessionInfo != null &&
                 sessionInfo!!.width > 0 &&
                 sessionInfo!!.height > 0
-            ) {
-                item(key = PREVIEW_CARD_ITEM_KEY) {
-                    PreviewCard(
-                        modifier = Modifier,
-                        sessionInfo = sessionInfo,
-                        previewHeightDp = asBundle.devicePreviewCardHeightDp.coerceAtLeast(120),
-                        onOpenFullscreen = {
-                            context.startActivity(StreamActivity.createIntent(context))
-                        },
-                        imeRequestToken = imeRequestToken,
-                        onImeCommitText = { text -> commitImeText(text) },
-                        onImeDeleteSurroundingText = { beforeLength, _ ->
-                            submitImeDeleteSurroundingText(
-                                scrcpy = scrcpy,
-                                beforeLength = beforeLength,
-                                afterLength = 0,
-                            )
-                        },
-                        onImeKeyEvent = { event ->
-                            submitImeKeyEvent(
-                                scrcpy = scrcpy,
-                                event = event,
-                                keyInjectMode = sessionInfo?.keyInjectMode
-                                    ?: ClientOptions.KeyInjectMode.MIXED,
-                                forwardKeyRepeat = sessionInfo?.forwardKeyRepeat ?: true,
-                            )
-                        },
-                        autoBringIntoView = pendingScrollToPreview,
-                        onAutoBringIntoViewConsumed = { pendingScrollToPreview = false },
-                    )
+
+    fun handleVirtualButtonAction(action: VirtualButtonAction) {
+        when (action) {
+            VirtualButtonAction.RECENT_TASKS -> {
+                showRecentTasksSheet = true
+                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshApps() }
+                    scope.launch(Dispatchers.IO) { refreshRecentTasks() }
                 }
+            }
 
-                item {
-                    VirtualButtonCard(
-                        busy = busy,
-                        outsideActions = virtualButtonLayout.first,
-                        moreActions = virtualButtonLayout.second,
-                        showText = asBundle.previewVirtualButtonShowText,
-                        onAction = { action ->
-                            when (action) {
-                                VirtualButtonAction.RECENT_TASKS -> {
-                                    showRecentTasksSheet = true
-                                    if (recentTasks.isEmpty() && !listingsRefreshBusy) {
-                                        scope.launch(Dispatchers.IO) { refreshApps() }
-                                        scope.launch(Dispatchers.IO) { refreshRecentTasks() }
-                                    }
-                                }
+            VirtualButtonAction.ALL_APPS -> {
+                showAllAppsSheet = true
+                if (apps.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshApps() }
+                }
+            }
 
-                                VirtualButtonAction.ALL_APPS -> {
-                                    showAllAppsSheet = true
-                                    if (apps.isEmpty() && !listingsRefreshBusy) {
-                                        scope.launch(Dispatchers.IO) { refreshApps() }
-                                    }
-                                }
+            VirtualButtonAction.TOGGLE_IME -> {
+                imeRequestToken++
+            }
 
-                                VirtualButtonAction.TOGGLE_IME -> {
-                                    imeRequestToken++
-                                }
+            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> {
+                scope.launch { pasteLocalClipboard() }
+            }
 
-                                VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> {
-                                    scope.launch { pasteLocalClipboard() }
-                                }
-
-                                else -> {
-                                    val keycode = action.keycode ?: return@VirtualButtonCard
-                                    runBusy("发送 ${action.title}") {
-                                        scrcpy.injectKeycode(0, keycode)
-                                        scrcpy.injectKeycode(1, keycode)
-                                    }
-                                }
-                            }
-                        },
-                        passwordPopupContent = { onDismissRequest ->
-                            PasswordPickerPopupContent(
-                                onDismissRequest = onDismissRequest,
-                            )
-                        },
-                    )
+            else -> {
+                val keycode = action.keycode ?: return
+                runBusy("发送 ${action.title}") {
+                    scrcpy.injectKeycode(0, keycode)
+                    scrcpy.injectKeycode(1, keycode)
                 }
             }
         }
+    }
 
+    @Composable
+    fun StatusSection() {
+        StatusCard(
+            statusLine = statusLine,
+            adbConnected = adbConnected,
+            streaming = sessionInfo != null,
+            sessionInfo = sessionInfo,
+            busyLabel = null,
+            connectedDeviceLabel = connectedDeviceLabel,
+        )
+    }
+
+    @Composable
+    fun DeviceListSection() {
+        DeviceTileList(
+            devices = savedShortcuts,
+            isConnected = { device ->
+                adbConnected
+                        && currentTarget?.host == device.host
+                        && currentTarget.port == device.port
+            },
+            actionEnabled = !busy && !adbConnecting,
+            actionInProgress = { device ->
+                adbConnecting && activeDeviceActionId == device.id
+            },
+            editingDeviceId = editingDeviceId,
+            onClick = { device ->
+                if (editingDeviceId != device.id)
+                    snackbar.show("长按可编辑")
+            },
+            onLongClick = { device ->
+                val connected = adbConnected
+                        && currentTarget?.host == device.host
+                        && currentTarget.port == device.port
+                if (connected) {
+                    snackbar.show("无法修改已连接的设备")
+                } else {
+                    editingDeviceId =
+                        if (editingDeviceId != device.id) device.id
+                        else null
+                }
+            },
+            onAction = { device ->
+                haptic.contextClick()
+                if (editingDeviceId == device.id) editingDeviceId = null
+                adbCallbacks.onDeviceAction(device)
+            },
+            onEditorSave = { device, updated ->
+                savedShortcuts = savedShortcuts.update(
+                    id = device.id,
+                    name = updated.name,
+                    host = updated.host,
+                    port = updated.port,
+                    startScrcpyOnConnect = updated.startScrcpyOnConnect,
+                    openFullscreenOnStart = updated.openFullscreenOnStart,
+                    scrcpyProfileId = updated.scrcpyProfileId,
+                )
+            },
+            onEditorDelete = { device ->
+                savedShortcuts = savedShortcuts.remove(id = device.id)
+                editingDeviceId = null
+            },
+            onEditorCancel = { editingDeviceId = null },
+        )
+    }
+
+    @Composable
+    fun QuickConnectSection() {
+        QuickConnectCard(
+            input = quickConnectInputTemp,
+            onValueChange = { quickConnectInputTemp = it },
+            onFocusLost = {
+                qdBundle = qdBundle.copy(quickConnectInput = quickConnectInputTemp)
+            },
+            enabled = !adbConnecting,
+            onAddDevice = {
+                val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
+                    ?: return@QuickConnectCard
+
+                savedShortcuts = savedShortcuts.upsert(
+                    DeviceShortcut(host = target.host, port = target.port)
+                )
+
+                Log.d(
+                    "SavedShortcuts",
+                    "size: ${savedShortcuts.size}, list: ${qdBundle.quickDevicesList}"
+                )
+                snackbar.show("已添加设备: ${target.host}:${target.port}")
+            },
+            onConnect = {
+                val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
+                    ?: return@QuickConnectCard
+
+                adbCallbacks.onQuickConnect(target)
+            },
+        )
+    }
+
+    @Composable
+    fun PairingSection() {
+        SectionSmallTitle("无线配对")
+        PairingCard(
+            busy = busy,
+            autoDiscoverOnDialogOpen = asBundle.adbPairingAutoDiscoverOnDialogOpen,
+            onDiscoverTarget = adbCallbacks::onDiscoverPairingTarget,
+            onPair = adbCallbacks::onPair,
+        )
+    }
+
+    @Composable
+    fun ScrcpyConfigSection() {
+        SectionSmallTitle("Scrcpy")
+        ConfigPanel(
+            busy = busy,
+            activeProfileId = connectedScrcpyProfileId,
+            activeBundle = connectedScrcpyBundle,
+            hideSimpleConfigItems = asBundle.hideSimpleConfigItems,
+            audioForwardingSupported = adbSession.audioForwardingSupported,
+            cameraMirroringSupported = adbSession.cameraMirroringSupported,
+            adbConnecting = adbConnecting,
+            isQuickConnected = isQuickConnected,
+            advancedEndActionText = connectedScrcpyProfileName,
+            allAppsEndActionText = when {
+                listingsRefreshBusy -> "..."
+                apps.isNotEmpty() -> apps.size.toString()
+                else -> "空"
+            },
+            onOpenAllApps = {
+                showAllAppsSheet = true
+                if (apps.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshApps() }
+                }
+            },
+            recentTasksEndActionText = when {
+                listingsRefreshBusy -> "..."
+                recentTasks.isNotEmpty() -> recentTasks.size.toString()
+                else -> "空"
+            },
+            onOpenRecentTasks = {
+                showRecentTasksSheet = true
+                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshRecentTasks() }
+                }
+            },
+            onOpenAdvanced = { navigator.push(RootScreen.Advanced) },
+            onStartStopHaptic = haptic::contextClick,
+            onStart = {
+                runBusy("启动 scrcpy") {
+                    startScrcpySession()
+                }
+            },
+            onStop = {
+                runBusy("停止 scrcpy") {
+                    stopScrcpySession()
+                }
+            },
+            sessionInfo = sessionInfo,
+            onDisconnect = { adbCallbacks.onDisconnectCurrent(currentTarget) },
+            showFullscreenAction = false,
+            onOpenFullscreen = {
+                context.startActivity(StreamActivity.createIntent(context))
+            },
+        )
+    }
+
+    @Composable
+    fun PreviewSection(
+        modifier: Modifier = Modifier,
+        directControlEnabled: Boolean = false,
+    ) {
+        PreviewCard(
+            modifier = modifier,
+            sessionInfo = sessionInfo,
+            previewHeightDp = asBundle.devicePreviewCardHeightDp.coerceAtLeast(120),
+            onOpenFullscreen = {
+                context.startActivity(StreamActivity.createIntent(context))
+            },
+            directControlEnabled = directControlEnabled,
+            onInjectTouch = { action, pointerId, x, y, pressure, actionButton, buttons ->
+                val session = sessionInfo
+                if (session != null) {
+                    withContext(Dispatchers.IO) {
+                        scrcpy.injectTouch(
+                            action = action,
+                            pointerId = pointerId,
+                            x = x,
+                            y = y,
+                            screenWidth = session.width,
+                            screenHeight = session.height,
+                            pressure = pressure,
+                            actionButton = actionButton,
+                            buttons = buttons,
+                        )
+                    }
+                }
+            },
+            onBackOrScreenOn = { action ->
+                withContext(Dispatchers.IO) {
+                    scrcpy.pressBackOrTurnScreenOn(action)
+                }
+            },
+            imeRequestToken = imeRequestToken,
+            onImeCommitText = { text -> commitImeText(text) },
+            onImeDeleteSurroundingText = { beforeLength, _ ->
+                submitImeDeleteSurroundingText(
+                    scrcpy = scrcpy,
+                    beforeLength = beforeLength,
+                    afterLength = 0,
+                )
+            },
+            onImeKeyEvent = { event ->
+                submitImeKeyEvent(
+                    scrcpy = scrcpy,
+                    event = event,
+                    keyInjectMode = sessionInfo?.keyInjectMode
+                        ?: ClientOptions.KeyInjectMode.MIXED,
+                    forwardKeyRepeat = sessionInfo?.forwardKeyRepeat ?: true,
+                )
+            },
+            autoBringIntoView = pendingScrollToPreview && !directControlEnabled,
+            onAutoBringIntoViewConsumed = { pendingScrollToPreview = false },
+            onTouchActiveChanged = {
+                if (directControlEnabled) onPreviewGestureLockChanged(it)
+            },
+        )
+    }
+
+    @Composable
+    fun ScrcpyConfigSectionForTwoPane() {
+        SectionSmallTitle("Scrcpy")
+        ConfigPanel(
+            busy = busy,
+            activeProfileId = connectedScrcpyProfileId,
+            activeBundle = connectedScrcpyBundle,
+            hideSimpleConfigItems = asBundle.hideSimpleConfigItems,
+            audioForwardingSupported = adbSession.audioForwardingSupported,
+            cameraMirroringSupported = adbSession.cameraMirroringSupported,
+            adbConnecting = adbConnecting,
+            isQuickConnected = isQuickConnected,
+            advancedEndActionText = connectedScrcpyProfileName,
+            allAppsEndActionText = when {
+                listingsRefreshBusy -> "..."
+                apps.isNotEmpty() -> apps.size.toString()
+                else -> "空"
+            },
+            onOpenAllApps = {
+                showAllAppsSheet = true
+                if (apps.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshApps() }
+                }
+            },
+            recentTasksEndActionText = when {
+                listingsRefreshBusy -> "..."
+                recentTasks.isNotEmpty() -> recentTasks.size.toString()
+                else -> "空"
+            },
+            onOpenRecentTasks = {
+                showRecentTasksSheet = true
+                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                    scope.launch(Dispatchers.IO) { refreshRecentTasks() }
+                }
+            },
+            onOpenAdvanced = { navigator.push(RootScreen.Advanced) },
+            onStartStopHaptic = haptic::contextClick,
+            onStart = {
+                runBusy("启动 scrcpy") {
+                    startScrcpySession()
+                }
+            },
+            onStop = {
+                runBusy("停止 scrcpy") {
+                    stopScrcpySession()
+                }
+            },
+            sessionInfo = sessionInfo,
+            onDisconnect = { adbCallbacks.onDisconnectCurrent(currentTarget) },
+            showFullscreenAction = canShowPreviewControls,
+            onOpenFullscreen = {
+                context.startActivity(StreamActivity.createIntent(context))
+            },
+            reverseSideActions = asBundle.deviceTwoPaneConfigOnRight,
+        )
+    }
+
+    @Composable
+    fun VirtualButtonsSection(modifier: Modifier = Modifier) {
+        VirtualButtonCard(
+            busy = busy,
+            outsideActions = virtualButtonLayout.first,
+            moreActions = virtualButtonLayout.second,
+            showText = asBundle.previewVirtualButtonShowText,
+            onAction = ::handleVirtualButtonAction,
+            passwordPopupContent = { onDismissRequest ->
+                PasswordPickerPopupContent(onDismissRequest = onDismissRequest)
+            },
+            popupBottomPadding = bottomInnerPadding,
+            modifier = modifier,
+        )
+    }
+
+    @Composable
+    fun LogsSection() {
         if (EventLogger.hasLogs()) {
-            item {
-                SectionSmallTitle("日志")
-                Card {
-                    TextField(
-                        value = EventLogger.eventLog.joinToString(separator = "\n"),
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
+            SectionSmallTitle("日志")
+            Card {
+                TextField(
+                    value = EventLogger.eventLog.joinToString(separator = "\n"),
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+
+    val pageContentPadding = contentPadding
+    val pageBottomInnerPadding = bottomInnerPadding
+
+    @Composable
+    fun DeviceListContent(
+        state: LazyListState,
+        includeInlinePreviewControls: Boolean,
+        useTwoPaneConfigPanel: Boolean = false,
+        modifier: Modifier = Modifier,
+        contentPadding: PaddingValues = pageContentPadding,
+        bottomInnerPadding: Dp? = pageBottomInnerPadding,
+    ) {
+        LazyColumn(
+            modifier = modifier,
+            contentPadding = contentPadding,
+            scrollBehavior = scrollBehavior,
+            state = state,
+            bottomInnerPadding = bottomInnerPadding,
+        ) {
+            item { StatusSection() }
+            item { DeviceListSection() }
+
+            if (!adbConnected) {
+                item { QuickConnectSection() }
+                item { PairingSection() }
+            }
+
+            if (adbConnected) {
+                item {
+                    if (useTwoPaneConfigPanel) ScrcpyConfigSectionForTwoPane()
+                    else ScrcpyConfigSection()
+                }
+
+                if (includeInlinePreviewControls && canShowPreviewControls) {
+                    item(key = PREVIEW_CARD_ITEM_KEY) { PreviewSection() }
+                    item { VirtualButtonsSection() }
+                }
+            }
+
+            item { LogsSection() }
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val useTwoPane = maxWidth > maxHeight
+                || when (windowSizeClass?.widthSizeClass) {
+            WindowWidthSizeClass.Compact -> false
+            WindowWidthSizeClass.Medium -> false
+            WindowWidthSizeClass.Expanded -> true
+            else -> false
+        }
+        val availableMaxWidth = maxWidth
+        val compactTopAppBar = useTwoPane && canShowPreviewControls
+        val showTwoPaneSideAction = useTwoPane && canShowPreviewControls
+        val configOnLeft = !asBundle.deviceTwoPaneConfigOnRight
+
+        LaunchedEffect(compactTopAppBar) {
+            onCompactTopAppBarChanged(compactTopAppBar)
+        }
+        LaunchedEffect(showTwoPaneSideAction, configOnLeft) {
+            onTwoPaneSideActionChanged(
+                showTwoPaneSideAction,
+                configOnLeft,
+            )
+        }
+        LaunchedEffect(twoPaneSideToggleRequest, showTwoPaneSideAction) {
+            if (twoPaneSideToggleRequest == handledTwoPaneSideToggleRequest) return@LaunchedEffect
+            handledTwoPaneSideToggleRequest = twoPaneSideToggleRequest
+            if (!showTwoPaneSideAction) return@LaunchedEffect
+            asBundle = asBundleLatest.copy(
+                deviceTwoPaneConfigOnRight = !asBundleLatest.deviceTwoPaneConfigOnRight
+            )
+        }
+
+        if (!useTwoPane || !canShowPreviewControls) {
+            DeviceListContent(
+                state = listState,
+                includeInlinePreviewControls = true,
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+                    .padding(
+                        horizontal = UiSpacing.PageHorizontal,
+                        vertical = UiSpacing.PageVertical,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(UiSpacing.PageItem),
+            ) {
+                val currentSession = sessionInfo!!
+                val twoPaneContentWidth =
+                    (availableMaxWidth - UiSpacing.PageHorizontal * 2 - UiSpacing.PageItem)
+                        .coerceAtLeast(0.dp)
+                val desiredPreviewWidth =
+                    (asBundle.devicePreviewCardHeightDp.coerceAtLeast(120)
+                        .toFloat() * currentSession.width / currentSession.height).dp
+                val previewWidth =
+                    desiredPreviewWidth.coerceAtMost(twoPaneContentWidth * 2f / 3f)
+                val configColumnWidth =
+                    (twoPaneContentWidth - previewWidth)
+                        .coerceIn(0.dp, DEVICE_TWO_PANE_CONFIG_MAX_WIDTH)
+                val previewPaneWidth =
+                    (twoPaneContentWidth - configColumnWidth)
+                        .coerceAtLeast(0.dp)
+
+                @Composable
+                fun ConfigColumn() {
+                    DeviceListContent(
+                        modifier = Modifier.width(configColumnWidth),
+                        state = listState,
+                        includeInlinePreviewControls = false,
+                        useTwoPaneConfigPanel = true,
+                        contentPadding = PaddingValues(0.dp),
+                        bottomInnerPadding = bottomInnerPadding,
                     )
+                }
+
+                @Composable
+                fun PreviewColumn() {
+                    Box(
+                        modifier = Modifier
+                            .width(previewPaneWidth)
+                            .fillMaxHeight()
+                            .padding(bottom = bottomInnerPadding),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Column(
+                            modifier = Modifier.width(previewWidth),
+                            verticalArrangement = Arrangement.spacedBy(UiSpacing.PageItem),
+                        ) {
+                            PreviewSection(
+                                modifier = Modifier.width(previewWidth),
+                                directControlEnabled = true,
+                            )
+                            VirtualButtonsSection(modifier = Modifier.width(previewWidth))
+                        }
+                    }
+                }
+
+                if (configOnLeft) {
+                    ConfigColumn()
+                    PreviewColumn()
+                } else {
+                    PreviewColumn()
+                    ConfigColumn()
                 }
             }
         }
-
     }
 
     AppListBottomSheet(
@@ -1303,45 +1604,6 @@ internal fun DeviceTabPage(
         onDismissRequest = { showAllAppsSheet = false },
         onRefresh = { scope.launch(Dispatchers.IO) { refreshApps() } },
     )
-
 }
 
-@Composable
-private fun DeviceMenuPopup(
-    show: Boolean,
-    onDismissRequest: () -> Unit,
-    onReorderDevices: () -> Unit,
-    onOpenVirtualButtonOrder: () -> Unit,
-    canClearLogs: Boolean,
-    onClearLogs: () -> Unit,
-) {
-    OverlayListPopup(
-        show = show,
-        popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-        alignment = PopupPositionProvider.Align.TopEnd,
-        onDismissRequest = onDismissRequest,
-    ) {
-        ListPopupColumn {
-            PopupMenuItem(
-                text = "快速设备排序",
-                optionSize = 3,
-                index = 0,
-                onSelectedIndexChange = { onReorderDevices() },
-            )
-            PopupMenuItem(
-                text = "虚拟按钮排序",
-                optionSize = 3,
-                index = 1,
-                onSelectedIndexChange = { onOpenVirtualButtonOrder() },
-            )
-            PopupMenuItem(
-                text = "清空日志",
-                optionSize = 3,
-                index = 2,
-                enabled = canClearLogs,
-                onSelectedIndexChange = { onClearLogs() },
-            )
-        }
-    }
-}
-
+private val DEVICE_TWO_PANE_CONFIG_MAX_WIDTH = 640.dp

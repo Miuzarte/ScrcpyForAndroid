@@ -30,6 +30,7 @@ object NativeCoreFacade {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bootstrapLock = Any()
     private val bootstrapPackets = ArrayDeque<CachedPacket>()
+
     @Volatile
     private var recordingSurfaceAttached = false
 
@@ -111,9 +112,6 @@ object NativeCoreFacade {
                 Log.i(TAG, "detachVideoSurface(): releasing decoder with destroyed surface")
                 decoder?.release()
                 decoder = null
-            } else if (activeSurfaceId == null && !recordingSurfaceAttached) {
-                decoder?.release()
-                decoder = null
             }
         }
     }
@@ -182,7 +180,6 @@ object NativeCoreFacade {
                 )
             }
             val currentDecoder = decoder ?: return@attachVideoConsumer
-            if (activeSurfaceId == null) return@attachVideoConsumer
             runCatching {
                 currentDecoder.feedAnnexB(
                     packet.data,

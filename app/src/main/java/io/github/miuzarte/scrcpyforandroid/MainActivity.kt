@@ -1,5 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid
 
+import android.content.pm.ActivityInfo
+import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyMainOrientationPolicy()
 
         AppRuntime.init(applicationContext)
         AppScreenOn.register(window)
@@ -39,11 +43,38 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        applyMainOrientationPolicy()
         StreamActivity.dismissActivePictureInPicture()
     }
 
     override fun onDestroy() {
         AppScreenOn.unregister(window)
         super.onDestroy()
+    }
+
+    private fun applyMainOrientationPolicy() {
+        val aspectRatio = currentDisplayAspectRatio()
+        requestedOrientation =
+            if (aspectRatio > PHONE_LANDSCAPE_LOCK_ASPECT_RATIO)
+                ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+            else
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
+    private fun currentDisplayAspectRatio(): Float {
+        val bounds =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                windowManager.maximumWindowMetrics.bounds
+            else resources.displayMetrics.let { metrics ->
+                Rect(0, 0, metrics.widthPixels, metrics.heightPixels)
+            }
+
+        val width = bounds.width().coerceAtLeast(1)
+        val height = bounds.height().coerceAtLeast(1)
+        return maxOf(width, height).toFloat() / minOf(width, height).toFloat()
+    }
+
+    private companion object {
+        private const val PHONE_LANDSCAPE_LOCK_ASPECT_RATIO = 16f / 9f
     }
 }

@@ -7,11 +7,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -132,6 +135,7 @@ fun FileManagerScreen(
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val pullToRefreshState = rememberPullToRefreshState()
     val listState = rememberLazyListState()
+    val layoutDirection = LocalLayoutDirection.current
     val asBundle by appSettings.bundleState.collectAsState()
 
     val pathStack = remember {
@@ -398,6 +402,89 @@ fun FileManagerScreen(
         }
     }
 
+    fun openEntry(entry: RemoteFileEntry) {
+        when {
+            entry.isDirectory -> {
+                rememberCurrentScrollPosition()
+                pathStack.add(normalizePath(entry.fullPath))
+            }
+
+            entry.kind == RemoteFileKind.Link || entry.symlinkTarget != null -> {
+                taskScope.launch {
+                    val targetPath = resolveLinkTarget(entry)
+                    if (targetPath == null) {
+                        withContext(Dispatchers.Main) {
+                            snackbar.show("链接目标不可用，长按查看信息")
+                        }
+                        return@launch
+                    }
+                    val result = runCatching {
+                        FileManagerService.stat(targetPath)
+                    }
+                    withContext(Dispatchers.Main) {
+                        result.onSuccess { targetStat ->
+                            if (isDirectoryStat(targetStat)) {
+                                jumpToPath(targetPath)
+                            } else {
+                                snackbar.show("链接目标不是文件夹，长按查看信息")
+                            }
+                        }.onFailure { error ->
+                            snackbar.show("读取链接目标失败: ${error.message ?: error.javaClass.simpleName}")
+                        }
+                    }
+                }
+            }
+
+            else -> snackbar.show("长按可查看文件详情")
+        }
+    }
+
+    fun showEntryDetails(entry: RemoteFileEntry) {
+        clearDetails()
+        selectedEntry = entry
+        showDetailsSheet = true
+        detailLoading = true
+        taskScope.launch {
+            val statResult = runCatching {
+                FileManagerService.stat(entry.fullPath)
+            }
+            val linkTargetPath = resolveLinkTarget(entry)
+            val targetStatResult =
+                if (linkTargetPath != null)
+                    runCatching { FileManagerService.stat(linkTargetPath) }
+                else null
+
+            val snapshotResult =
+                if (entry.isDirectory)
+                    runCatching {
+                        val session = DirectorySnapshotSession.open()
+                        withContext(Dispatchers.Main) {
+                            activeSnapshotSession = session
+                        }
+                        session.load(entry.fullPath)
+                    }
+                else null
+
+            withContext(Dispatchers.Main) {
+                detailLoading = false
+                statResult
+                    .onSuccess { selectedStat = it }
+                    .onFailure { error ->
+                        snackbar.show("读取详情失败: ${error.message ?: error.javaClass.simpleName}")
+                        if (selectedEntry === entry)
+                            selectedEntry = null
+                    }
+                targetStatResult
+                    ?.onSuccess { selectedTargetStat = it }
+                snapshotResult
+                    ?.onSuccess { selectedSnapshot = it }
+                    ?.onFailure { error ->
+                        snackbar.show("目录扫描失败: ${error.message ?: error.javaClass.simpleName}")
+                    }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
@@ -546,104 +633,78 @@ fun FileManagerScreen(
                     top = pagePadding.calculateTopPadding() + 12.dp,
                 ),
             ) {
-                LazyColumn(
-                    contentPadding = pagePadding,
-                    bottomInnerPadding = bottomInnerPadding,
-                    state = listState,
-                ) {
-                    if (loading && cachedEntries == null) {
-                        item { FileManagerStatusCard("加载中") }
-                    } else if (errorText != null && cachedEntries == null) {
-                        item { FileManagerStatusCard("加载失败: $errorText") }
-                    } else if (displayedEntries.isEmpty()) {
-                        item { FileManagerStatusCard("空目录") }
-                    } else {
-                        items(displayedEntries) { entry ->
-                            FileManagerItemCard(
-                                entry = entry,
-                                summary = FileManagerService.formatSummary(entry),
-                                onClick = {
-                                    when {
-                                        entry.isDirectory -> {
-                                            rememberCurrentScrollPosition()
-                                            pathStack.add(normalizePath(entry.fullPath))
-                                        }
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val fileCardMinWidth = 220.dp
+                    val listHorizontalPadding =
+                        pagePadding.calculateLeftPadding(layoutDirection) +
+                                pagePadding.calculateRightPadding(layoutDirection) +
+                                UiSpacing.PageHorizontal * 2
+                    val availableListWidth =
+                        (maxWidth - listHorizontalPadding).coerceAtLeast(fileCardMinWidth)
+                    val columns = (
+                            (availableListWidth.value + UiSpacing.PageItem.value) /
+                                    (fileCardMinWidth.value + UiSpacing.PageItem.value)
+                            ).toInt().coerceAtLeast(1)
+                    val fileRows = remember(displayedEntries, columns) {
+                        displayedEntries.chunked(columns)
+                    }
 
-                                        entry.kind == RemoteFileKind.Link || entry.symlinkTarget != null -> {
-                                            taskScope.launch {
-                                                val targetPath = resolveLinkTarget(entry)
-                                                if (targetPath == null) {
-                                                    withContext(Dispatchers.Main) {
-                                                        snackbar.show("链接目标不可用，长按查看信息")
-                                                    }
-                                                    return@launch
-                                                }
-                                                val result = runCatching {
-                                                    FileManagerService.stat(targetPath)
-                                                }
-                                                withContext(Dispatchers.Main) {
-                                                    result.onSuccess { targetStat ->
-                                                        if (isDirectoryStat(targetStat)) {
-                                                            jumpToPath(targetPath)
-                                                        } else {
-                                                            snackbar.show("链接目标不是文件夹，长按查看信息")
-                                                        }
-                                                    }.onFailure { error ->
-                                                        snackbar.show("读取链接目标失败: ${error.message ?: error.javaClass.simpleName}")
-                                                    }
-                                                }
-                                            }
-                                        }
+                    @Composable
+                    fun FileStateContent() {
+                        when {
+                            loading && cachedEntries == null ->
+                                FileManagerStatusCard(
+                                    message = "加载中",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
 
-                                        else -> snackbar.show("长按可查看文件详情")
+                            errorText != null && cachedEntries == null ->
+                                FileManagerStatusCard(
+                                    message = "加载失败: $errorText",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+
+                            displayedEntries.isEmpty() ->
+                                FileManagerStatusCard(
+                                    message = "空目录",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                        }
+                    }
+
+                    LazyColumn(
+                        contentPadding = pagePadding,
+                        bottomInnerPadding = bottomInnerPadding,
+                        state = listState,
+                        limitLandscapeWidth = false,
+                    ) {
+                        if (loading && cachedEntries == null ||
+                            errorText != null && cachedEntries == null ||
+                            displayedEntries.isEmpty()
+                        ) {
+                            item { FileStateContent() }
+                        } else {
+                            items(fileRows) { rowEntries ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(UiSpacing.PageItem),
+                                ) {
+                                    rowEntries.forEach { entry ->
+                                        FileManagerItemCard(
+                                            entry = entry,
+                                            summary = FileManagerService.formatSummary(entry),
+                                            onClick = { openEntry(entry) },
+                                            onLongClick = { showEntryDetails(entry) },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(72.dp),
+                                        )
                                     }
-                                },
-                                onLongClick = {
-                                    clearDetails()
-                                    selectedEntry = entry
-                                    showDetailsSheet = true
-                                    detailLoading = true
-                                    taskScope.launch {
-                                        val statResult = runCatching {
-                                            FileManagerService.stat(entry.fullPath)
-                                        }
-                                        val linkTargetPath = resolveLinkTarget(entry)
-                                        val targetStatResult =
-                                            if (linkTargetPath != null)
-                                                runCatching { FileManagerService.stat(linkTargetPath) }
-                                            else null
-
-                                        val snapshotResult =
-                                            if (entry.isDirectory)
-                                                runCatching {
-                                                    val session = DirectorySnapshotSession.open()
-                                                    withContext(Dispatchers.Main) {
-                                                        activeSnapshotSession = session
-                                                    }
-                                                    session.load(entry.fullPath)
-                                                }
-                                            else null
-
-                                        withContext(Dispatchers.Main) {
-                                            detailLoading = false
-                                            statResult
-                                                .onSuccess { selectedStat = it }
-                                                .onFailure { error ->
-                                                    snackbar.show("读取详情失败: ${error.message ?: error.javaClass.simpleName}")
-                                                    if (selectedEntry === entry)
-                                                        selectedEntry = null
-                                                }
-                                            targetStatResult
-                                                ?.onSuccess { selectedTargetStat = it }
-                                            snapshotResult
-                                                ?.onSuccess { selectedSnapshot = it }
-                                                ?.onFailure { error ->
-                                                    snackbar.show("目录扫描失败: ${error.message ?: error.javaClass.simpleName}")
-                                                }
-                                        }
+                                    repeat(columns - rowEntries.size) {
+                                        Box(Modifier.weight(1f))
                                     }
-                                },
-                            )
+                                }
+                            }
                         }
                     }
                 }
@@ -719,8 +780,11 @@ fun FileManagerScreen(
 }
 
 @Composable
-private fun FileManagerStatusCard(message: String) {
-    Card {
+private fun FileManagerStatusCard(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
         Text(
             text = message,
             modifier = Modifier
@@ -737,10 +801,10 @@ private fun FileManagerItemCard(
     summary: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -749,7 +813,8 @@ private fun FileManagerItemCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .fillMaxHeight()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(

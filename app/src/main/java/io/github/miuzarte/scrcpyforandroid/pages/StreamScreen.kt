@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
-import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
