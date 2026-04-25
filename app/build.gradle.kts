@@ -56,8 +56,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 37
-        versionCode = 22
-        versionName = "0.2.6"
+        versionCode = 23
+        versionName = "0.2.7"
 
         externalNativeBuild {
             cmake {
@@ -151,6 +151,7 @@ dependencies {
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.security.crypto)
+    implementation("com.github.promeg:tinypinyin:2.0.3")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

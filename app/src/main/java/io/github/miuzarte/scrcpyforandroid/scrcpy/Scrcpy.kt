@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import android.view.KeyEvent
 import androidx.core.net.toUri
+import com.github.promeg.pinyinhelper.Pinyin
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
@@ -42,6 +43,7 @@ import java.io.EOFException
 import java.io.File
 import java.io.InputStreamReader
 import java.util.ArrayDeque
+import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -813,8 +815,54 @@ class Scrcpy(
                 )
             )
         }
-        return apps.toList()
+        return apps.toList().sortedBy { appSortKey(it) }
     }
+
+    private fun appSortKey(app: AppInfo): String {
+        val label = app.label?.takeIf { it.isNotBlank() } ?: app.packageName
+        val tokens = label.map { char ->
+            when {
+                char.code <= 0x7F -> AppSortToken(
+                    priority = 0,
+                    value = char.lowercaseChar().toString(),
+                )
+
+                Pinyin.isChinese(char) -> AppSortToken(
+                    priority = 1,
+                    value = Pinyin.toPinyin(char).lowercase(Locale.ROOT),
+                )
+
+                else -> AppSortToken(
+                    priority = 2,
+                    value = char.lowercaseChar().toString(),
+                )
+            }
+        }
+        val firstToken = tokens.firstOrNull { it.value.any(Char::isLetterOrDigit) }
+            ?: tokens.firstOrNull()
+        val firstLetter = firstToken
+            ?.value
+            ?.firstOrNull(Char::isLetterOrDigit)
+            ?: Char.MAX_VALUE
+
+        return buildString {
+            append(firstLetter)
+            append('\u0000')
+            append(firstToken?.priority ?: 2)
+            append('\u0000')
+            tokens.forEach { token ->
+                append(token.value)
+                append('\u0000')
+            }
+            append('\u0001')
+            append(app.packageName.lowercase(Locale.ROOT))
+        }
+    }
+
+    private data class AppSortToken(
+        val priority: Int,
+        val value: String,
+    )
 
     private fun parseRecentTasks(output: String): List<RecentTaskInfo> {
         val packages = LinkedHashSet<String>()
