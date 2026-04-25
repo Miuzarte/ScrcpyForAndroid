@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -81,14 +82,14 @@ private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 private val monetPaletteStyleOptions = ThemePaletteStyle.entries.map { it.name }
 private val monetColorSpecOptions = ThemeColorSpec.entries.map { it.name }
 
-private fun terminalFontFile(context: android.content.Context): File {
-    return File(context.filesDir, TERMINAL_FONT_RELATIVE_PATH)
-}
-
-private fun clearTerminalFont(context: android.content.Context): Boolean {
-    val target = terminalFontFile(context)
-    return target.exists() && target.delete()
-}
+suspend fun clearTerminalFont(context: Context) =
+    withContext(Dispatchers.IO) {
+        val target = File(
+            context.filesDir,
+            TERMINAL_FONT_RELATIVE_PATH,
+        )
+        target.exists() && target.delete()
+    }
 
 @Composable
 fun SettingsScreen(
@@ -135,7 +136,6 @@ fun SettingsPage(
     onOpenReorderDevices: () -> Unit,
 ) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
     val updateState by AppUpdateChecker.state.collectAsState()
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
@@ -235,7 +235,9 @@ fun SettingsPage(
                     selectedIndex = asBundle.themeBaseIndex
                         .coerceIn(0, ThemeModes.baseOptions.lastIndex),
                     onSelectedIndexChange = {
-                        asBundle = asBundle.copy(themeBaseIndex = it)
+                        asBundle = asBundle.copy(
+                            themeBaseIndex = it
+                        )
                     },
                 )
                 SwitchPreference(
@@ -243,20 +245,26 @@ fun SettingsPage(
                     summary = "开启后使用 Monet 动态配色",
                     checked = asBundle.monet,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(monet = it)
+                        asBundle = asBundle.copy(
+                            monet = it
+                        )
                     },
                 )
                 AnimatedVisibility(asBundle.monet) {
-                    OverlayDropdownPreference(
-                        title = "Monet Key Color",
-                        summary = "设置 Monet 强调色",
-                        items = MonetKeyColorOptions,
-                        selectedIndex = asBundle.monetSeedIndex
-                            .coerceIn(0, MonetKeyColorOptions.lastIndex),
-                        onSelectedIndexChange = {
-                            asBundle = asBundle.copy(monetSeedIndex = it)
-                        },
-                    )
+                    Column {
+                        OverlayDropdownPreference(
+                            title = "Monet Key Color",
+                            summary = "设置 Monet 强调色",
+                            items = MonetKeyColorOptions,
+                            selectedIndex = asBundle.monetSeedIndex
+                                .coerceIn(0, MonetKeyColorOptions.lastIndex),
+                            onSelectedIndexChange = {
+                                asBundle = asBundle.copy(
+                                    monetSeedIndex = it
+                                )
+                            },
+                        )
+                    }
                 }
                 AnimatedVisibility(asBundle.monet && asBundle.monetSeedIndex > 0) {
                     Column {
@@ -267,7 +275,9 @@ fun SettingsPage(
                             selectedIndex = asBundle.monetPaletteStyle
                                 .coerceIn(0, monetPaletteStyleOptions.lastIndex),
                             onSelectedIndexChange = {
-                                asBundle = asBundle.copy(monetPaletteStyle = it)
+                                asBundle = asBundle.copy(
+                                    monetPaletteStyle = it
+                                )
                             },
                         )
                         OverlayDropdownPreference(
@@ -277,7 +287,9 @@ fun SettingsPage(
                             selectedIndex = asBundle.monetColorSpec
                                 .coerceIn(0, monetColorSpecOptions.lastIndex),
                             onSelectedIndexChange = {
-                                asBundle = asBundle.copy(monetColorSpec = it)
+                                asBundle = asBundle.copy(
+                                    monetColorSpec = it
+                                )
                             },
                         )
                     }
@@ -287,7 +299,9 @@ fun SettingsPage(
                     summary = "启用顶栏和底栏的模糊效果",
                     checked = asBundle.blur,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(blur = it)
+                        asBundle = asBundle.copy(
+                            blur = it
+                        )
                     }
                 )
                 SwitchPreference(
@@ -295,25 +309,34 @@ fun SettingsPage(
                     summary = "使用 Apple 风格的悬浮底栏",
                     checked = asBundle.floatingBottomBar,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(floatingBottomBar = it)
+                        asBundle = asBundle.copy(
+                            floatingBottomBar = it
+                        )
                     }
                 )
-                AnimatedVisibility(asBundle.floatingBottomBar) {
-                    SwitchPreference(
-                        title = "液态玻璃",
-                        summary = "启用悬浮底栏的液态玻璃效果",
-                        checked = asBundle.floatingBottomBarBlur,
-                        onCheckedChange = {
-                            asBundle = asBundle.copy(floatingBottomBarBlur = it)
-                        }
-                    )
+                AnimatedVisibility(asBundle.floatingBottomBar && asBundle.blur) {
+                    Column {
+                        SwitchPreference(
+                            title = "液态玻璃",
+                            summary = "启用悬浮底栏的液态玻璃效果",
+                            checked = asBundle.floatingBottomBar && asBundle.blur
+                                    && asBundle.floatingBottomBarBlur,
+                            onCheckedChange = {
+                                asBundle = asBundle.copy(
+                                    floatingBottomBarBlur = it
+                                )
+                            }
+                        )
+                    }
                 }
                 SwitchPreference(
                     title = "平滑圆角",
                     summary = "启用全局平滑圆角效果",
                     checked = asBundle.smoothCorner,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(smoothCorner = it)
+                        asBundle = asBundle.copy(
+                            smoothCorner = it
+                        )
                     }
                 )
             }
@@ -330,19 +353,23 @@ fun SettingsPage(
                             推荐配合 RAW PCM 编解码
                             修改后建议划卡重启应用
                         """.trimIndent(),
+                    enabled = !isScrcpyStreaming,
                     checked = asBundle.lowLatency,
                     onCheckedChange = {
                         if (!isScrcpyStreaming)
-                            asBundle = asBundle.copy(lowLatency = it)
+                            asBundle = asBundle.copy(
+                                lowLatency = it
+                            )
                     },
-                    enabled = !isScrcpyStreaming,
                 )
                 SwitchPreference(
                     title = "启用调试信息",
                     summary = "在全屏界面悬浮显示分辨率、帧率和触点信息",
                     checked = asBundle.fullscreenDebugInfo,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(fullscreenDebugInfo = it)
+                        asBundle = asBundle.copy(
+                            fullscreenDebugInfo = it
+                        )
                     },
                 )
                 SwitchPreference(
@@ -350,7 +377,9 @@ fun SettingsPage(
                     summary = "启用后设备页仅保留更多参数、所有应用、最近任务和启动/停止按钮",
                     checked = asBundle.hideSimpleConfigItems,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(hideSimpleConfigItems = it)
+                        asBundle = asBundle.copy(
+                            hideSimpleConfigItems = it
+                        )
                     },
                 )
                 SuperSlider(
@@ -396,6 +425,27 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
+                    title = "实时同步剪贴板到受控机",
+                    summary =
+                        """
+                            本机剪贴板更新后会自动同步到受控机
+                            禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容
+                            MIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效
+                        """.trimIndent(),
+                    checked = asBundle.realtimeClipboardSyncToDevice,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            realtimeClipboardSyncToDevice = it
+                        )
+                    },
+                )
+            }
+        }
+
+        item {
+            SectionSmallTitle("全屏")
+            Card {
+                SwitchPreference(
                     title = "全屏时不跟随系统旋转锁定",
                     summary = "启用后使用传感器方向，忽略系统自动旋转锁定状态",
                     checked = asBundle.fullscreenControlIgnoreSystemRotationLock,
@@ -420,11 +470,13 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "全屏显示虚拟按钮",
+                    title = "全屏时显示虚拟按钮",
                     summary = "在全屏控制页中显示返回键、主页键等虚拟按钮",
                     checked = asBundle.showFullscreenVirtualButtons,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(showFullscreenVirtualButtons = it)
+                        asBundle = asBundle.copy(
+                            showFullscreenVirtualButtons = it
+                        )
                     },
                 )
                 AnimatedVisibility(asBundle.showFullscreenVirtualButtons) {
@@ -491,11 +543,13 @@ fun SettingsPage(
                     }
                 }
                 SwitchPreference(
-                    title = "全屏显示悬浮球",
+                    title = "全屏时显示悬浮球",
                     summary = "在全屏控制页中显示可拖动的悬浮球，点击后弹出完整虚拟按键菜单",
                     checked = asBundle.showFullscreenFloatingButton,
                     onCheckedChange = {
-                        asBundle = asBundle.copy(showFullscreenFloatingButton = it)
+                        asBundle = asBundle.copy(
+                            showFullscreenFloatingButton = it
+                        )
                     },
                 )
                 AnimatedVisibility(asBundle.showFullscreenFloatingButton) {
@@ -577,21 +631,6 @@ fun SettingsPage(
                         )
                     }
                 }
-                SwitchPreference(
-                    title = "实时同步剪贴板到受控机",
-                    summary =
-                        """
-                            本机剪贴板更新后会自动同步到受控机
-                            禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容
-                            MIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效
-                        """.trimIndent(),
-                    checked = asBundle.realtimeClipboardSyncToDevice,
-                    onCheckedChange = {
-                        asBundle = asBundle.copy(
-                            realtimeClipboardSyncToDevice = it
-                        )
-                    },
-                )
             }
         }
 
@@ -862,16 +901,12 @@ fun SettingsPage(
                             useLabelAsPlaceholder = true,
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
-                                Row(
-                                    modifier = Modifier.padding(end = UiSpacing.Medium),
-                                ) {
+                                Row(modifier = Modifier.padding(end = UiSpacing.Medium)) {
                                     if (asBundle.terminalFontDisplayName.isNotBlank()) {
                                         IconButton(
                                             onClick = {
                                                 scope.launch {
-                                                    val cleared = withContext(Dispatchers.IO) {
-                                                        clearTerminalFont(context)
-                                                    }
+                                                    val cleared = clearTerminalFont(context)
                                                     asBundle = asBundle.copy(
                                                         terminalFontDisplayName = ""
                                                     )
@@ -903,6 +938,32 @@ fun SettingsPage(
         }
 
         item {
+            SectionSmallTitle("杂项")
+            Card {
+                SwitchPreference(
+                    title = "退出应用时清除日志",
+                    summary = "双击返回退出应用时清除日志",
+                    checked = asBundle.clearLogsOnExit,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            clearLogsOnExit = it
+                        )
+                    },
+                )
+                SwitchPreference(
+                    title = "隐藏设备页日志框",
+                    summary = "隐藏设备页最下方的日志框",
+                    checked = asBundle.hideDeviceLogs,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            hideDeviceLogs = it
+                        )
+                    },
+                )
+            }
+        }
+
+        item {
             SectionSmallTitle("")
             Card {
                 ArrowPreference(
@@ -912,6 +973,5 @@ fun SettingsPage(
                 )
             }
         }
-
     }
 }

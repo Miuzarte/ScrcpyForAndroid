@@ -122,6 +122,12 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             intPreferencesKey("device_preview_card_height_dp"),
             1080 / 3,
         )
+        val REALTIME_CLIPBOARD_SYNC_TO_DEVICE = Pair(
+            booleanPreferencesKey("realtime_clipboard_sync_to_device"),
+            true,
+        )
+
+        // Fullscreen
         val FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK = Pair(
             booleanPreferencesKey("fullscreen_control_ignore_system_rotation_lock"),
             true,
@@ -157,10 +163,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val FULLSCREEN_FLOATING_BUTTON_RING_ALPHA_PERCENT = Pair(
             intPreferencesKey("fullscreen_floating_button_ring_alpha_percent"),
             100,
-        )
-        val REALTIME_CLIPBOARD_SYNC_TO_DEVICE = Pair(
-            booleanPreferencesKey("realtime_clipboard_sync_to_device"),
-            true,
         )
 
         val FULLSCREEN_FLOATING_BUTTON_X_FRACTION = Pair(
@@ -262,6 +264,14 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             longPreferencesKey("last_update_check_at"),
             0L,
         )
+        val CLEAR_LOGS_ON_EXIT = Pair(
+            booleanPreferencesKey("clear_logs_on_exit"),
+            true,
+        )
+        val HIDE_DEVICE_LOGS = Pair(
+            booleanPreferencesKey("hide_device_logs"),
+            false,
+        )
     }
 
     @Parcelize
@@ -282,6 +292,9 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenDebugInfo: Boolean,
         val hideSimpleConfigItems: Boolean,
         val devicePreviewCardHeightDp: Int,
+        val realtimeClipboardSyncToDevice: Boolean,
+
+        // Fullscreen
         val fullscreenControlIgnoreSystemRotationLock: Boolean,
         val fullscreenControlBackToDevice: Boolean,
         val showFullscreenVirtualButtons: Boolean,
@@ -291,7 +304,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenFloatingButtonSizeDp: Int,
         val fullscreenFloatingButtonBackgroundAlphaPercent: Int,
         val fullscreenFloatingButtonRingAlphaPercent: Int,
-        val realtimeClipboardSyncToDevice: Boolean,
 
         val fullscreenFloatingButtonXFraction: Float,
         val fullscreenFloatingButtonYFraction: Float,
@@ -320,6 +332,8 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fileManagerSortBy: String,
         val fileManagerSortDescending: Boolean,
         val lastUpdateCheckAt: Long,
+        val clearLogsOnExit: Boolean,
+        val hideDeviceLogs: Boolean,
     ) : Parcelable {
     }
 
@@ -340,6 +354,9 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_DEBUG_INFO) { it.fullscreenDebugInfo },
         bundleField(HIDE_SIMPLE_CONFIG_ITEMS) { it.hideSimpleConfigItems },
         bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { it.devicePreviewCardHeightDp },
+        bundleField(REALTIME_CLIPBOARD_SYNC_TO_DEVICE) { it.realtimeClipboardSyncToDevice },
+
+        // Fullscreen
         bundleField(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK) { it.fullscreenControlIgnoreSystemRotationLock },
         bundleField(FULLSCREEN_CONTROL_BACK_TO_DEVICE) { it.fullscreenControlBackToDevice },
         bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { it.showFullscreenVirtualButtons },
@@ -349,7 +366,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_FLOATING_BUTTON_SIZE_DP) { it.fullscreenFloatingButtonSizeDp },
         bundleField(FULLSCREEN_FLOATING_BUTTON_BACKGROUND_ALPHA_PERCENT) { it.fullscreenFloatingButtonBackgroundAlphaPercent },
         bundleField(FULLSCREEN_FLOATING_BUTTON_RING_ALPHA_PERCENT) { it.fullscreenFloatingButtonRingAlphaPercent },
-        bundleField(REALTIME_CLIPBOARD_SYNC_TO_DEVICE) { it.realtimeClipboardSyncToDevice },
 
         bundleField(FULLSCREEN_FLOATING_BUTTON_X_FRACTION) { it.fullscreenFloatingButtonXFraction },
         bundleField(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION) { it.fullscreenFloatingButtonYFraction },
@@ -378,6 +394,8 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FILE_MANAGER_SORT_BY) { it.fileManagerSortBy },
         bundleField(FILE_MANAGER_SORT_DESCENDING) { it.fileManagerSortDescending },
         bundleField(LAST_UPDATE_CHECK_AT) { it.lastUpdateCheckAt },
+        bundleField(CLEAR_LOGS_ON_EXIT) { it.clearLogsOnExit },
+        bundleField(HIDE_DEVICE_LOGS) { it.hideDeviceLogs },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)
@@ -399,6 +417,9 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         hideSimpleConfigItems = preferences.read(HIDE_SIMPLE_CONFIG_ITEMS),
         devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
+        realtimeClipboardSyncToDevice = preferences.read(REALTIME_CLIPBOARD_SYNC_TO_DEVICE),
+
+        // Fullscreen
         fullscreenControlIgnoreSystemRotationLock =
             preferences.read(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK),
         fullscreenControlBackToDevice = preferences.read(FULLSCREEN_CONTROL_BACK_TO_DEVICE),
@@ -411,7 +432,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             preferences.read(FULLSCREEN_FLOATING_BUTTON_BACKGROUND_ALPHA_PERCENT),
         fullscreenFloatingButtonRingAlphaPercent =
             preferences.read(FULLSCREEN_FLOATING_BUTTON_RING_ALPHA_PERCENT),
-        realtimeClipboardSyncToDevice = preferences.read(REALTIME_CLIPBOARD_SYNC_TO_DEVICE),
 
         fullscreenFloatingButtonXFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_X_FRACTION),
         fullscreenFloatingButtonYFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION),
@@ -440,6 +460,8 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fileManagerSortBy = preferences.read(FILE_MANAGER_SORT_BY),
         fileManagerSortDescending = preferences.read(FILE_MANAGER_SORT_DESCENDING),
         lastUpdateCheckAt = preferences.read(LAST_UPDATE_CHECK_AT),
+        clearLogsOnExit = preferences.read(CLEAR_LOGS_ON_EXIT),
+        hideDeviceLogs = preferences.read(HIDE_DEVICE_LOGS),
     )
 
     suspend fun loadBundle() = loadBundle(::bundleFromPreferences)

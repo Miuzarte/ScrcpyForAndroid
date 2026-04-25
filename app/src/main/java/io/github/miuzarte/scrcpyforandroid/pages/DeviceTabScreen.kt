@@ -1344,7 +1344,7 @@ internal fun DeviceTabPage(
 
     @Composable
     fun LogsSection() {
-        if (EventLogger.hasLogs()) {
+        if (!asBundle.hideDeviceLogs && EventLogger.hasLogs()) {
             SectionSmallTitle("日志")
             Card {
                 TextField(

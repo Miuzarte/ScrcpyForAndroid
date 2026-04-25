@@ -13,6 +13,8 @@ val configuredAbiList = (project.findProperty("abiList") as String?)
     ?.filter { it.isNotEmpty() }
     ?.ifEmpty { null }
     ?: defaultAbiList
+val buildUniversalApk = configuredAbiList.size > 1
+val singleAbi = configuredAbiList.singleOrNull()
 
 android {
     namespace = "io.github.miuzarte.scrcpyforandroid"
@@ -74,10 +76,10 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            isEnable = buildUniversalApk
             reset()
             include(*configuredAbiList.toTypedArray())
-            isUniversalApk = true
+            isUniversalApk = buildUniversalApk
         }
     }
 
@@ -109,6 +111,16 @@ android {
 
     buildToolsVersion = "37.0.0"
     ndkVersion = "29.0.14206865"
+}
+
+androidComponents {
+    onVariants { variant ->
+        singleAbi?.let { abi ->
+            variant.outputs.forEach { output ->
+                output.outputFileName.set("app-$abi-${variant.name}.apk")
+            }
+        }
+    }
 }
 
 dependencies {

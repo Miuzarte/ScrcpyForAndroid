@@ -68,6 +68,7 @@ import io.github.miuzarte.scrcpyforandroid.services.ConnectionController
 import io.github.miuzarte.scrcpyforandroid.services.ConnectionStateStore
 import io.github.miuzarte.scrcpyforandroid.services.DeviceAdbAutoReconnectManager
 import io.github.miuzarte.scrcpyforandroid.services.DeviceAdbConnectionCoordinator
+import io.github.miuzarte.scrcpyforandroid.services.EventLogger
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.SnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -450,6 +451,9 @@ fun MainScreen() {
                     withContext(Dispatchers.IO) {
                         runCatching { scrcpy.stop() }
                         runCatching { NativeAdbService.disconnect() }
+                    }
+                    if (asBundle.clearLogsOnExit) {
+                        EventLogger.clearLogs()
                     }
                     activity?.finish()
                 }

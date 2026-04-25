@@ -746,7 +746,7 @@ internal fun ScrcpyAllOptionsPage(
     }
 
     val apps = remember(scrcpy.listings.apps, listRefreshVersion) {
-        scrcpy.listings.apps.sortedBy { it.packageName }
+        scrcpy.listings.apps // .sortedBy { it.packageName }
     }
     val appDropdownItems by remember(apps, listRefreshVersion) {
         derivedStateOf {
