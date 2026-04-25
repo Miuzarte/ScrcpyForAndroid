@@ -406,6 +406,20 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
+                    title = "全屏时返回键发送到远程",
+                    summary =
+                        """
+                            启用后系统返回键会发送给设备，不再退出全屏控制页
+                            此时退出全屏需要回到桌面通过图标重新进入应用
+                        """.trimIndent(),
+                    checked = asBundle.fullscreenControlBackToDevice,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            fullscreenControlBackToDevice = it
+                        )
+                    },
+                )
+                SwitchPreference(
                     title = "全屏显示虚拟按钮",
                     summary = "在全屏控制页中显示返回键、主页键等虚拟按钮",
                     checked = asBundle.showFullscreenVirtualButtons,

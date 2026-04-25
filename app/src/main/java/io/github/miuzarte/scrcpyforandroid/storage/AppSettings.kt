@@ -122,13 +122,13 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             intPreferencesKey("device_preview_card_height_dp"),
             1080 / 3,
         )
-        val DEVICE_TWO_PANE_CONFIG_ON_RIGHT = Pair(
-            booleanPreferencesKey("device_two_pane_config_on_right"),
-            false,
-        )
         val FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK = Pair(
             booleanPreferencesKey("fullscreen_control_ignore_system_rotation_lock"),
             true,
+        )
+        val FULLSCREEN_CONTROL_BACK_TO_DEVICE = Pair(
+            booleanPreferencesKey("fullscreen_control_back_to_device"),
+            false,
         )
         val SHOW_FULLSCREEN_VIRTUAL_BUTTONS = Pair(
             booleanPreferencesKey("show_fullscreen_virtual_buttons"),
@@ -192,6 +192,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
                     ",power:0,screenshot:0" +
 
                     "",
+        )
+        val DEVICE_TWO_PANE_CONFIG_ON_RIGHT = Pair(
+            booleanPreferencesKey("device_two_pane_config_on_right"),
+            false,
         )
 
         // Scrcpy Server
@@ -278,8 +282,8 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenDebugInfo: Boolean,
         val hideSimpleConfigItems: Boolean,
         val devicePreviewCardHeightDp: Int,
-        val deviceTwoPaneConfigOnRight: Boolean,
         val fullscreenControlIgnoreSystemRotationLock: Boolean,
+        val fullscreenControlBackToDevice: Boolean,
         val showFullscreenVirtualButtons: Boolean,
         val fullscreenVirtualButtonHeightDp: Int,
         val fullscreenVirtualButtonDock: String,
@@ -293,6 +297,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenFloatingButtonYFraction: Float,
         val previewVirtualButtonShowText: Boolean,
         val virtualButtonsLayout: String,
+        val deviceTwoPaneConfigOnRight: Boolean,
 
         // Scrcpy Server
         val customServerUri: String,
@@ -335,8 +340,8 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_DEBUG_INFO) { it.fullscreenDebugInfo },
         bundleField(HIDE_SIMPLE_CONFIG_ITEMS) { it.hideSimpleConfigItems },
         bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { it.devicePreviewCardHeightDp },
-        bundleField(DEVICE_TWO_PANE_CONFIG_ON_RIGHT) { it.deviceTwoPaneConfigOnRight },
         bundleField(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK) { it.fullscreenControlIgnoreSystemRotationLock },
+        bundleField(FULLSCREEN_CONTROL_BACK_TO_DEVICE) { it.fullscreenControlBackToDevice },
         bundleField(SHOW_FULLSCREEN_VIRTUAL_BUTTONS) { it.showFullscreenVirtualButtons },
         bundleField(FULLSCREEN_VIRTUAL_BUTTON_HEIGHT_DP) { it.fullscreenVirtualButtonHeightDp },
         bundleField(FULLSCREEN_VIRTUAL_BUTTON_DOCK) { it.fullscreenVirtualButtonDock },
@@ -350,6 +355,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION) { it.fullscreenFloatingButtonYFraction },
         bundleField(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT) { it.previewVirtualButtonShowText },
         bundleField(VIRTUAL_BUTTONS_LAYOUT) { it.virtualButtonsLayout },
+        bundleField(DEVICE_TWO_PANE_CONFIG_ON_RIGHT) { it.deviceTwoPaneConfigOnRight },
 
         // Scrcpy Server
         bundleField(CUSTOM_SERVER_URI) { it.customServerUri },
@@ -393,9 +399,9 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         hideSimpleConfigItems = preferences.read(HIDE_SIMPLE_CONFIG_ITEMS),
         devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
-        deviceTwoPaneConfigOnRight = preferences.read(DEVICE_TWO_PANE_CONFIG_ON_RIGHT),
         fullscreenControlIgnoreSystemRotationLock =
             preferences.read(FULLSCREEN_CONTROL_IGNORE_SYSTEM_ROTATION_LOCK),
+        fullscreenControlBackToDevice = preferences.read(FULLSCREEN_CONTROL_BACK_TO_DEVICE),
         showFullscreenVirtualButtons = preferences.read(SHOW_FULLSCREEN_VIRTUAL_BUTTONS),
         fullscreenVirtualButtonHeightDp = preferences.read(FULLSCREEN_VIRTUAL_BUTTON_HEIGHT_DP),
         fullscreenVirtualButtonDock = preferences.read(FULLSCREEN_VIRTUAL_BUTTON_DOCK),
@@ -411,6 +417,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         fullscreenFloatingButtonYFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION),
         previewVirtualButtonShowText = preferences.read(PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT),
         virtualButtonsLayout = preferences.read(VIRTUAL_BUTTONS_LAYOUT),
+        deviceTwoPaneConfigOnRight = preferences.read(DEVICE_TWO_PANE_CONFIG_ON_RIGHT),
 
         // Scrcpy Server
         customServerUri = preferences.read(CUSTOM_SERVER_URI),

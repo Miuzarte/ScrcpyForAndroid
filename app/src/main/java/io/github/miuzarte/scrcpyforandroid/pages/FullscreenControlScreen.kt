@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.Surface
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -84,8 +85,6 @@ fun FullscreenControlScreen(
     onVideoSizeChanged: (width: Int, height: Int) -> Unit,
     onVideoBoundsInWindowChanged: (Rect?) -> Unit,
 ) {
-    BackHandler(enabled = true, onBack = onBack)
-
     val activity = LocalActivity.current
     val context = LocalContext.current
     val fragmentActivity = remember(activity) { activity as? FragmentActivity }
@@ -281,6 +280,25 @@ fun FullscreenControlScreen(
                 e
             )
         }
+    }
+
+    suspend fun sendBackOrTurnScreenOn() {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                scrcpy.pressBackOrTurnScreenOn(KeyEvent.ACTION_DOWN)
+                scrcpy.pressBackOrTurnScreenOn(KeyEvent.ACTION_UP)
+            }
+        }.onFailure { e ->
+            Log.w("FullscreenControlPage", "send back failed", e)
+        }
+    }
+
+    BackHandler(enabled = true) {
+        if (asBundle.fullscreenControlBackToDevice && currentSession != null)
+            taskScope.launch {
+                sendBackOrTurnScreenOn()
+            }
+        else onBack()
     }
 
     suspend fun refreshApps() {
