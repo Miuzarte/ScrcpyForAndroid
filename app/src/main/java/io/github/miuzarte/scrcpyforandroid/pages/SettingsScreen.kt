@@ -631,6 +631,16 @@ fun SettingsPage(
                         )
                     }
                 }
+                SwitchPreference(
+                    title = "全屏兼容模式",
+                    summary = "启用后全屏控制页不再跨 Activity，会导致画中画不可用",
+                    checked = asBundle.fullscreenCompatibilityMode,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(
+                            fullscreenCompatibilityMode = it
+                        )
+                    },
+                )
             }
         }
 

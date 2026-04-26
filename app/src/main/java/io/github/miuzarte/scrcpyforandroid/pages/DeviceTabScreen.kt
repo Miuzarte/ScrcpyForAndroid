@@ -133,6 +133,7 @@ internal fun DeviceTabScreen(
     bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
     onPreviewGestureLockChanged: (Boolean) -> Unit = {},
+    onOpenFullscreenCompat: () -> Unit = {},
 ) {
     val navigator = LocalRootNavigator.current
     var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
@@ -249,6 +250,7 @@ internal fun DeviceTabScreen(
                 bottomInnerPadding = bottomInnerPadding,
                 twoPaneSideToggleRequest = twoPaneSideToggleRequest,
                 onPreviewGestureLockChanged = onPreviewGestureLockChanged,
+                onOpenFullscreenCompat = onOpenFullscreenCompat,
                 onCompactTopAppBarChanged = ::setTopAppBarCompact,
                 onTwoPaneSideActionChanged = ::setTwoPaneSideAction,
             )
@@ -266,6 +268,7 @@ internal fun DeviceTabPage(
     bottomInnerPadding: Dp,
     twoPaneSideToggleRequest: Int = 0,
     onPreviewGestureLockChanged: (Boolean) -> Unit = {},
+    onOpenFullscreenCompat: () -> Unit = {},
     onCompactTopAppBarChanged: (Boolean) -> Unit = {},
     onTwoPaneSideActionChanged: (Boolean, Boolean) -> Unit = { _, _ -> },
 ) {
@@ -738,6 +741,14 @@ internal fun DeviceTabPage(
         }
     }
 
+    fun openFullscreenControl() {
+        if (asBundle.fullscreenCompatibilityMode) {
+            onOpenFullscreenCompat()
+        } else {
+            context.startActivity(StreamActivity.createIntent(context))
+        }
+    }
+
     suspend fun startScrcpySession(
         openFullscreen: Boolean = false,
         startAppOverride: String? = null,
@@ -768,7 +779,7 @@ internal fun DeviceTabPage(
             resolvedOptions.video &&
             resolvedOptions.videoPlayback
         ) withContext(Dispatchers.Main) {
-            context.startActivity(StreamActivity.createIntent(context))
+            openFullscreenControl()
         }
         if (resolvedOptions.disableScreensaver)
             AppScreenOn.acquire()
@@ -1201,9 +1212,7 @@ internal fun DeviceTabPage(
             sessionInfo = sessionInfo,
             onDisconnect = { adbCallbacks.onDisconnectCurrent(currentTarget) },
             showFullscreenAction = false,
-            onOpenFullscreen = {
-                context.startActivity(StreamActivity.createIntent(context))
-            },
+            onOpenFullscreen = ::openFullscreenControl,
         )
     }
 
@@ -1216,9 +1225,7 @@ internal fun DeviceTabPage(
             modifier = modifier,
             sessionInfo = sessionInfo,
             previewHeightDp = asBundle.devicePreviewCardHeightDp.coerceAtLeast(120),
-            onOpenFullscreen = {
-                context.startActivity(StreamActivity.createIntent(context))
-            },
+            onOpenFullscreen = ::openFullscreenControl,
             directControlEnabled = directControlEnabled,
             onInjectTouch = { action, pointerId, x, y, pressure, actionButton, buttons ->
                 val session = sessionInfo
@@ -1319,9 +1326,7 @@ internal fun DeviceTabPage(
             sessionInfo = sessionInfo,
             onDisconnect = { adbCallbacks.onDisconnectCurrent(currentTarget) },
             showFullscreenAction = canShowPreviewControls,
-            onOpenFullscreen = {
-                context.startActivity(StreamActivity.createIntent(context))
-            },
+            onOpenFullscreen = ::openFullscreenControl,
             reverseSideActions = asBundle.deviceTwoPaneConfigOnRight,
         )
     }

@@ -164,6 +164,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             intPreferencesKey("fullscreen_floating_button_ring_alpha_percent"),
             100,
         )
+        val FULLSCREEN_COMPATIBILITY_MODE = Pair(
+            booleanPreferencesKey("fullscreen_compatibility_mode"),
+            false,
+        )
 
         val FULLSCREEN_FLOATING_BUTTON_X_FRACTION = Pair(
             floatPreferencesKey("fullscreen_floating_button_x_fraction"),
@@ -304,6 +308,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val fullscreenFloatingButtonSizeDp: Int,
         val fullscreenFloatingButtonBackgroundAlphaPercent: Int,
         val fullscreenFloatingButtonRingAlphaPercent: Int,
+        val fullscreenCompatibilityMode: Boolean,
 
         val fullscreenFloatingButtonXFraction: Float,
         val fullscreenFloatingButtonYFraction: Float,
@@ -366,6 +371,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(FULLSCREEN_FLOATING_BUTTON_SIZE_DP) { it.fullscreenFloatingButtonSizeDp },
         bundleField(FULLSCREEN_FLOATING_BUTTON_BACKGROUND_ALPHA_PERCENT) { it.fullscreenFloatingButtonBackgroundAlphaPercent },
         bundleField(FULLSCREEN_FLOATING_BUTTON_RING_ALPHA_PERCENT) { it.fullscreenFloatingButtonRingAlphaPercent },
+        bundleField(FULLSCREEN_COMPATIBILITY_MODE) { it.fullscreenCompatibilityMode },
 
         bundleField(FULLSCREEN_FLOATING_BUTTON_X_FRACTION) { it.fullscreenFloatingButtonXFraction },
         bundleField(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION) { it.fullscreenFloatingButtonYFraction },
@@ -432,6 +438,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             preferences.read(FULLSCREEN_FLOATING_BUTTON_BACKGROUND_ALPHA_PERCENT),
         fullscreenFloatingButtonRingAlphaPercent =
             preferences.read(FULLSCREEN_FLOATING_BUTTON_RING_ALPHA_PERCENT),
+        fullscreenCompatibilityMode = preferences.read(FULLSCREEN_COMPATIBILITY_MODE),
 
         fullscreenFloatingButtonXFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_X_FRACTION),
         fullscreenFloatingButtonYFraction = preferences.read(FULLSCREEN_FLOATING_BUTTON_Y_FRACTION),
