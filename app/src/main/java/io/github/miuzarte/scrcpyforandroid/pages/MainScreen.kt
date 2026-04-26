@@ -2,7 +2,6 @@ package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.SystemClock
 import android.provider.OpenableColumns
@@ -51,9 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
@@ -299,7 +295,6 @@ fun MainScreen() {
         }
     }
 
-    val currentSession by scrcpy.currentSessionState.collectAsState()
     val deviceConnectionServices = remember(scrcpy) {
         val adbCoordinator = DeviceAdbConnectionCoordinator()
         val connectionStateStore = ConnectionStateStore()
@@ -678,45 +673,11 @@ fun MainScreen() {
         }
 
         entry(RootScreen.FullscreenControl) {
-            val lifecycleOwner = LocalLifecycleOwner.current
-            LaunchedEffect(currentSession) {
-                if (currentSession == null) rootNavigator.pop()
-            }
-            DisposableEffect(lifecycleOwner) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_STOP) {
-                        rootNavigator.pop()
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-                }
-            }
-            DisposableEffect(activity) {
-                onDispose {
-                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
-            }
-            FullscreenControlScreen(
+            FullscreenControlRoute(
                 scrcpy = scrcpy,
                 onBack = rootNavigator.pop,
                 isInPip = false,
-                onVideoSizeChanged = { width, height ->
-                    activity?.requestedOrientation =
-                        if (width >= height) {
-                            if (asBundle.fullscreenControlIgnoreSystemRotationLock)
-                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                            else
-                                ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
-                        } else {
-                            if (asBundle.fullscreenControlIgnoreSystemRotationLock)
-                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                            else
-                                ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
-                        }
-                },
-                onVideoBoundsInWindowChanged = {},
+                autoExitOnStop = true,
             )
         }
 
