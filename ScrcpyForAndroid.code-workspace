@@ -8,41 +8,41 @@
 			"name": "scrcpy",
 			"path": "../scrcpy"
 		},
-		{
-			"name": "miuix",
-			"path": "../miuix"
-		},
-		{
-			"name": "Reorderable",
-			"path": "../Reorderable"
-		},
-		{
-			"name": "shizuku",
-			"path": "../shizuku"
-		},
-		{
-			"name": "moonlight-android",
-			"path": "../moonlight-android"
-		},
-		{
-			"name": "KernelSU",
-			"path": "../KernelSU"
-		},
-		{
-			"name": "adblib",
-			"path": "../adblib"
-		},
-		{
-			"path": "../socialite"
-		},
-		{
-			"path": "../termux-app"
-		},
-		{
-			"path": "../termux-kotlin-app"
-		},
-		{
-			"path": "../Android-DataBackup"
-		}
+		// {
+		// 	"name": "miuix",
+		// 	"path": "../miuix"
+		// },
+		// {
+		// 	"name": "Reorderable",
+		// 	"path": "../Reorderable"
+		// },
+		// {
+		// 	"name": "shizuku",
+		// 	"path": "../shizuku"
+		// },
+		// {
+		// 	"name": "moonlight-android",
+		// 	"path": "../moonlight-android"
+		// },
+		// {
+		// 	"name": "KernelSU",
+		// 	"path": "../KernelSU"
+		// },
+		// {
+		// 	"name": "adblib",
+		// 	"path": "../adblib"
+		// },
+		// {
+		// 	"path": "../socialite"
+		// },
+		// {
+		// 	"path": "../termux-app"
+		// },
+		// {
+		// 	"path": "../termux-kotlin-app"
+		// },
+		// {
+		// 	"path": "../Android-DataBackup"
+		// },
 	],
 }
