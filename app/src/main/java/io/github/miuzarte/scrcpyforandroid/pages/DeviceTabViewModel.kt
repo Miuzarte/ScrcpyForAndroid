@@ -517,38 +517,8 @@ internal class DeviceTabViewModel(
         connectionController.connectWithTimeout(host, port, ADB_CONNECT_TIMEOUT_MS)
     }
 
-    fun applyConnectedDeviceCapabilities(sdkInt: Int, release: String) {
-        val profileId = connectedScrcpyProfileId.value
-        val currentBundle = resolveScrcpyBundle(profileId)
+    fun applyConnectedDeviceCapabilities(sdkInt: Int) {
         connectionController.applyConnectedDeviceCapabilities(sdkInt)
-
-        if (sdkInt in 0..<30 && currentBundle.audio) {
-            viewModelScope.launch {
-                if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID)
-                    scrcpyOptions.updateBundle { it.copy(audio = false) }
-                else
-                    scrcpyProfiles.updateBundle(profileId, currentBundle.copy(audio = false))
-            }
-            logEvent(
-                "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持音频转发，已自动关闭",
-                Log.WARN
-            )
-        }
-        if (sdkInt in 0..<31 && currentBundle.videoSource == "camera") {
-            viewModelScope.launch {
-                if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID)
-                    scrcpyOptions.updateBundle { it.copy(videoSource = "display") }
-                else
-                    scrcpyProfiles.updateBundle(
-                        profileId,
-                        currentBundle.copy(videoSource = "display")
-                    )
-            }
-            logEvent(
-                "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持 camera mirroring，已切换为 display",
-                Log.WARN
-            )
-        }
     }
 
     suspend fun handleAdbConnected(
@@ -562,7 +532,7 @@ internal class DeviceTabViewModel(
         val fullLabel =
             if (info.serial.isNotBlank()) "${info.model} (${info.serial})" else info.model
 
-        applyConnectedDeviceCapabilities(info.sdkInt, info.androidRelease)
+        applyConnectedDeviceCapabilities(info.sdkInt)
         _savedShortcuts.update {
             it.update(
                 host = host,

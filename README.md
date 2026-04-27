@@ -128,7 +128,15 @@
 - Android NDK `29.0.14206865`
 
 ```bash
+git clone --recursive https://github.com/Miuzarte/ScrcpyForAndroid.git
+cd ScrcpyForAndroid
 ./gradlew assembleDebug
+```
+
+已克隆但没有拉取子模块：
+
+```bash
+git submodule update --init --recursive
 ```
 
 specific abi:

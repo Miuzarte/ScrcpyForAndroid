@@ -34,6 +34,7 @@ google-services.json
 # Android Profiling
 *.hprof
 
+.claude/
 .kiro/
 
 .kotlin/

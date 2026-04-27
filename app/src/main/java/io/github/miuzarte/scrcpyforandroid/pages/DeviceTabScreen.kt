@@ -65,7 +65,7 @@ import io.github.miuzarte.scrcpyforandroid.widgets.AppListEntry
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTileList
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
-import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import io.github.miuzarte.scrcpyforandroid.widgets.PreviewCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
 import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
@@ -158,27 +158,30 @@ internal fun DeviceTabScreen(
                             onDismissRequest = { showThreePointMenu = false },
                         ) {
                             ListPopupColumn {
-                                PopupMenuItem(
+                                DropdownImpl(
                                     text = "快速设备排序",
                                     optionSize = 3,
+                                    isSelected = false,
                                     index = 0,
                                     onSelectedIndexChange = {
                                         onOpenReorderDevices()
                                         showThreePointMenu = false
                                     },
                                 )
-                                PopupMenuItem(
+                                DropdownImpl(
                                     text = "虚拟按钮排序",
                                     optionSize = 3,
+                                    isSelected = false,
                                     index = 1,
                                     onSelectedIndexChange = {
                                         navigator.push(RootScreen.VirtualButtonOrder)
                                         showThreePointMenu = false
                                     },
                                 )
-                                PopupMenuItem(
+                                DropdownImpl(
                                     text = "清空日志",
                                     optionSize = 3,
+                                    isSelected = false,
                                     index = 2,
                                     enabled = EventLogger.hasLogs(),
                                     onSelectedIndexChange = {
@@ -594,7 +597,6 @@ internal fun DeviceTabPage(
                     scope.launch(Dispatchers.IO) {
                         viewModel.refreshApps()
                     }
-
             },
             recentTasksEndActionText = when {
                 listingsRefreshBusy -> "..."
@@ -607,7 +609,6 @@ internal fun DeviceTabPage(
                     scope.launch(Dispatchers.IO) {
                         viewModel.refreshRecentTasks()
                     }
-
             },
             onOpenAdvanced = { navigator.push(RootScreen.Advanced) },
             onStartStopHaptic = haptic::contextClick,

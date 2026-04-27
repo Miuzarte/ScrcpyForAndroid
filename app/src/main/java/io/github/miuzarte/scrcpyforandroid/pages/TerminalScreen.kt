@@ -59,7 +59,7 @@ import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -144,9 +144,10 @@ fun TerminalScreen(
                                 onDismissRequest = { showMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "自由复制",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 0,
                                         enabled = output.isNotBlank(),
                                         onSelectedIndexChange = {
@@ -154,9 +155,10 @@ fun TerminalScreen(
                                             showOutputSheet = true
                                         },
                                     )
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "清屏",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 1,
                                         onSelectedIndexChange = {
                                             showMenu = false

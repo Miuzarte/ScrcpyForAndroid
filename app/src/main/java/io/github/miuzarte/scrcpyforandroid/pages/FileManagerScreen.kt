@@ -65,9 +65,8 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdown
-import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdownGroup
-import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -538,41 +537,47 @@ fun FileManagerScreen(
                                 onDismissRequest = { showSortMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    MultiGroupsDropdown(
-                                        groups = listOf(
-                                            MultiGroupsDropdownGroup(
-                                                options = listOf(
-                                                    "文件名",
-                                                    "大小",
-                                                    "时间",
-                                                    "扩展名"
-                                                ),
-                                                selectedIndex = when (sortField) {
-                                                    FileManagerSortField.NAME -> 0
-                                                    FileManagerSortField.SIZE -> 1
-                                                    FileManagerSortField.TIME -> 2
-                                                    FileManagerSortField.EXTENSION -> 3
-                                                },
-                                                onSelectedIndexChange = { index ->
-                                                    updateSort(
-                                                        sortBy = when (index) {
-                                                            1 -> FileManagerSortField.SIZE
-                                                            2 -> FileManagerSortField.TIME
-                                                            3 -> FileManagerSortField.EXTENSION
-                                                            else -> FileManagerSortField.NAME
-                                                        }
-                                                    )
-                                                },
-                                            ),
-                                            MultiGroupsDropdownGroup(
-                                                options = listOf("正序", "倒序"),
-                                                selectedIndex = if (sortDescending) 1 else 0,
-                                                onSelectedIndexChange = { index ->
-                                                    updateSort(descending = index == 1)
-                                                },
-                                            ),
-                                        ),
-                                    )
+                                    // sort field group
+                                    val sortOptions = listOf("文件名", "大小", "时间", "扩展名")
+                                    val sortFieldIdx = when (sortField) {
+                                        FileManagerSortField.NAME -> 0
+                                        FileManagerSortField.SIZE -> 1
+                                        FileManagerSortField.TIME -> 2
+                                        FileManagerSortField.EXTENSION -> 3
+                                    }
+                                    sortOptions.forEachIndexed { i, option ->
+                                        DropdownImpl(
+                                            text = option,
+                                            optionSize = sortOptions.size,
+                                            isSelected = i == sortFieldIdx,
+                                            index = i,
+                                            onSelectedIndexChange = { index ->
+                                                updateSort(
+                                                    sortBy = when (index) {
+                                                        1 -> FileManagerSortField.SIZE
+                                                        2 -> FileManagerSortField.TIME
+                                                        3 -> FileManagerSortField.EXTENSION
+                                                        else -> FileManagerSortField.NAME
+                                                    }
+                                                )
+                                            },
+                                        )
+                                    }
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                                    // sort direction group
+                                    val dirOptions = listOf("正序", "倒序")
+                                    val dirIdx = if (sortDescending) 1 else 0
+                                    dirOptions.forEachIndexed { i, option ->
+                                        DropdownImpl(
+                                            text = option,
+                                            optionSize = dirOptions.size,
+                                            isSelected = i == dirIdx,
+                                            index = i,
+                                            onSelectedIndexChange = { index ->
+                                                updateSort(descending = index == 1)
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -593,18 +598,20 @@ fun FileManagerScreen(
                                 onDismissRequest = { showMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "创建文件夹",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 0,
                                         onSelectedIndexChange = {
                                             showMenu = false
                                             openCreateFolderDialog()
                                         },
                                     )
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "上传文件到该目录",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 1,
                                         onSelectedIndexChange = {
                                             showMenu = false
