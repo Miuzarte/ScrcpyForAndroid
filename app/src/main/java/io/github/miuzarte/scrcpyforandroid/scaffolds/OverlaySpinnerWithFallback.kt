@@ -50,7 +50,9 @@ fun OverlaySpinnerWithFallback(
         buildList {
             addAll(items)
             if (fallbackActive) {
-                add(SpinnerEntry(title = overrideEndActionValue!!))
+                add(
+                    SpinnerEntry(title = overrideEndActionValue)
+                )
             }
             if (dataLoading) {
                 add(

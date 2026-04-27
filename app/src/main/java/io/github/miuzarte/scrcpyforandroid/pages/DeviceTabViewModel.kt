@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
@@ -64,8 +65,6 @@ internal class DeviceTabViewModel(
     private val connectionStateStore = connectionServices.connectionStateStore
     private val connectionController = connectionServices.connectionController
     private val autoReconnectManager = connectionServices.autoReconnectManager
-
-    private val taskScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _asBundle = MutableStateFlow(appSettings.bundleState.value)
     val asBundle: StateFlow<AppSettings.Bundle> = _asBundle.asStateFlow()
@@ -297,11 +296,10 @@ internal class DeviceTabViewModel(
     }
 
     override fun onCleared() {
-        taskScope.launch {
+        runBlocking(Dispatchers.IO) {
             appSettings.saveBundle(_asBundle.value)
             quickDevices.saveBundle(_qdBundle.value)
         }
-        taskScope.cancel()
     }
 
     fun resolveScrcpyBundle(profileId: String): ScrcpyOptions.Bundle {

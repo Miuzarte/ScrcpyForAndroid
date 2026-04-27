@@ -1,6 +1,3 @@
-[submodule "miuix-submodule"]
-	path = miuix-submodule
-	url = https://github.com/compose-miuix-ui/miuix.git
 [submodule "submodule/miuix"]
 	path = submodule/miuix
 	url = https://github.com/compose-miuix-ui/miuix.git
