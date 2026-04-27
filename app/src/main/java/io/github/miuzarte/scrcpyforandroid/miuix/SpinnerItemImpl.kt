@@ -47,11 +47,13 @@ fun SpinnerItemImpl(
             MiuixTheme.colorScheme.disabledOnSecondaryVariant,
             spinnerColors.containerColor,
         )
+
         isSelected -> Triple(
             spinnerColors.selectedContentColor,
             spinnerColors.selectedSummaryColor,
             spinnerColors.selectedContainerColor,
         )
+
         else -> Triple(
             spinnerColors.contentColor,
             spinnerColors.summaryColor,
@@ -91,7 +93,11 @@ fun SpinnerItemImpl(
             horizontalArrangement = Arrangement.Start,
         ) {
             entry.icon?.let {
-                it(Modifier.sizeIn(minWidth = 26.dp, minHeight = 26.dp).padding(end = 12.dp))
+                it(
+                    Modifier
+                        .sizeIn(minWidth = 26.dp, minHeight = 26.dp)
+                        .padding(end = 12.dp),
+                )
             }
             Column {
                 entry.title?.let {

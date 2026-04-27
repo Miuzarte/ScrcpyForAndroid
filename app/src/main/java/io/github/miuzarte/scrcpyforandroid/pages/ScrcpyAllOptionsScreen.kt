@@ -46,13 +46,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.Crop
 import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.NewDisplay
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
+import io.github.miuzarte.scrcpyforandroid.scaffolds.OverlaySpinnerWithFallback
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
-import io.github.miuzarte.scrcpyforandroid.scaffolds.OverlaySpinnerWithFallback
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
@@ -92,7 +93,6 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHost
-import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -105,7 +105,6 @@ import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
