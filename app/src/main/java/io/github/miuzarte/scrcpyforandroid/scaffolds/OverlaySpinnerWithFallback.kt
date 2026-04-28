@@ -51,7 +51,10 @@ fun OverlaySpinnerWithFallback(
             addAll(items)
             if (fallbackActive) {
                 add(
-                    SpinnerEntry(title = overrideEndActionValue)
+                    SpinnerEntry(
+                        title = overrideEndActionValue,
+                        enabled = true, // 保持启用以显示蓝色而非灰色
+                    )
                 )
             }
             if (dataLoading) {

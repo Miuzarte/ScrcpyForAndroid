@@ -787,26 +787,30 @@ internal class DeviceTabViewModel(
         if (_keepAliveLoopStarted) return
         _keepAliveLoopStarted = true
         viewModelScope.launch {
-            autoReconnectManager.runKeepAliveLoop(
-                isForeground = { _isAppInForeground.value },
-                intervalMs = ADB_KEEPALIVE_INTERVAL_MS,
-                connectTimeoutMs = ADB_CONNECT_TIMEOUT_MS,
-                keepAliveTimeoutMs = ADB_KEEPALIVE_TIMEOUT_MS,
-                onReconnectSuccess = { host, port ->
-                    logEvent("ADB 自动重连成功: $host:$port")
-                    snackbar("ADB 自动重连成功")
-                },
-                onReconnectFailure = { error ->
-                    viewModelScope.launch {
-                        disconnectAdbConnection(
-                            cause = DisconnectCause.KeepAliveFailed,
-                            statusLine = "ADB 连接断开"
-                        )
-                    }
-                    logEvent("ADB 自动重连失败: $error", Log.ERROR)
-                    snackbar("ADB 自动重连失败")
-                },
-            )
+            try {
+                autoReconnectManager.runKeepAliveLoop(
+                    isForeground = { _isAppInForeground.value },
+                    intervalMs = ADB_KEEPALIVE_INTERVAL_MS,
+                    connectTimeoutMs = ADB_CONNECT_TIMEOUT_MS,
+                    keepAliveTimeoutMs = ADB_KEEPALIVE_TIMEOUT_MS,
+                    onReconnectSuccess = { host, port ->
+                        logEvent("ADB 自动重连成功: $host:$port")
+                        snackbar("ADB 自动重连成功")
+                    },
+                    onReconnectFailure = { error ->
+                        viewModelScope.launch {
+                            disconnectAdbConnection(
+                                cause = DisconnectCause.KeepAliveFailed,
+                                statusLine = "ADB 连接断开"
+                            )
+                        }
+                        logEvent("ADB 自动重连失败: $error", Log.ERROR)
+                        snackbar("ADB 自动重连失败")
+                    },
+                )
+            } finally {
+                _keepAliveLoopStarted = false
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.storage
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -93,10 +94,11 @@ class BundleSyncDelegate<T>(
 fun <T> rememberBundleState(
     sharedFlow: StateFlow<T>,
     save: suspend (T) -> Unit,
-): T {
+): MutableState<T> {
     val shared by sharedFlow.collectAsState()
     val sharedLatest by rememberUpdatedState(shared)
-    var local by rememberSaveable(shared) { mutableStateOf(shared) }
+    val state = rememberSaveable(shared) { mutableStateOf(shared) }
+    var local by state
     val localLatest by rememberUpdatedState(local)
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
@@ -116,5 +118,5 @@ fun <T> rememberBundleState(
         }
     }
 
-    return local
+    return state
 }
