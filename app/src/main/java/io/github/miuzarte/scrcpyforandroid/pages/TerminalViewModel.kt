@@ -1,7 +1,9 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.content.Context
-import android.graphics.Typeface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.termux.terminal.KeyHandler
@@ -26,7 +28,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.SnackbarResult
-import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.math.roundToInt
 
@@ -72,7 +73,7 @@ internal class TerminalViewModel : ViewModel() {
         val stream = shellStream
         if (stream == null || !_shellReady.value || stream.closed) return
         val payload = data.copyOfRange(offset, offset + count)
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
                 shellWriteMutex.withLock {
                     stream.outputStream.write(payload)
@@ -95,12 +96,14 @@ internal class TerminalViewModel : ViewModel() {
         }
     }
 
-    var ctrlLatched: Boolean = false
-    var altLatched: Boolean = false
-    var pendingLatchedConsume: Boolean = false
+    var ctrlLatched by mutableStateOf(false)
+    var altLatched by mutableStateOf(false)
+    var pendingLatchedConsume by mutableStateOf(false)
 
     fun consumeLatchedVisualState() {
-        ctrlLatched = false; altLatched = false; pendingLatchedConsume = false
+        ctrlLatched = false
+        altLatched = false
+        pendingLatchedConsume = false
     }
 
     fun writeLiteralKey(text: String) {
@@ -111,7 +114,9 @@ internal class TerminalViewModel : ViewModel() {
         if (altLatched) {
             payload = "$payload"
         }
-        ctrlLatched = false; altLatched = false; pendingLatchedConsume = false
+        ctrlLatched = false
+        altLatched = false
+        pendingLatchedConsume = false
         val bytes = payload.toByteArray(StandardCharsets.UTF_8)
         writeBytesToShell(bytes, 0, bytes.size)
     }
@@ -121,7 +126,9 @@ internal class TerminalViewModel : ViewModel() {
         var modifiers = 0
         if (ctrlLatched) modifiers = modifiers or KeyHandler.KEYMOD_CTRL
         if (altLatched) modifiers = modifiers or KeyHandler.KEYMOD_ALT
-        ctrlLatched = false; altLatched = false; pendingLatchedConsume = false
+        ctrlLatched = false
+        altLatched = false
+        pendingLatchedConsume = false
         val sequence = KeyHandler.getCode(
             keyCode, modifiers,
             session.emulator.isCursorKeysApplicationMode(),
@@ -159,9 +166,9 @@ internal class TerminalViewModel : ViewModel() {
             return
         }
         _shellConnecting.value = true
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val streamResult = runCatching {
-                withContext(Dispatchers.IO) { NativeAdbService.openShellStream("") }
+                NativeAdbService.openShellStream("")
             }
             val stream = streamResult.getOrElse { error ->
                 withContext(Dispatchers.Main) {
@@ -182,7 +189,7 @@ internal class TerminalViewModel : ViewModel() {
             val buffer = ByteArray(4096)
             try {
                 while (!stream.closed) {
-                    val count = withContext(Dispatchers.IO) { stream.inputStream.read(buffer) }
+                    val count = stream.inputStream.read(buffer)
                     if (count <= 0) break
                     withContext(Dispatchers.Main) {
                         sessionHolder[0]?.append(buffer, count)
@@ -200,6 +207,16 @@ internal class TerminalViewModel : ViewModel() {
                     _shellConnecting.value = false
                 }
             }
+        }
+    }
+
+    fun autoConnectIfNeeded(onFocus: () -> Unit) {
+        if (_shellReady.value || _shellConnecting.value) return
+        viewModelScope.launch {
+            val connected = runCatching {
+                withContext(Dispatchers.IO) { NativeAdbService.isConnected() }
+            }.getOrDefault(false)
+            if (connected) openShellSession(false, onFocus)
         }
     }
 

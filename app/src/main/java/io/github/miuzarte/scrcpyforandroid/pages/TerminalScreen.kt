@@ -74,7 +74,6 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
 
-private const val DEFAULT_TERMINAL_FONT_SIZE_SP = 14f
 private const val FONT_SCALE_STEP_THRESHOLD = 1.08f
 private const val LOG_TAG = "TerminalScreen"
 
@@ -204,8 +203,6 @@ private fun TerminalPage(
 
     val asBundle by viewModel.asBundle.collectAsState()
     val terminalFontSizeSp by viewModel.terminalFontSizeSp.collectAsState()
-    val shellReady by viewModel.shellReady.collectAsState()
-    val shellConnecting by viewModel.shellConnecting.collectAsState()
 
     val imeBottomDp = with(density) { WindowInsets.ime.getBottom(this).toDp() }
     var pinchGestureLock by remember { mutableStateOf(false) }
@@ -226,7 +223,10 @@ private fun TerminalPage(
             shellWriter = { data, offset, count ->
                 viewModel.writeBytesToShell(data, offset, count)
             },
-            onScreenUpdated = { viewModel.syncOutput { onOutputChange(it) } },
+            onScreenUpdated = {
+                viewModel.syncOutput { onOutputChange(it) }
+                terminalView?.onScreenUpdated()
+            },
             onCopyTextToClipboardRequested = { text ->
                 LocalInputService.setClipboardText(context, text)
                 snackbar.show("已复制到剪贴板")
@@ -430,11 +430,7 @@ private fun TerminalPage(
             return@LaunchedEffect
         }
         customTypeface = loadTerminalTypeface(context)
-        if (!shellReady && !shellConnecting) {
-            val connected = runCatching { NativeAdbService.isConnected() }
-                .getOrDefault(false)
-            if (connected) openShellSession(false)
-        }
+        viewModel.autoConnectIfNeeded(::requestTerminalFocus)
     }
 
     // theme changes
