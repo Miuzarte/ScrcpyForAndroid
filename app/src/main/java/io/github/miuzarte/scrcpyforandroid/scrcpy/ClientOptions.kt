@@ -18,7 +18,6 @@ data class ClientOptions(
     // --crop=width:height:x:y
     var crop: String = "", // to server
 
-    // TODO: implement
     // --record
     var recordFilename: String = "",
 

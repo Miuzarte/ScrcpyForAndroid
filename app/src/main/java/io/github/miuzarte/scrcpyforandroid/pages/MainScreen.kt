@@ -314,6 +314,11 @@ fun MainScreen() {
             autoReconnectManager = autoReconnectManager,
         )
     }
+
+    val deviceTabViewModelFactory = remember(scrcpy, deviceConnectionServices) {
+        DeviceTabViewModel.Factory(scrcpy, deviceConnectionServices)
+    }
+
     DisposableEffect(deviceConnectionServices) {
         onDispose {
             deviceConnectionServices.autoReconnectManager.close()
@@ -568,9 +573,8 @@ fun MainScreen() {
                             saveableStateHolder.SaveableStateProvider(tab.name) {
                                 when (tab) {
                                     MainBottomTabDestination.Devices -> DeviceTabScreen(
+                                        viewModelFactory = deviceTabViewModelFactory,
                                         scrollBehavior = devicesPageScrollBehavior,
-                                        scrcpy = scrcpy,
-                                        connectionServices = deviceConnectionServices,
                                         bottomInnerPadding = bottomInnerPadding,
                                         onOpenReorderDevices = { showReorderDevices = true },
                                         onPreviewGestureLockChanged = { locked ->

@@ -51,8 +51,6 @@ import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.MonetKeyColorOptions
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdownGroup
-import io.github.miuzarte.scrcpyforandroid.widgets.MultiGroupsDropdownPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,6 +58,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -481,12 +481,11 @@ fun SettingsPage(
                 )
                 AnimatedVisibility(asBundle.showFullscreenVirtualButtons) {
                     Column {
-                        MultiGroupsDropdownPreference(
-                            title = "虚拟按钮方向",
-                            summary = fullscreenVirtualButtonDock.summary,
-                            groups = listOf(
-                                MultiGroupsDropdownGroup(
-                                    options = FullscreenVirtualButtonDock.modeItems,
+                        OverlayDropdownPreference(
+                            entries = listOf(
+                                DropdownEntry(
+                                    items = FullscreenVirtualButtonDock
+                                        .modeItems.map { DropdownItem(it) },
                                     selectedIndex = fullscreenVirtualButtonDock.modeIndex,
                                     onSelectedIndexChange = { modeIndex ->
                                         asBundle = asBundle.copy(
@@ -499,8 +498,9 @@ fun SettingsPage(
                                         )
                                     },
                                 ),
-                                MultiGroupsDropdownGroup(
-                                    options = FullscreenVirtualButtonDock.directionItems,
+                                DropdownEntry(
+                                    items = FullscreenVirtualButtonDock
+                                        .directionItems.map { DropdownItem(it) },
                                     selectedIndex = fullscreenVirtualButtonDock.directionIndex,
                                     onSelectedIndexChange = { directionIndex ->
                                         asBundle = asBundle.copy(
@@ -514,6 +514,8 @@ fun SettingsPage(
                                     },
                                 ),
                             ),
+                            title = "虚拟按钮方向",
+                            summary = fullscreenVirtualButtonDock.summary,
                         )
                         SuperSlider(
                             title = "虚拟按钮高度",

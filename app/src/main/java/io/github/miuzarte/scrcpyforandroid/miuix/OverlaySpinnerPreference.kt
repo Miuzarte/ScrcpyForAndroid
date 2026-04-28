@@ -1,4 +1,4 @@
-package io.github.miuzarte.scrcpyforandroid.scaffolds
+package io.github.miuzarte.scrcpyforandroid.miuix
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,14 +26,17 @@ import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.SpinnerColors
 import top.yukonga.miuix.kmp.basic.SpinnerDefaults
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
-import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/**
+ * Copy of miuix [OverlaySpinnerPreference] (popup mode) using our custom
+ * [SpinnerEntry] with per-item [SpinnerEntry.enabled] passed through to
+ * [SpinnerItemImpl].
+ */
 @Composable
-fun SuperSpinner(
+fun OverlaySpinnerPreference(
     items: List<SpinnerEntry>,
     selectedIndex: Int,
     title: String,
@@ -49,21 +52,26 @@ fun SuperSpinner(
     enabled: Boolean = true,
     showValue: Boolean = true,
     renderInRootScaffold: Boolean = true,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     onSelectedIndexChange: ((Int) -> Unit)? = null,
-    overrideEndActionValue: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isDropdownExpanded = rememberSaveable { mutableStateOf(false) }
     val isHoldDown = remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-    val hapticLatest by rememberUpdatedState(haptic)
+    val hapticFeedback = LocalHapticFeedback.current
+    val currentHapticFeedback by rememberUpdatedState(hapticFeedback)
+    val currentOnExpandedChange = rememberUpdatedState(onExpandedChange)
+    val setExpanded: (Boolean) -> Unit = remember {
+        { expanded ->
+            if (isDropdownExpanded.value != expanded) {
+                isDropdownExpanded.value = expanded
+                currentOnExpandedChange.value?.invoke(expanded)
+            }
+        }
+    }
 
     val itemsNotEmpty = items.isNotEmpty()
     val actualEnabled = enabled && itemsNotEmpty
-    val forceOverrideValue = overrideEndActionValue != null
-    val endActionText = overrideEndActionValue
-        ?.takeIf { it.isNotBlank() }
-        ?: if (showValue && itemsNotEmpty) items[selectedIndex].title.orEmpty() else null
 
     val actionColor = if (actualEnabled) {
         MiuixTheme.colorScheme.onSurfaceVariantActions
@@ -74,10 +82,10 @@ fun SuperSpinner(
     val handleClick = remember(actualEnabled) {
         {
             if (actualEnabled) {
-                isDropdownExpanded.value = !isDropdownExpanded.value
+                setExpanded(!isDropdownExpanded.value)
                 if (isDropdownExpanded.value) {
                     isHoldDown.value = true
-                    hapticLatest.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    currentHapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
                 }
             }
         }
@@ -93,9 +101,9 @@ fun SuperSpinner(
         summaryColor = summaryColor,
         startAction = startAction,
         endActions = {
-            if (endActionText != null) {
+            if (showValue && itemsNotEmpty) {
                 Text(
-                    text = endActionText,
+                    text = items[selectedIndex].title ?: "",
                     modifier = Modifier
                         .padding(end = 8.dp)
                         .align(Alignment.CenterVertically)
@@ -105,22 +113,19 @@ fun SuperSpinner(
                     textAlign = TextAlign.End,
                 )
             }
-            DropdownArrowEndAction(
-                actionColor = actionColor,
-            )
+            DropdownArrowEndAction(actionColor = actionColor)
             if (itemsNotEmpty) {
-                SuperSpinnerPopup(
+                OverlaySpinnerPopup(
                     items = items,
                     selectedIndex = selectedIndex,
                     isDropdownExpanded = isDropdownExpanded.value,
-                    onDismiss = { isDropdownExpanded.value = false },
+                    onDismiss = { setExpanded(false) },
                     onDismissFinished = { isHoldDown.value = false },
                     maxHeight = maxHeight,
-                    hapticFeedback = haptic,
+                    hapticFeedback = hapticFeedback,
                     spinnerColors = spinnerColors,
                     renderInRootScaffold = renderInRootScaffold,
                     onSelectedIndexChange = onSelectedIndexChange,
-                    forceNoSelectedState = forceOverrideValue,
                 )
             }
         },
@@ -132,7 +137,7 @@ fun SuperSpinner(
 }
 
 @Composable
-private fun SuperSpinnerPopup(
+private fun OverlaySpinnerPopup(
     items: List<SpinnerEntry>,
     selectedIndex: Int,
     isDropdownExpanded: Boolean,
@@ -143,14 +148,13 @@ private fun SuperSpinnerPopup(
     spinnerColors: SpinnerColors,
     renderInRootScaffold: Boolean,
     onSelectedIndexChange: ((Int) -> Unit)?,
-    forceNoSelectedState: Boolean,
 ) {
-    val haptic = LocalHapticFeedback.current
     val onSelectState = rememberUpdatedState(onSelectedIndexChange)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
+    val currentHapticFeedback by rememberUpdatedState(hapticFeedback)
     val onItemSelected: (Int) -> Unit = remember {
         { selectedIdx ->
-            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+            currentHapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
             onSelectState.value?.invoke(selectedIdx)
             currentOnDismiss()
         }
@@ -169,10 +173,11 @@ private fun SuperSpinnerPopup(
                     SpinnerItemImpl(
                         entry = spinnerEntry,
                         entryCount = items.size,
-                        isSelected = !forceNoSelectedState && selectedIndex == index,
+                        isSelected = selectedIndex == index,
                         index = index,
                         spinnerColors = spinnerColors,
                         dialogMode = false,
+                        enabled = spinnerEntry.enabled,
                         onSelectedIndexChange = onItemSelected,
                     )
                 }

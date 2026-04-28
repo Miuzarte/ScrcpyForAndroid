@@ -46,13 +46,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.Crop
 import io.github.miuzarte.scrcpyforandroid.models.ScrcpyOptions.NewDisplay
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
+import io.github.miuzarte.scrcpyforandroid.scaffolds.OverlaySpinnerWithFallback
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
-import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSpinner
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
@@ -92,7 +93,6 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHost
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -105,7 +105,6 @@ import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
@@ -257,9 +256,10 @@ internal fun ScrcpyAllOptionsScreen(
                                 onDismissRequest = { showProfileMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    ProfileMenuPopupItem(
+                                    DropdownImpl(
                                         text = "管理配置",
                                         optionSize = 1,
+                                        isSelected = false,
                                         index = 0,
                                         onSelectedIndexChange = {
                                             showManageProfilesSheet = true
@@ -516,9 +516,7 @@ internal fun ScrcpyAllOptionsPage(
         (displays.indexOfFirst { it.id == soBundle.displayId } + 1).coerceAtLeast(0)
     }
     val displayOverrideEndActionValue = remember(
-        displays,
-        listRefreshVersion,
-        soBundle.displayId,
+        displays, listRefreshVersion, soBundle.displayId,
     ) {
         if (displays.isEmpty() && soBundle.displayId >= 0) soBundle.displayId.toString()
         else null
@@ -550,9 +548,7 @@ internal fun ScrcpyAllOptionsPage(
         (cameras.indexOfFirst { it.id == soBundle.cameraId } + 1).coerceAtLeast(0)
     }
     val cameraOverrideEndActionValue = remember(
-        cameras,
-        listRefreshVersion,
-        soBundle.cameraId,
+        cameras, listRefreshVersion, soBundle.cameraId,
     ) {
         if (cameras.isEmpty() && soBundle.cameraId.isNotBlank()) soBundle.cameraId
         else null
@@ -601,11 +597,8 @@ internal fun ScrcpyAllOptionsPage(
         }
     }
     val cameraSizeOverrideEndActionValue = remember(
-        cameraSizes,
-        listRefreshVersion,
-        soBundle.cameraSize,
-        soBundle.cameraSizeCustom,
-        soBundle.cameraSizeUseCustom,
+        cameraSizes, listRefreshVersion,
+        soBundle.cameraSize, soBundle.cameraSizeCustom, soBundle.cameraSizeUseCustom,
     ) {
         when {
             cameraSizes.isNotEmpty() -> null
@@ -689,9 +682,7 @@ internal fun ScrcpyAllOptionsPage(
             .coerceAtLeast(0)
     }
     val videoEncoderOverrideEndActionValue = remember(
-        videoEncoders,
-        listRefreshVersion,
-        soBundle.videoEncoder,
+        videoEncoders, listRefreshVersion, soBundle.videoEncoder,
     ) {
         if (videoEncoders.isEmpty() && soBundle.videoEncoder.isNotBlank()) soBundle.videoEncoder
         else null
@@ -722,9 +713,7 @@ internal fun ScrcpyAllOptionsPage(
             .coerceAtLeast(0)
     }
     val audioEncoderOverrideEndActionValue = remember(
-        audioEncoders,
-        listRefreshVersion,
-        soBundle.audioEncoder,
+        audioEncoders, listRefreshVersion, soBundle.audioEncoder,
     ) {
         if (audioEncoders.isEmpty() && soBundle.audioEncoder.isNotBlank()) soBundle.audioEncoder
         else null
@@ -792,13 +781,12 @@ internal fun ScrcpyAllOptionsPage(
         }
     }
     val startAppOverrideEndActionValue = remember(
-        apps,
-        listRefreshVersion,
-        soBundle.startApp,
+        apps, listRefreshVersion, soBundle.startApp,
     ) {
         if (apps.isEmpty() && soBundle.startApp.isNotBlank()) soBundle.startApp
         else null
     }
+
     var startAppCustomInput by rememberSaveable(soBundle.startAppCustom) {
         mutableStateOf(soBundle.startAppCustom)
     }
@@ -1204,30 +1192,29 @@ internal fun ScrcpyAllOptionsPage(
                 )
                 AnimatedVisibility(soBundle.videoSource == "display") {
                     Column {
-                        ArrowPreference(
-                            title = "获取 Displays",
-                            summary = "--list-displays",
-                            onClick = {
-                                if (refreshBusy) return@ArrowPreference
-                                scope.launch {
-                                    snackbar.show("获取中")
-                                    try {
-                                        withContext(Dispatchers.IO) {
-                                            scrcpy.listings.getDisplays(forceRefresh = true)
-                                        }
-                                        snackbar.show("获取成功")
-                                    } catch (e: Exception) {
-                                        snackbar.show("刷新失败: ${e.message}")
-                                    }
-                                }
-                            },
-                        )
-                        SuperSpinner(
+                        OverlaySpinnerWithFallback(
                             title = "监视器 ID",
                             summary = "--display-id",
                             items = displaySpinnerItems,
                             selectedIndex = displayDropdownIndex,
+                            dataLoaded = displays.isNotEmpty(),
+                            dataLoading = refreshBusy,
                             overrideEndActionValue = displayOverrideEndActionValue,
+                            onExpandedChange = { expanded ->
+                                if (expanded && displays.isEmpty()) {
+                                    scope.launch {
+                                        snackbar.show("获取中")
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                scrcpy.listings.getDisplays(forceRefresh = false)
+                                            }
+                                            snackbar.show("获取成功")
+                                        } catch (e: Exception) {
+                                            snackbar.show("刷新失败: ${e.message}")
+                                        }
+                                    }
+                                }
+                            },
                             onSelectedIndexChange = {
                                 soBundle = soBundle.copy(
                                     displayId =
@@ -1301,30 +1288,29 @@ internal fun ScrcpyAllOptionsPage(
                 }
                 AnimatedVisibility(soBundle.videoSource == "camera") {
                     Column {
-                        ArrowPreference(
-                            title = "获取 Cameras",
-                            summary = "--list-cameras",
-                            onClick = {
-                                if (refreshBusy) return@ArrowPreference
-                                scope.launch {
-                                    snackbar.show("获取中")
-                                    try {
-                                        withContext(Dispatchers.IO) {
-                                            scrcpy.listings.getCameras(forceRefresh = true)
-                                        }
-                                        snackbar.show("获取成功")
-                                    } catch (e: Exception) {
-                                        snackbar.show("刷新失败: ${e.message}")
-                                    }
-                                }
-                            },
-                        )
-                        SuperSpinner(
+                        OverlaySpinnerWithFallback(
                             title = "摄像头 ID",
                             summary = "--camera-id",
                             items = cameraSpinnerItems,
                             selectedIndex = cameraDropdownIndex,
+                            dataLoaded = cameras.isNotEmpty(),
+                            dataLoading = refreshBusy,
                             overrideEndActionValue = cameraOverrideEndActionValue,
+                            onExpandedChange = { expanded ->
+                                if (expanded && cameras.isEmpty()) {
+                                    scope.launch {
+                                        snackbar.show("获取中")
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                scrcpy.listings.getCameras(forceRefresh = false)
+                                            }
+                                            snackbar.show("获取成功")
+                                        } catch (e: Exception) {
+                                            snackbar.show("刷新失败: ${e.message}")
+                                        }
+                                    }
+                                }
+                            },
                             onSelectedIndexChange = {
                                 soBundle = soBundle.copy(
                                     cameraId =
@@ -1346,30 +1332,29 @@ internal fun ScrcpyAllOptionsPage(
                                 )
                             },
                         )
-                        ArrowPreference(
-                            title = "获取 Camera Sizes",
-                            summary = "--list-camera-sizes",
-                            onClick = {
-                                if (refreshBusy) return@ArrowPreference
-                                scope.launch {
-                                    snackbar.show("获取中")
-                                    try {
-                                        withContext(Dispatchers.IO) {
-                                            scrcpy.listings.getCameraSizes(forceRefresh = true)
-                                        }
-                                        snackbar.show("获取成功")
-                                    } catch (e: Exception) {
-                                        snackbar.show("刷新失败: ${e.message}")
-                                    }
-                                }
-                            },
-                        )
-                        SuperSpinner(
+                        OverlaySpinnerWithFallback(
                             title = "摄像头分辨率",
                             summary = "--camera-size",
                             items = cameraSizeSpinnerItems,
                             selectedIndex = cameraSizeDropdownIndex,
+                            dataLoaded = cameraSizes.isNotEmpty(),
+                            dataLoading = refreshBusy,
                             overrideEndActionValue = cameraSizeOverrideEndActionValue,
+                            onExpandedChange = { expanded ->
+                                if (expanded && cameraSizes.isEmpty()) {
+                                    scope.launch {
+                                        snackbar.show("获取中")
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                scrcpy.listings.getCameraSizes(forceRefresh = false)
+                                            }
+                                            snackbar.show("获取成功")
+                                        } catch (e: Exception) {
+                                            snackbar.show("刷新失败: ${e.message}")
+                                        }
+                                    }
+                                }
+                            },
                             onSelectedIndexChange = {
                                 when (it) {
                                     0 -> {
@@ -1524,31 +1509,29 @@ internal fun ScrcpyAllOptionsPage(
 
         item {
             Card {
-                ArrowPreference(
-                    title = "获取编码器列表",
-                    summary = "--list-encoders",
-                    onClick = {
-                        if (refreshBusy) return@ArrowPreference
-                        scope.launch {
-                            snackbar.show("获取中")
-                            try {
-                                withContext(Dispatchers.IO) {
-                                    scrcpy.listings.getEncoders(forceRefresh = true)
-                                }
-                                snackbar.show("获取成功")
-                            } catch (e: Exception) {
-                                snackbar.show("刷新失败: ${e.message}")
-                            }
-                        }
-                    },
-                )
-                // TODO: 等 MIUIX 发版, 在 OverlaySpinnerPreference / OverlayDropdownPreference 支持展开状态回调后, 在展开时触发获取
-                SuperSpinner(
+                OverlaySpinnerWithFallback(
                     title = "视频编码器",
                     summary = "--video-encoder",
                     items = videoEncoderItems,
                     selectedIndex = videoEncoderIndex,
+                    dataLoaded = videoEncoders.isNotEmpty(),
+                    dataLoading = refreshBusy,
                     overrideEndActionValue = videoEncoderOverrideEndActionValue,
+                    onExpandedChange = { expanded ->
+                        if (expanded && videoEncoders.isEmpty()) {
+                            scope.launch {
+                                snackbar.show("获取中")
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        scrcpy.listings.getEncoders(forceRefresh = false)
+                                    }
+                                    snackbar.show("获取成功")
+                                } catch (e: Exception) {
+                                    snackbar.show("刷新失败: ${e.message}")
+                                }
+                            }
+                        }
+                    },
                     onSelectedIndexChange = {
                         soBundle = soBundle.copy(
                             videoEncoder =
@@ -1571,12 +1554,29 @@ internal fun ScrcpyAllOptionsPage(
                         .fillMaxWidth()
                         .padding(all = UiSpacing.Large),
                 )
-                SuperSpinner(
+                OverlaySpinnerWithFallback(
                     title = "音频编码器",
                     summary = "--audio-encoder",
                     items = audioEncoderItems,
                     selectedIndex = audioEncoderIndex,
+                    dataLoaded = audioEncoders.isNotEmpty(),
+                    dataLoading = refreshBusy,
                     overrideEndActionValue = audioEncoderOverrideEndActionValue,
+                    onExpandedChange = { expanded ->
+                        if (expanded && audioEncoders.isEmpty()) {
+                            scope.launch {
+                                snackbar.show("获取中")
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        scrcpy.listings.getEncoders(forceRefresh = false)
+                                    }
+                                    snackbar.show("获取成功")
+                                } catch (e: Exception) {
+                                    snackbar.show("刷新失败: ${e.message}")
+                                }
+                            }
+                        }
+                    },
                     onSelectedIndexChange = {
                         soBundle = soBundle.copy(
                             audioEncoder =
@@ -1734,30 +1734,29 @@ internal fun ScrcpyAllOptionsPage(
 
         if (soBundle.videoSource == "display") item {
             Card {
-                ArrowPreference(
-                    title = "获取应用列表",
-                    summary = "--list-apps",
-                    onClick = {
-                        if (refreshBusy) return@ArrowPreference
-                        scope.launch {
-                            snackbar.show("获取中")
-                            try {
-                                withContext(Dispatchers.IO) {
-                                    scrcpy.listings.getApps(forceRefresh = true)
-                                }
-                                snackbar.show("获取成功")
-                            } catch (e: Exception) {
-                                snackbar.show("刷新失败: ${e.message}")
-                            }
-                        }
-                    },
-                )
-                SuperSpinner(
+                OverlaySpinnerWithFallback(
                     title = "scrcpy 启动后打开应用",
                     summary = "--start-app",
                     items = appDropdownItems,
                     selectedIndex = appDropdownIndex,
+                    dataLoaded = apps.isNotEmpty(),
+                    dataLoading = refreshBusy,
                     overrideEndActionValue = startAppOverrideEndActionValue,
+                    onExpandedChange = { expanded ->
+                        if (expanded && apps.isEmpty()) {
+                            scope.launch {
+                                snackbar.show("获取中")
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        scrcpy.listings.getApps(forceRefresh = false)
+                                    }
+                                    snackbar.show("获取成功")
+                                } catch (e: Exception) {
+                                    snackbar.show("刷新失败: ${e.message}")
+                                }
+                            }
+                        }
+                    },
                     onSelectedIndexChange = {
                         when (it) {
                             0 -> {
@@ -2110,39 +2109,6 @@ internal fun ScrcpyAllOptionsPage(
 private enum class ProfileDialogMode {
     Create,
     Rename,
-}
-
-@Composable
-private fun ProfileMenuPopupItem(
-    text: String,
-    optionSize: Int,
-    index: Int,
-    enabled: Boolean = true,
-    onSelectedIndexChange: (Int) -> Unit,
-) {
-    if (enabled) {
-        DropdownImpl(
-            text = text,
-            optionSize = optionSize,
-            isSelected = false,
-            index = index,
-            onSelectedIndexChange = onSelectedIndexChange,
-        )
-        return
-    }
-
-    Text(
-        text = text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = UiSpacing.PopupHorizontal)
-            .padding(
-                top = if (index == 0) UiSpacing.PopupHorizontal else UiSpacing.PageItem,
-                bottom = if (index == optionSize - 1) UiSpacing.PopupHorizontal else UiSpacing.PageItem,
-            ),
-        color = colorScheme.disabledOnSecondaryVariant,
-        fontWeight = FontWeight.Medium,
-    )
 }
 
 @Composable

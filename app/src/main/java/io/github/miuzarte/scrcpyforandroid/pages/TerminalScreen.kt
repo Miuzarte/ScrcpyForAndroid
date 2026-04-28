@@ -29,7 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,38 +43,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.termux.terminal.KeyHandler
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.termux.terminal.TerminalSession
-import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
-import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
-import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
-import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import io.github.miuzarte.scrcpyforandroid.widgets.PopupMenuItem
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.SnackbarDuration
-import top.yukonga.miuix.kmp.basic.SnackbarResult
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -85,21 +70,14 @@ import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import java.io.File
-import java.nio.charset.StandardCharsets
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.roundToInt
 
-private const val DEFAULT_TERMINAL_FONT_SIZE_SP = 14f
-private const val MIN_TERMINAL_FONT_SIZE_SP = 1f
-private const val MAX_TERMINAL_FONT_SIZE_SP = 32f
 private const val FONT_SCALE_STEP_THRESHOLD = 1.08f
 private const val LOG_TAG = "TerminalScreen"
-private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 
-private fun terminalFontFile(context: android.content.Context): File {
-    return File(context.filesDir, TERMINAL_FONT_RELATIVE_PATH)
-}
+private fun terminalFontFile(context: android.content.Context) =
+    File(context.filesDir, "terminal/font.ttf")
 
 private fun loadTerminalTypeface(context: android.content.Context): Typeface? {
     val file = terminalFontFile(context)
@@ -113,6 +91,7 @@ fun TerminalScreen(
     isActive: Boolean,
     onTerminalGestureLockChanged: (Boolean) -> Unit,
 ) {
+    val viewModel: TerminalViewModel = viewModel()
     val context = LocalContext.current
     val snackbar = LocalSnackbarController.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
@@ -120,6 +99,10 @@ fun TerminalScreen(
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showOutputSheet by rememberSaveable { mutableStateOf(false) }
     var output by rememberSaveable { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        viewModel.snackbarEvents.collect { snackbar.show(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -144,9 +127,10 @@ fun TerminalScreen(
                                 onDismissRequest = { showMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "自由复制",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 0,
                                         enabled = output.isNotBlank(),
                                         onSelectedIndexChange = {
@@ -154,9 +138,10 @@ fun TerminalScreen(
                                             showOutputSheet = true
                                         },
                                     )
-                                    PopupMenuItem(
+                                    DropdownImpl(
                                         text = "清屏",
                                         optionSize = 2,
+                                        isSelected = false,
                                         index = 1,
                                         onSelectedIndexChange = {
                                             showMenu = false
@@ -174,9 +159,10 @@ fun TerminalScreen(
         Box(
             modifier =
                 if (blurActive) Modifier.layerBackdrop(blurBackdrop)
-                else Modifier,
+                else Modifier
         ) {
             TerminalPage(
+                viewModel = viewModel,
                 contentPadding = pagePadding,
                 bottomInnerPadding = bottomInnerPadding,
                 isActive = isActive,
@@ -184,7 +170,6 @@ fun TerminalScreen(
                 output = output,
                 onOutputChange = { output = it },
             )
-
             TerminalOutputBottomSheet(
                 show = showOutputSheet,
                 output = output,
@@ -202,6 +187,7 @@ fun TerminalScreen(
 @SuppressLint("ClickableViewAccessibility")
 @Composable
 private fun TerminalPage(
+    viewModel: TerminalViewModel,
     contentPadding: PaddingValues,
     bottomInnerPadding: Dp,
     isActive: Boolean,
@@ -213,151 +199,81 @@ private fun TerminalPage(
     val density = LocalDensity.current
     val snackbar = LocalSnackbarController.current
     val haptic = LocalHapticFeedback.current
-    val asBundleShared by appSettings.bundleState.collectAsState()
-    val uiScope = rememberCoroutineScope()
-    val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    val shellWriteMutex = remember { Mutex() }
-    var terminalFontSizeSp by rememberSaveable(asBundleShared.terminalFontSizeSp) {
-        mutableFloatStateOf(asBundleShared.terminalFontSizeSp)
-    }
-    var shellReady by remember { mutableStateOf(false) }
-    var shellConnecting by remember { mutableStateOf(false) }
-    var shellStream by remember { mutableStateOf<AdbSocketStream?>(null) }
-    var terminalView by remember { mutableStateOf<TerminalView?>(null) }
+
+    val asBundle by viewModel.asBundle.collectAsState()
+    val terminalFontSizeSp by viewModel.terminalFontSizeSp.collectAsState()
+
     val imeBottomDp = with(density) { WindowInsets.ime.getBottom(this).toDp() }
-    var ctrlLatched by rememberSaveable { mutableStateOf(false) }
-    var altLatched by rememberSaveable { mutableStateOf(false) }
-    var pendingLatchedConsume by remember { mutableStateOf(false) }
     var pinchGestureLock by remember { mutableStateOf(false) }
     var terminalTouchStartX by remember { mutableFloatStateOf(0f) }
     var terminalTouchStartY by remember { mutableFloatStateOf(0f) }
-    val terminalTouchSlop = remember(context) {
-        ViewConfiguration.get(context).scaledTouchSlop
-    }
+    val terminalTouchSlop = remember(context) { ViewConfiguration.get(context).scaledTouchSlop }
     var customTypeface by remember { mutableStateOf(loadTerminalTypeface(context)) }
-    val sessionHolder = remember { arrayOfNulls<TerminalSession>(1) }
+    var terminalView by remember { mutableStateOf<TerminalView?>(null) }
+
     val terminalSurfaceColorArgb = colorScheme.surface.toArgb()
     val terminalOnSurfaceColorArgb = colorScheme.onSurface.toArgb()
     val terminalCursorColorArgb =
         if (colorScheme.surface.luminance() < 0.5f) 0xffffffff.toInt()
         else 0xff000000.toInt()
 
-    LaunchedEffect(asBundleShared.terminalFontSizeSp) {
-        if (terminalFontSizeSp != asBundleShared.terminalFontSizeSp) {
-            terminalFontSizeSp = asBundleShared.terminalFontSizeSp
-        }
-    }
-
-    fun extractTranscript(session: TerminalSession): String {
-        val screen = session.emulator.getScreen()
-        return screen.getSelectedText(
-            selX1 = 0,
-            selY1 = -screen.activeTranscriptRows,
-            selX2 = session.emulator.mColumns,
-            selY2 = session.emulator.mRows - 1,
-            joinBackLines = false,
-            joinFullLines = false,
-        ).trim('\n')
-    }
-
-    fun syncOutput() {
-        val session = sessionHolder[0] ?: return
-        onOutputChange(extractTranscript(session))
-        terminalView?.onScreenUpdated()
-    }
-
-    fun writeBytesToShell(
-        data: ByteArray,
-        offset: Int,
-        count: Int,
-    ) {
-        val stream = shellStream
-        if (stream == null || !shellReady || stream.closed) {
-            return
-        }
-        val payload = data.copyOfRange(offset, offset + count)
-        taskScope.launch {
-            val result = runCatching {
-                shellWriteMutex.withLock {
-                    stream.outputStream.write(payload)
-                    stream.outputStream.flush()
-                }
-            }
-            withContext(Dispatchers.Main) {
-                result.onFailure { error ->
-                    snackbar.show("终端输入失败: ${error.message ?: error.javaClass.simpleName}")
-                }
-            }
-        }
-    }
-
-    fun writeClipboardToShell() {
-        val text = LocalInputService.getClipboardText(context)
-        if (!text.isNullOrBlank()) {
-            val bytes = text.toByteArray(StandardCharsets.UTF_8)
-            writeBytesToShell(bytes, 0, bytes.size)
-        }
-    }
-
     val terminalSession = remember {
         TerminalSession(
-            shellWriter = ::writeBytesToShell,
-            onScreenUpdated = ::syncOutput,
+            shellWriter = { data, offset, count ->
+                viewModel.writeBytesToShell(data, offset, count)
+            },
+            onScreenUpdated = {
+                viewModel.syncOutput { onOutputChange(it) }
+                terminalView?.onScreenUpdated()
+            },
             onCopyTextToClipboardRequested = { text ->
                 LocalInputService.setClipboardText(context, text)
-                uiScope.launch {
-                    snackbar.show("已复制到剪贴板")
-                }
+                snackbar.show("已复制到剪贴板")
             },
-            onPasteTextFromClipboardRequested = ::writeClipboardToShell,
+            onPasteTextFromClipboardRequested = { viewModel.writeClipboardToShell(context) },
             onBellRequested = {},
-        )
-    }
-    sessionHolder[0] = terminalSession
-
-    fun applyTerminalThemeColors() {
-        val colors = terminalSession.emulator.mColors.mCurrentColors
-        colors[TextStyle.COLOR_INDEX_BACKGROUND] = terminalSurfaceColorArgb
-        colors[TextStyle.COLOR_INDEX_FOREGROUND] = terminalOnSurfaceColorArgb
-        colors[TextStyle.COLOR_INDEX_CURSOR] = terminalCursorColorArgb
+        ).also { viewModel.sessionHolder[0] = it }
     }
 
-    fun updateTerminalFontSize(newValue: Float) {
-        val clamped = newValue.coerceIn(MIN_TERMINAL_FONT_SIZE_SP, MAX_TERMINAL_FONT_SIZE_SP)
-        if (clamped == terminalFontSizeSp) {
-            return
+    fun requestTerminalFocus() {
+        terminalView?.requestFocusFromTouch()
+        terminalView?.requestFocus()
+        terminalView?.post {
+            terminalView?.requestFocusFromTouch()
+            terminalView?.requestFocus()
+            terminalView?.let(LocalInputService::showSoftKeyboard)
         }
-        terminalFontSizeSp = clamped
-        terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
-        uiScope.launch {
-            val latest = appSettings.bundleState.value
-            if (latest.terminalFontSizeSp != clamped) {
-                appSettings.updateBundle {
-                    it.copy(terminalFontSizeSp = clamped)
-                }
-            }
+    }
+
+    fun openShellSession(showKeyboardAfterConnect: Boolean) {
+        viewModel.openShellSession(showKeyboardAfterConnect, ::requestTerminalFocus)
+    }
+
+    fun updateFontSize(newValue: Float) {
+        viewModel.updateTerminalFontSize(newValue) { clamped ->
+            terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
         }
     }
 
     fun showFontSizeSnackbar() {
-        uiScope.launch {
-            snackbar.hostState.newestSnackbarData()?.dismiss()
-            val result = snackbar.hostState.showSnackbar(
-                message = "终端字号 ${terminalFontSizeSp.roundToInt()}sp",
-                actionLabel = "恢复默认",
-                withDismissAction = true,
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                updateTerminalFontSize(DEFAULT_TERMINAL_FONT_SIZE_SP)
-            }
-        }
+        viewModel.launchFontSizeSnackbar(
+            fontSizeSp = terminalFontSizeSp,
+            hostState = snackbar.hostState,
+            onReset = { clamped ->
+                terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
+            },
+        )
     }
 
-    fun handleTerminalTouchInterception(
-        view: TerminalView,
-        event: MotionEvent,
-    ): Boolean {
+    fun applyTheme() {
+        viewModel.applyTerminalThemeColors(
+            terminalSurfaceColorArgb,
+            terminalOnSurfaceColorArgb,
+            terminalCursorColorArgb,
+        )
+    }
+
+    fun handleTerminalTouchInterception(view: TerminalView, event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 terminalTouchStartX = event.x
@@ -384,7 +300,6 @@ private fun TerminalPage(
                 }
             }
         }
-
         val shouldUnlock = event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_CANCEL ||
                 (event.actionMasked == MotionEvent.ACTION_POINTER_UP && event.pointerCount <= 2)
@@ -398,143 +313,18 @@ private fun TerminalPage(
         return false
     }
 
-    fun openShellSession(showKeyboardAfterConnect: Boolean) {
-        if (shellStream != null || shellConnecting) {
-            if (shellReady && showKeyboardAfterConnect) {
-                terminalView?.requestFocusFromTouch()
-                terminalView?.requestFocus()
-                terminalView?.post {
-                    terminalView?.requestFocusFromTouch()
-                    terminalView?.requestFocus()
-                    terminalView?.let(LocalInputService::showSoftKeyboard)
-                }
-            }
-            return
-        }
-        shellConnecting = true
-        taskScope.launch {
-            val streamResult = runCatching {
-                NativeAdbService.openShellStream("")
-            }
-            val stream = streamResult.getOrElse { error ->
-                withContext(Dispatchers.Main) {
-                    shellConnecting = false
-                    shellReady = false
-                    snackbar.show("终端会话创建失败: ${error.message ?: error.javaClass.simpleName}")
-                }
-                return@launch
-            }
-
-            withContext(Dispatchers.Main) {
-                shellStream = stream
-                shellReady = true
-                shellConnecting = false
-                if (showKeyboardAfterConnect) {
-                    terminalView?.requestFocusFromTouch()
-                    terminalView?.requestFocus()
-                    terminalView?.post {
-                        terminalView?.requestFocusFromTouch()
-                        terminalView?.requestFocus()
-                        terminalView?.let(LocalInputService::showSoftKeyboard)
-                    }
-                }
-            }
-
-            val buffer = ByteArray(4096)
-            try {
-                while (!stream.closed) {
-                    val count = stream.inputStream.read(buffer)
-                    if (count <= 0) {
-                        break
-                    }
-                    withContext(Dispatchers.Main) {
-                        terminalSession.append(buffer, count)
-                    }
-                }
-            } catch (error: Throwable) {
-                withContext(Dispatchers.Main) {
-                    snackbar.show("终端输出失败: ${error.message ?: error.javaClass.simpleName}")
-                }
-            } finally {
-                runCatching { stream.close() }
-                withContext(Dispatchers.Main) {
-                    if (shellStream === stream) {
-                        shellStream = null
-                    }
-                    shellReady = false
-                    shellConnecting = false
-                }
-            }
-        }
-    }
-
-    fun consumeLatchedModifiers(): Int {
-        var modifiers = 0
-        if (ctrlLatched) modifiers = modifiers or KeyHandler.KEYMOD_CTRL
-        if (altLatched) modifiers = modifiers or KeyHandler.KEYMOD_ALT
-        ctrlLatched = false
-        altLatched = false
-        pendingLatchedConsume = false
-        return modifiers
-    }
-
-    fun consumeLatchedVisualState() {
-        ctrlLatched = false
-        altLatched = false
-        pendingLatchedConsume = false
-    }
-
-    fun applyCtrlModifier(ch: Char): Char {
-        return when (ch) {
-            in 'a'..'z' -> (ch.code - 'a'.code + 1).toChar()
-            in 'A'..'Z' -> (ch.code - 'A'.code + 1).toChar()
-            ' ' -> 0.toChar()
-            '[' -> 27.toChar()
-            '\\' -> 28.toChar()
-            ']' -> 29.toChar()
-            '^' -> 30.toChar()
-            '_', '/' -> 31.toChar()
-            else -> ch
-        }
-    }
-
-    fun writeLiteralKey(text: String) {
-        var payload = text
-        val modifiers = consumeLatchedModifiers()
-        if ((modifiers and KeyHandler.KEYMOD_CTRL) != 0) {
-            payload = payload.map(::applyCtrlModifier).joinToString(separator = "")
-        }
-        if ((modifiers and KeyHandler.KEYMOD_ALT) != 0) {
-            payload = "\u001B$payload"
-        }
-        val bytes = payload.toByteArray(StandardCharsets.UTF_8)
-        writeBytesToShell(bytes, 0, bytes.size)
-    }
-
-    fun writeSpecialKey(keyCode: Int) {
-        val modifiers = consumeLatchedModifiers()
-        val sequence = KeyHandler.getCode(
-            keyCode,
-            modifiers,
-            terminalSession.emulator.isCursorKeysApplicationMode(),
-            terminalSession.emulator.isKeypadApplicationMode(),
-        ) ?: return
-        val bytes = sequence.toByteArray(StandardCharsets.UTF_8)
-        writeBytesToShell(bytes, 0, bytes.size)
-    }
-
     val terminalViewClient = remember {
         object : TerminalViewClient {
             override fun onScale(scale: Float): Float {
                 when {
                     scale >= FONT_SCALE_STEP_THRESHOLD -> {
-                        updateTerminalFontSize(terminalFontSizeSp + 1f)
+                        updateFontSize(terminalFontSizeSp + 1f)
                         showFontSizeSnackbar()
                         return 1f
                     }
 
                     scale <= 1f / FONT_SCALE_STEP_THRESHOLD -> {
-                        updateTerminalFontSize(terminalFontSizeSp - 1f)
+                        updateFontSize(terminalFontSizeSp - 1f)
                         showFontSizeSnackbar()
                         return 1f
                     }
@@ -543,55 +333,42 @@ private fun TerminalPage(
             }
 
             override fun onSingleTapUp(e: MotionEvent) {
-                openShellSession(showKeyboardAfterConnect = true)
+                openShellSession(true)
             }
 
-            override fun shouldBackButtonBeMappedToEscape(): Boolean = false
-
-            override fun shouldEnforceCharBasedInput(): Boolean = false
-
-            override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
-
-            override fun isTerminalViewSelected(): Boolean = true
-
+            override fun shouldBackButtonBeMappedToEscape() = false
+            override fun shouldEnforceCharBasedInput() = false
+            override fun shouldUseCtrlSpaceWorkaround() = false
+            override fun isTerminalViewSelected() = true
             override fun copyModeChanged(copyMode: Boolean) = Unit
-
             override fun onKeyDown(
                 keyCode: Int,
                 e: KeyEvent,
                 session: TerminalSession,
             ): Boolean {
-                if (e.action == KeyEvent.ACTION_DOWN && (ctrlLatched || altLatched)) {
-                    pendingLatchedConsume = true
-                }
+                if (e.action == KeyEvent.ACTION_DOWN && (viewModel.ctrlLatched || viewModel.altLatched))
+                    viewModel.pendingLatchedConsume = true
                 return false
             }
 
             override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean {
-                if (e.action == KeyEvent.ACTION_UP && pendingLatchedConsume) {
-                    consumeLatchedVisualState()
-                }
+                if (e.action == KeyEvent.ACTION_UP && viewModel.pendingLatchedConsume)
+                    viewModel.consumeLatchedVisualState()
                 return false
             }
 
-            override fun onLongPress(event: MotionEvent): Boolean = false
-
-            override fun readControlKey(): Boolean = ctrlLatched
-
-            override fun readAltKey(): Boolean = altLatched
-
-            override fun readShiftKey(): Boolean = false
-
-            override fun readFnKey(): Boolean = false
-
+            override fun onLongPress(event: MotionEvent) = false
+            override fun readControlKey() = viewModel.ctrlLatched
+            override fun readAltKey() = viewModel.altLatched
+            override fun readShiftKey() = false
+            override fun readFnKey() = false
             override fun onCodePoint(
                 codePoint: Int,
                 ctrlDown: Boolean,
                 session: TerminalSession,
             ): Boolean {
-                if (ctrlLatched || altLatched || pendingLatchedConsume) {
-                    consumeLatchedVisualState()
-                }
+                if (viewModel.ctrlLatched || viewModel.altLatched || viewModel.pendingLatchedConsume)
+                    viewModel.consumeLatchedVisualState()
                 return false
             }
 
@@ -601,7 +378,7 @@ private fun TerminalPage(
                     start = true,
                     startOnlyIfCursorEnabled = true
                 )
-                syncOutput()
+                viewModel.syncOutput { onOutputChange(it) }
             }
 
             override fun logError(tag: String?, message: String?) {
@@ -624,11 +401,7 @@ private fun TerminalPage(
                 Log.v(tag ?: LOG_TAG, message.orEmpty())
             }
 
-            override fun logStackTraceWithMessage(
-                tag: String?,
-                message: String?,
-                e: Exception?,
-            ) {
+            override fun logStackTraceWithMessage(tag: String?, message: String?, e: Exception?) {
                 Log.e(tag ?: LOG_TAG, message, e)
             }
 
@@ -638,50 +411,48 @@ private fun TerminalPage(
         }
     }
 
+    // reset on clear output
     LaunchedEffect(output) {
-        if (output.isEmpty() && extractTranscript(terminalSession).isNotEmpty()) {
+        if (output.isEmpty() && viewModel.extractTranscript(terminalSession).isNotEmpty()) {
             terminalSession.reset()
-            applyTerminalThemeColors()
+            applyTheme()
             terminalView?.mEmulator = terminalSession.emulator
             terminalView?.onScreenUpdated()
-            syncOutput()
+            viewModel.syncOutput { onOutputChange(it) }
         }
     }
 
+    // auto-connect when tab becomes active
     LaunchedEffect(isActive) {
         if (!isActive) {
             onTerminalGestureLockChanged(false)
             return@LaunchedEffect
         }
         customTypeface = loadTerminalTypeface(context)
-        if (shellStream == null && !shellConnecting) {
-            val connected = runCatching { NativeAdbService.isConnected() }.getOrDefault(false)
-            if (connected) {
-                openShellSession(showKeyboardAfterConnect = false)
-            }
-        }
+        viewModel.autoConnectIfNeeded(::requestTerminalFocus)
     }
 
-    LaunchedEffect(colorScheme.surface, colorScheme.onSurface) {
-        applyTerminalThemeColors()
+    // theme changes
+    LaunchedEffect(
+        colorScheme.surface,
+        colorScheme.onSurface
+    ) {
+        applyTheme()
         terminalView?.onScreenUpdated()
-        syncOutput()
+        viewModel.syncOutput { onOutputChange(it) }
+    }
+
+    // font size sync from storage
+    LaunchedEffect(asBundle.terminalFontSizeSp) {
+        if (terminalFontSizeSp != asBundle.terminalFontSizeSp) {
+            updateFontSize(asBundle.terminalFontSizeSp)
+        }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            val latestFontSize = terminalFontSizeSp
             onTerminalGestureLockChanged(false)
-            taskScope.launch {
-                val latest = appSettings.bundleState.value
-                if (latest.terminalFontSizeSp != latestFontSize) {
-                    appSettings.updateBundle {
-                        it.copy(terminalFontSizeSp = latestFontSize)
-                    }
-                }
-            }
-            runCatching { shellStream?.close() }
-            taskScope.cancel()
+            viewModel.closeShell()
         }
     }
 
@@ -708,15 +479,10 @@ private fun TerminalPage(
                     setTextSize(with(density) { terminalFontSizeSp.sp.roundToPx() })
                     setTypeface(customTypeface ?: Typeface.MONOSPACE)
                     attachSession(terminalSession)
-                    applyTerminalThemeColors()
+                    applyTheme()
                     setTerminalCursorBlinkerRate(500)
-                    setTerminalCursorBlinkerState(
-                        start = true,
-                        startOnlyIfCursorEnabled = true,
-                    )
-                    setOnTouchListener { _, event ->
-                        handleTerminalTouchInterception(this, event)
-                    }
+                    setTerminalCursorBlinkerState(start = true, startOnlyIfCursorEnabled = true)
+                    setOnTouchListener { _, event -> handleTerminalTouchInterception(this, event) }
                     terminalView = this
                 }
             },
@@ -724,126 +490,118 @@ private fun TerminalPage(
                 terminalView = it
                 it.setTextSize(with(density) { terminalFontSizeSp.sp.roundToPx() })
                 it.setTypeface(customTypeface ?: Typeface.MONOSPACE)
-                if (it.currentSession !== terminalSession) {
-                    it.attachSession(terminalSession)
-                }
-                it.setOnTouchListener { _, event ->
-                    handleTerminalTouchInterception(it, event)
-                }
-                applyTerminalThemeColors()
+                if (it.currentSession !== terminalSession) it.attachSession(terminalSession)
+                it.setOnTouchListener { _, event -> handleTerminalTouchInterception(it, event) }
+                applyTheme()
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
             TerminalExtraKeyButton(
-                label = "ESC",
-                modifier = Modifier.weight(1f),
+                "ESC",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeLiteralKey("\u001B")
+                viewModel.writeLiteralKey("")
             }
             TerminalExtraKeyButton(
-                label = "/",
-                modifier = Modifier.weight(1f),
+                "/",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeLiteralKey("/")
+                viewModel.writeLiteralKey("/")
             }
             TerminalExtraKeyButton(
-                label = "-",
-                modifier = Modifier.weight(1f),
+                "-",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeLiteralKey("-")
+                viewModel.writeLiteralKey("-")
             }
             TerminalExtraKeyButton(
-                label = "HOME",
-                modifier = Modifier.weight(1f),
+                "HOME",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_MOVE_HOME)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_MOVE_HOME)
             }
             TerminalExtraKeyButton(
-                label = "↑",
-                modifier = Modifier.weight(1f),
+                "↑",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_DPAD_UP)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_DPAD_UP)
             }
             TerminalExtraKeyButton(
-                label = "END",
-                modifier = Modifier.weight(1f),
+                "END",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_MOVE_END)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_MOVE_END)
             }
             TerminalExtraKeyButton(
-                label = "PGUP",
-                modifier = Modifier.weight(1f),
+                "PGUP",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_PAGE_UP)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_PAGE_UP)
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
             TerminalExtraKeyButton(
-                label = "TAB",
-                modifier = Modifier.weight(1f),
+                "TAB",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_TAB)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_TAB)
             }
             TerminalExtraKeyButton(
-                label = "CTRL",
-                active = ctrlLatched,
-                modifier = Modifier.weight(1f),
+                "CTRL",
+                Modifier.weight(1f),
+                active = viewModel.ctrlLatched
             ) {
                 haptic.contextClick()
-                ctrlLatched = !ctrlLatched
+                viewModel.ctrlLatched = !viewModel.ctrlLatched
             }
             TerminalExtraKeyButton(
-                label = "ALT",
-                active = altLatched,
-                modifier = Modifier.weight(1f),
+                "ALT",
+                Modifier.weight(1f),
+                active = viewModel.altLatched
             ) {
                 haptic.contextClick()
-                altLatched = !altLatched
+                viewModel.altLatched = !viewModel.altLatched
             }
             TerminalExtraKeyButton(
-                label = "←",
-                modifier = Modifier.weight(1f),
+                "←",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_DPAD_LEFT)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_DPAD_LEFT)
             }
             TerminalExtraKeyButton(
-                label = "↓",
-                modifier = Modifier.weight(1f),
+                "↓",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_DPAD_DOWN)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_DPAD_DOWN)
             }
             TerminalExtraKeyButton(
-                label = "→",
-                modifier = Modifier.weight(1f),
+                "→",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_DPAD_RIGHT)
             }
             TerminalExtraKeyButton(
-                label = "PGDN",
-                modifier = Modifier.weight(1f),
+                "PGDN",
+                Modifier.weight(1f),
             ) {
                 haptic.contextClick()
-                writeSpecialKey(KeyEvent.KEYCODE_PAGE_DOWN)
+                viewModel.writeSpecialKey(KeyEvent.KEYCODE_PAGE_DOWN)
             }
         }
     }
@@ -859,7 +617,6 @@ private fun TerminalExtraKeyButton(
     val content =
         if (active) colorScheme.primary
         else colorScheme.onSurface
-
     Box(
         modifier = modifier
             .height(32.dp)
@@ -898,7 +655,7 @@ private fun TerminalOutputBottomSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(2f / 3f),
+                .fillMaxHeight(2f / 3f)
         ) {
             item {
                 TextField(

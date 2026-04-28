@@ -64,7 +64,6 @@ import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.isRenderEffectSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -195,6 +194,31 @@ private fun AboutContent(
                         .coerceIn(0f, 1f)
             }
             .collect {}
+    }
+
+    @Composable
+    fun AboutCard(
+        modifier: Modifier = Modifier.padding(horizontal = 12.dp),
+        content: @Composable () -> Unit,
+    ) {
+        Card(
+            modifier = modifier.textureBlur(
+                backdrop = backdrop,
+                shape = SmoothRoundedCornerShape(16.dp),
+                blurRadius = 60f,
+                noiseCoefficient = BlurDefaults.NoiseCoefficient,
+                colors = BlurColors(blendColors = cardBlendColors),
+                enabled = blurEnabled,
+            ),
+            colors = CardDefaults.defaultColors(
+                color =
+                    if (blurEnabled) Color.Transparent
+                    else colorScheme.surfaceContainer,
+                contentColor = Color.Transparent,
+            ),
+        ) {
+            content()
+        }
     }
 
     BgEffectBackground(
@@ -348,12 +372,7 @@ private fun AboutContent(
                         .padding(bottom = padding.calculateBottomPadding()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    AboutCard(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        backdrop = backdrop,
-                        blurEnabled = blurEnabled,
-                        blendColors = cardBlendColors,
-                    ) {
+                    AboutCard {
                         ArrowPreference(
                             title = "项目仓库",
                             endActions = {
@@ -382,17 +401,15 @@ private fun AboutContent(
                             },
                             onClick = {
                                 context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, releasesUrl.toUri())
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        releasesUrl.toUri(),
+                                    )
                                 )
                             },
                         )
                     }
-                    AboutCard(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        backdrop = backdrop,
-                        blurEnabled = blurEnabled,
-                        blendColors = cardBlendColors,
-                    ) {
+                    AboutCard {
                         ArrowPreference(
                             title = "License",
                             endActions = {
@@ -406,43 +423,40 @@ private fun AboutContent(
                                 context.startActivity(
                                     Intent(
                                         Intent.ACTION_VIEW,
-                                        "https://www.apache.org/licenses/LICENSE-2.0.txt".toUri()
+                                        "https://www.apache.org/licenses/LICENSE-2.0.txt".toUri(),
                                     )
                                 )
                             },
                         )
                     }
+                    AboutCard {
+                        listOf(
+                            Pair("Miuix", "https://github.com/compose-miuix-ui/miuix"),
+                            Pair("scrcpy", "https://github.com/Genymobile/scrcpy"),
+                        ).forEach { (name, repo) ->
+                            ArrowPreference(
+                                title = name,
+                                endActions = {
+                                    Text(
+                                        text = "GitHub",
+                                        fontSize = textStyles.body2.fontSize,
+                                        color = colorScheme.onSurfaceVariantActions,
+                                    )
+                                },
+                                onClick = {
+                                    context.startActivity(
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            repo.toUri(),
+                                        )
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AboutCard(
-    modifier: Modifier,
-    backdrop: LayerBackdrop,
-    blurEnabled: Boolean,
-    blendColors: List<BlendColorEntry>,
-    content: @Composable () -> Unit,
-) {
-    Card(
-        modifier = modifier.textureBlur(
-            backdrop = backdrop,
-            shape = SmoothRoundedCornerShape(16.dp),
-            blurRadius = 60f,
-            noiseCoefficient = BlurDefaults.NoiseCoefficient,
-            colors = BlurColors(blendColors = blendColors),
-            enabled = blurEnabled,
-        ),
-        colors = CardDefaults.defaultColors(
-            color =
-                if (blurEnabled) Color.Transparent
-                else colorScheme.surfaceContainer,
-            contentColor = Color.Transparent,
-        ),
-    ) {
-        content()
     }
 }
 
