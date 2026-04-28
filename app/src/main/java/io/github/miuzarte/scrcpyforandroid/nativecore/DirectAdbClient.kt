@@ -3,6 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 import android.os.Build
 import android.util.Base64
 import android.util.Log
+import io.github.miuzarte.scrcpyforandroid.storage.AdbClientData
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
@@ -118,7 +119,11 @@ internal object DirectAdbTransport {
                         Base64.decode(privB64, Base64.DEFAULT)
                     )
                 )
-                val pub = derivePublicX509(priv)
+                val pubB64 = adbClientData.rsaPublicKeyX509.get()
+                val pub =
+                    if (pubB64.isNotBlank()) Base64.decode(pubB64, Base64.DEFAULT)
+                    else derivePublicX509(priv)
+
                 Log.i(
                     TAG,
                     "loadOrCreate(): loaded persisted RSA key pair from DataStore, " +
@@ -137,15 +142,18 @@ internal object DirectAdbTransport {
         kpg.initialize(2048)
         val kp = kpg.generateKeyPair()
 
-        // 保存到 DataStore
         val privateKeyB64 = Base64.encodeToString(kp.private.encoded, Base64.NO_WRAP)
         val publicKeyB64 = Base64.encodeToString(kp.public.encoded, Base64.NO_WRAP)
-        adbClientData.rsaPrivateKey.set(privateKeyB64)
-        adbClientData.rsaPublicKeyX509.set(publicKeyB64)
+        adbClientData.saveBundle(
+            AdbClientData.Bundle(
+                rsaPrivateKey = privateKeyB64,
+                rsaPublicKeyX509 = publicKeyB64,
+            )
+        )
 
         Log.i(
             TAG,
-            "loadOrCreate(): generated new RSA key pair and saved to DataStore, fp=${fingerprint(kp.public.encoded)}"
+            "loadOrCreate(): generated new RSA key pair, fp=${fingerprint(kp.public.encoded)}"
         )
         return Pair(kp.private, kp.public.encoded)
     }
