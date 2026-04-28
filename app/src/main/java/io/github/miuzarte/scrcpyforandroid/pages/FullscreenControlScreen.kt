@@ -56,6 +56,7 @@ import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
+import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
@@ -267,21 +268,6 @@ fun FullscreenControlScreen(
         }
     }
 
-    suspend fun sendKeycode(keycode: Int) {
-        runCatching {
-            withContext(Dispatchers.IO) {
-                scrcpy.injectKeycode(0, keycode)
-                scrcpy.injectKeycode(1, keycode)
-            }
-        }.onFailure { e ->
-            Log.w(
-                "FullscreenControlPage",
-                "sendKeycode failed for keycode=$keycode",
-                e
-            )
-        }
-    }
-
     suspend fun sendBackOrTurnScreenOn() {
         runCatching {
             withContext(Dispatchers.IO) {
@@ -295,9 +281,7 @@ fun FullscreenControlScreen(
 
     BackHandler(enabled = true) {
         if (asBundle.fullscreenControlBackToDevice && currentSession != null)
-            taskScope.launch {
-                sendBackOrTurnScreenOn()
-            }
+            taskScope.launch { sendBackOrTurnScreenOn() }
         else onBack()
     }
 
@@ -323,34 +307,6 @@ fun FullscreenControlScreen(
         }
     }
 
-    suspend fun pasteLocalClipboard() {
-        val session = currentSession ?: return
-        val text = io.github.miuzarte.scrcpyforandroid.services.LocalInputService.getClipboardText(
-            activity ?: return
-        )
-            ?.takeIf { it.isNotBlank() }
-        if (text == null) {
-            snackbar.show("本机剪贴板为空或不是文本")
-            return
-        }
-        val useLegacyPaste = session.legacyPaste
-        runCatching {
-            withContext(Dispatchers.IO) {
-                if (useLegacyPaste) {
-                    scrcpy.injectText(text)
-                } else {
-                    scrcpy.setClipboard(text, paste = true)
-                }
-            }
-        }.onFailure { error ->
-            Log.w("FullscreenControlPage", "pasteLocalClipboard failed", error)
-            snackbar.show(
-                if (useLegacyPaste) "legacy 粘贴失败"
-                else "剪贴板同步粘贴失败，可尝试开启 --legacy-paste"
-            )
-        }
-    }
-
     suspend fun commitImeText(text: String) {
         submitImeText(
             scrcpy = scrcpy,
@@ -364,6 +320,78 @@ fun FullscreenControlScreen(
             )
         }
     }
+
+    fun handleButtonAction(action: VirtualButtonAction) {
+        when (action) {
+            VirtualButtonAction.RECENT_TASKS -> {
+                showRecentTasksSheet = true
+                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                    taskScope.launch {
+                        refreshApps()
+                        refreshRecentTasks()
+                    }
+                }
+            }
+
+            VirtualButtonAction.ALL_APPS -> {
+                showAllAppsSheet = true
+                if (apps.isEmpty() && !listingsRefreshBusy) {
+                    taskScope.launch {
+                        refreshApps()
+                    }
+                }
+            }
+
+            VirtualButtonAction.TOGGLE_IME -> imeRequestToken++
+
+            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD ->
+                taskScope.launch {
+                    val session = currentSession ?: return@launch
+                    val text = LocalInputService.getClipboardText(activity ?: return@launch)
+                        ?.takeIf { it.isNotBlank() }
+                    if (text == null) {
+                        snackbar.show("本机剪贴板为空或不是文本")
+                        return@launch
+                    }
+                    val useLegacyPaste = session.legacyPaste
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            if (useLegacyPaste) scrcpy.injectText(text)
+                            else scrcpy.setClipboard(text, paste = true)
+                        }
+                    }.onFailure { error ->
+                        Log.w("FullscreenControl", "pasteLocalClipboard failed", error)
+                        snackbar.show(if (useLegacyPaste) "legacy 粘贴失败" else "剪贴板同步粘贴失败，可尝试开启 --legacy-paste")
+                    }
+                }
+
+            else -> action.keycode?.let {
+                taskScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            scrcpy.injectKeycode(0, it)
+                            scrcpy.injectKeycode(1, it)
+                        }
+                    }.onFailure { e ->
+                        Log.w(
+                            "FullscreenControlPage",
+                            "sendKeycode failed for keycode=$it",
+                            e
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun startApp(packageName: String) =
+        runCatching {
+            withContext(Dispatchers.IO) {
+                scrcpy.startApp(packageName)
+            }
+        }.onFailure { error ->
+            snackbar.show("启动应用失败: ${error.message ?: error.javaClass.simpleName}")
+        }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -402,9 +430,7 @@ fun FullscreenControlScreen(
                     }
                 },
                 onBackOrScreenOn = { action ->
-                    withContext(Dispatchers.IO) {
-                        scrcpy.pressBackOrTurnScreenOn(action)
-                    }
+                    withContext(Dispatchers.IO) { scrcpy.pressBackOrTurnScreenOn(action) }
                 },
             )
 
@@ -421,44 +447,9 @@ fun FullscreenControlScreen(
                     dock = fullscreenVirtualButtonDock,
                     reverseOrder = fullscreenVirtualButtonReverseOrder,
                     thickness = fullscreenVirtualButtonHeight,
-                    onAction = { action ->
-                        when (action) {
-                            VirtualButtonAction.RECENT_TASKS -> {
-                                showRecentTasksSheet = true
-                                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
-                                    refreshApps()
-                                    refreshRecentTasks()
-                                }
-                            }
-
-                            VirtualButtonAction.ALL_APPS -> {
-                                showAllAppsSheet = true
-                                if (apps.isEmpty() && !listingsRefreshBusy) {
-                                    refreshApps()
-                                }
-                            }
-
-                            VirtualButtonAction.TOGGLE_IME -> {
-                                imeRequestToken++
-                            }
-
-                            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> {
-                                pasteLocalClipboard()
-                            }
-
-                            else -> {
-                                action.keycode?.let { sendKeycode(it) }
-                            }
-                        }
-                    },
-                    passwordPopupContent = if (fragmentActivity == null) {
-                        null
-                    } else {
-                        { onDismissRequest ->
-                            PasswordPickerPopupContent(
-                                onDismissRequest = onDismissRequest,
-                            )
-                        }
+                    onAction = ::handleButtonAction,
+                    passwordPopupContent = fragmentActivity?.let {
+                        { onDismissRequest -> PasswordPickerPopupContent(onDismissRequest = onDismissRequest) }
                     },
                 )
             }
@@ -467,43 +458,10 @@ fun FullscreenControlScreen(
                 bar.FloatingBall(
                     actions = floatingActions,
                     modifier = Modifier.fillMaxSize(),
-                    onAction = { action ->
-                        when (action) {
-                            VirtualButtonAction.RECENT_TASKS -> {
-                                showRecentTasksSheet = true
-                                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
-                                    refreshApps()
-                                    refreshRecentTasks()
-                                }
-                            }
-
-                            VirtualButtonAction.ALL_APPS -> {
-                                showAllAppsSheet = true
-                                if (apps.isEmpty() && !listingsRefreshBusy) {
-                                    refreshApps()
-                                }
-                            }
-
-                            VirtualButtonAction.TOGGLE_IME -> {
-                                imeRequestToken++
-                            }
-
-                            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> {
-                                pasteLocalClipboard()
-                            }
-
-                            else -> {
-                                action.keycode?.let { sendKeycode(it) }
-                            }
-                        }
+                    onAction = ::handleButtonAction,
+                    passwordPopupContent = fragmentActivity?.let {
+                        { onDismissRequest -> PasswordPickerPopupContent(onDismissRequest = onDismissRequest) }
                     },
-                    passwordPopupContent =
-                        if (fragmentActivity == null) null
-                        else { onDismissRequest ->
-                            PasswordPickerPopupContent(
-                                onDismissRequest = onDismissRequest,
-                            )
-                        },
                 )
             }
 
@@ -521,15 +479,7 @@ fun FullscreenControlScreen(
                         system = app?.system,
                         onClick = {
                             showRecentTasksSheet = false
-                            taskScope.launch {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        scrcpy.startApp(task.packageName)
-                                    }
-                                }.onFailure { error ->
-                                    snackbar.show("启动应用失败: ${error.message ?: error.javaClass.simpleName}")
-                                }
-                            }
+                            taskScope.launch { startApp(task.packageName) }
                         },
                     )
                 },
@@ -556,15 +506,7 @@ fun FullscreenControlScreen(
                         system = app.system,
                         onClick = {
                             showAllAppsSheet = false
-                            taskScope.launch {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        scrcpy.startApp(app.packageName)
-                                    }
-                                }.onFailure { error ->
-                                    snackbar.show("启动应用失败: ${error.message ?: error.javaClass.simpleName}")
-                                }
-                            }
+                            taskScope.launch { startApp(app.packageName) }
                         },
                     )
                 },
@@ -576,7 +518,6 @@ fun FullscreenControlScreen(
                     }
                 },
             )
-
         }
     }
 }
@@ -676,22 +617,6 @@ private fun rotateDockDirection(
     else -> direction
 }
 
-/**
- * FullscreenControlScreen
- *
- * Purpose:
- * - Presents a fullscreen interactive touch surface that maps Compose touch events
- *   to device coordinates and injects them via [onInjectTouch].
- * - Responsible for pointer tracking, multi-touch mapping, coordinate normalization,
- *   and lifetime of synthetic touch events sent to the device.
- *
- * Concurrency and side-effects:
- * - All heavy computations are local to the UI thread; injection itself is a quick
- *   callback (`onInjectTouch`) which delegates to native code elsewhere — keep that
- *   callback lightweight.
- * - Use `pointerInteropFilter` to receive raw MotionEvent instances for precise
- *   multi-touch handling and to map Android pointer IDs to device pointers.
- */
 @Composable
 fun FullscreenControlPage(
     scrcpy: Scrcpy,
