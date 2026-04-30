@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
@@ -93,23 +96,20 @@ fun TerminalScreen(
 ) {
     val viewModel: TerminalViewModel = viewModel()
     val context = LocalContext.current
-    val snackbar = LocalSnackbarController.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showOutputSheet by rememberSaveable { mutableStateOf(false) }
     var output by rememberSaveable { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        viewModel.snackbarEvents.collect { snackbar.show(it) }
-    }
-
     Scaffold(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 SmallTopAppBar(
-                    title = "终端",
-                    color = if (blurActive) Color.Transparent else colorScheme.surface,
+                    title = stringResource(R.string.terminal_title),
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface,
                     actions = {
                         Box {
                             IconButton(
@@ -118,7 +118,7 @@ fun TerminalScreen(
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.More,
-                                    contentDescription = "更多",
+                                    contentDescription = stringResource(R.string.cd_more),
                                 )
                             }
                             OverlayListPopup(
@@ -128,7 +128,7 @@ fun TerminalScreen(
                             ) {
                                 ListPopupColumn {
                                     DropdownImpl(
-                                        text = "自由复制",
+                                        text = stringResource(R.string.terminal_menu_free_copy),
                                         optionSize = 2,
                                         isSelected = false,
                                         index = 0,
@@ -139,7 +139,7 @@ fun TerminalScreen(
                                         },
                                     )
                                     DropdownImpl(
-                                        text = "清屏",
+                                        text = stringResource(R.string.terminal_menu_clear_screen),
                                         optionSize = 2,
                                         isSelected = false,
                                         index = 1,
@@ -177,7 +177,7 @@ fun TerminalScreen(
                 onCopyAll = {
                     showMenu = false
                     LocalInputService.setClipboardText(context, output)
-                    snackbar.show("已复制所有终端输出")
+                    AppRuntime.snackbar(R.string.terminal_copied_all)
                 },
             )
         }
@@ -197,7 +197,6 @@ private fun TerminalPage(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val snackbar = LocalSnackbarController.current
     val haptic = LocalHapticFeedback.current
 
     val asBundle by viewModel.asBundle.collectAsState()
@@ -228,7 +227,7 @@ private fun TerminalPage(
             },
             onCopyTextToClipboardRequested = { text ->
                 LocalInputService.setClipboardText(context, text)
-                snackbar.show("已复制到剪贴板")
+                AppRuntime.snackbar(R.string.terminal_copied)
             },
             onPasteTextFromClipboardRequested = { viewModel.writeClipboardToShell(context) },
             onBellRequested = {},
@@ -249,16 +248,21 @@ private fun TerminalPage(
         viewModel.openShellSession(showKeyboardAfterConnect, ::requestTerminalFocus)
     }
 
-    fun updateFontSize(newValue: Float) {
-        viewModel.updateTerminalFontSize(newValue) { clamped ->
+    fun updateFontSize(newValue: Float): Float {
+        return viewModel.updateTerminalFontSize(newValue) { clamped ->
             terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
         }
     }
 
-    fun showFontSizeSnackbar() {
+    fun adjustFontSize(delta: Float): Float {
+        return viewModel.adjustTerminalFontSize(delta) { clamped ->
+            terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
+        }
+    }
+
+    fun showFontSizeSnackbar(fontSizeSp: Float) {
         viewModel.launchFontSizeSnackbar(
-            fontSizeSp = terminalFontSizeSp,
-            hostState = snackbar.hostState,
+            fontSizeSp = fontSizeSp,
             onReset = { clamped ->
                 terminalView?.setTextSize(with(density) { clamped.sp.roundToPx() })
             },
@@ -318,14 +322,14 @@ private fun TerminalPage(
             override fun onScale(scale: Float): Float {
                 when {
                     scale >= FONT_SCALE_STEP_THRESHOLD -> {
-                        updateFontSize(terminalFontSizeSp + 1f)
-                        showFontSizeSnackbar()
+                        val applied = adjustFontSize(1f)
+                        showFontSizeSnackbar(applied)
                         return 1f
                     }
 
                     scale <= 1f / FONT_SCALE_STEP_THRESHOLD -> {
-                        updateFontSize(terminalFontSizeSp - 1f)
-                        showFontSizeSnackbar()
+                        val applied = adjustFontSize(-1f)
+                        showFontSizeSnackbar(applied)
                         return 1f
                     }
                 }
@@ -640,14 +644,14 @@ private fun TerminalOutputBottomSheet(
 ) {
     OverlayBottomSheet(
         show = show,
-        title = "自由复制",
+        title = stringResource(R.string.terminal_menu_free_copy),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
         endAction = {
             IconButton(onClick = onCopyAll) {
                 Icon(
                     imageVector = Icons.Rounded.ContentCopy,
-                    contentDescription = "复制全部",
+                    contentDescription = stringResource(R.string.terminal_copy_all),
                 )
             }
         },
@@ -659,13 +663,13 @@ private fun TerminalOutputBottomSheet(
         ) {
             item {
                 TextField(
-                    value = output.ifBlank { "当前没有输出" },
+                    value = output.ifBlank { stringResource(R.string.terminal_no_output) },
                     onValueChange = {},
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = UiSpacing.PageVertical),
                     readOnly = true,
-                    label = "终端输出",
+                    label = stringResource(R.string.terminal_output_label),
                     useLabelAsPlaceholder = true,
                 )
             }

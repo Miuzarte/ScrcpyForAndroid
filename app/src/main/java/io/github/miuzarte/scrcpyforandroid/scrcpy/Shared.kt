@@ -3,9 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.scrcpy
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
-/*
-参考官方实现尽量统一行为
- */
+// 参考官方实现尽量统一行为
 
 class Shared {
     @JvmInline

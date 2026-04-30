@@ -57,8 +57,8 @@ internal class ConnectionStateStore {
 
     fun markDisconnected(
         cause: DisconnectCause,
-        statusLine: String = "未连接",
-        connectedDeviceLabel: String = "未连接",
+        statusLine: String = "Disconnected",
+        connectedDeviceLabel: String = "Disconnected",
     ) {
         update {
             it.copy(
@@ -75,7 +75,7 @@ internal class ConnectionStateStore {
     fun markConnectionFailed(message: String?) {
         update {
             it.copy(
-                adbSession = it.adbSession.copy(statusLine = "ADB 连接失败"),
+                adbSession = it.adbSession.copy(statusLine = "ADB connection failed"),
                 disconnectCause = DisconnectCause.ConnectFailed,
                 lastError = message,
             )

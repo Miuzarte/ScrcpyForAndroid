@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
@@ -10,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,8 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
@@ -58,6 +60,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
@@ -106,22 +109,22 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop as miuixLayerBackdrop
 
 private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 
-private fun terminalFontFile(context: android.content.Context): File {
+private fun terminalFontFile(context: Context): File {
     return File(context.filesDir, TERMINAL_FONT_RELATIVE_PATH)
 }
 
-private fun copyTerminalFontToPrivate(context: android.content.Context, uri: Uri) {
+private fun copyTerminalFontToPrivate(context: Context, uri: Uri) {
     val target = terminalFontFile(context)
     target.parentFile?.mkdirs()
     context.contentResolver.openInputStream(uri).use { input ->
-        requireNotNull(input) { "无法读取字体文件" }
+        requireNotNull(input) { context.getString(R.string.main_font_read_error) }
         target.outputStream().use { output ->
             input.copyTo(output)
         }
     }
 }
 
-private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
+private fun queryDisplayName(context: Context, uri: Uri): String? {
     return context.contentResolver
         .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
         ?.use { cursor ->
@@ -135,13 +138,13 @@ private fun queryDisplayName(context: android.content.Context, uri: Uri): String
 }
 
 private enum class MainBottomTabDestination(
-    val label: String,
+    @field:StringRes val labelResId: Int,
     val icon: ImageVector,
 ) {
-    Devices(label = "设备", icon = Icons.Rounded.Devices),
-    Terminal(label = "终端", icon = Icons.Rounded.Terminal),
-    Files(label = "文件", icon = Icons.Rounded.Folder),
-    Settings(label = "设置", icon = Icons.Rounded.Settings);
+    Devices(labelResId = R.string.main_tab_devices, icon = Icons.Rounded.Devices),
+    Terminal(labelResId = R.string.main_tab_terminal, icon = Icons.Rounded.Terminal),
+    Files(labelResId = R.string.main_tab_files, icon = Icons.Rounded.Folder),
+    Settings(labelResId = R.string.main_tab_settings, icon = Icons.Rounded.Settings);
 }
 
 sealed interface RootScreen : NavKey {
@@ -171,6 +174,11 @@ fun MainScreen() {
             scope = scope,
             hostState = snackHostState,
         )
+    }
+
+    DisposableEffect(snackHostState) {
+        val unregister = AppRuntime.registerSnackbarHostState(snackHostState)
+        onDispose(unregister)
     }
 
     // Root navigation and UI chrome state
@@ -365,10 +373,11 @@ fun MainScreen() {
             withContext(Dispatchers.Main) {
                 result.onSuccess { displayName ->
                     asBundle = asBundle.copy(terminalFontDisplayName = displayName)
-                    snackbarController.show("终端字体导入成功")
+                    AppRuntime.snackbar(R.string.main_terminal_font_imported)
                 }.onFailure { error ->
-                    snackbarController.show(
-                        "终端字体导入失败: ${error.message ?: error.javaClass.simpleName}"
+                    AppRuntime.snackbar(
+                        R.string.main_terminal_font_import_failed,
+                        error.message ?: error.javaClass.simpleName,
                     )
                 }
             }
@@ -434,6 +443,7 @@ fun MainScreen() {
         }
     }
 
+    val textMainPressBackAgain = stringResource(R.string.main_press_back_again)
     fun handleBackNavigation() {
         when {
             rootBackStack.size > 1 -> rootNavigator.pop()
@@ -450,7 +460,11 @@ fun MainScreen() {
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastExitBackPressAtMs > 2_000L) {
                     lastExitBackPressAtMs = now
-                    Toast.makeText(context, "再按一次返回键退出", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        textMainPressBackAgain,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     return
                 }
                 lastExitBackPressAtMs = 0L
@@ -526,7 +540,7 @@ fun MainScreen() {
                                         selected = currentTab == tab,
                                         onClick = { navigateToTab(tab) },
                                         icon = tab.icon,
-                                        label = tab.label,
+                                        label = stringResource(tab.labelResId),
                                     )
                                 }
                             }
@@ -535,11 +549,11 @@ fun MainScreen() {
                 },
                 snackbarHost = { SnackbarHost(snackHostState) },
             ) { contentPadding ->
-                val bottomInnerPadding: Dp = if (asBundle.floatingBottomBar) {
-                    12.dp + 64.dp + contentPadding.calculateBottomPadding()
-                } else {
-                    contentPadding.calculateBottomPadding()
-                }
+                val bottomInnerPadding =
+                    if (asBundle.floatingBottomBar)
+                        12.dp + 64.dp + contentPadding.calculateBottomPadding()
+                    else
+                        contentPadding.calculateBottomPadding()
 
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -634,11 +648,11 @@ fun MainScreen() {
                                 ) {
                                     Icon(
                                         imageVector = tab.icon,
-                                        contentDescription = tab.label,
+                                        contentDescription = stringResource(tab.labelResId),
                                         tint = colorScheme.onSurface,
                                     )
                                     Text(
-                                        text = tab.label,
+                                        text = stringResource(tab.labelResId),
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp,
                                         color = colorScheme.onSurface,

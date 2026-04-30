@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.miuzarte.scrcpyforandroid.R
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.DirectoryDownloadSnapshot
 import io.github.miuzarte.scrcpyforandroid.services.DirectorySnapshotSession
 import io.github.miuzarte.scrcpyforandroid.services.FileManagerService
@@ -14,15 +16,12 @@ import io.github.miuzarte.scrcpyforandroid.services.RemoteFileStat
 import io.github.miuzarte.scrcpyforandroid.storage.BundleSyncDelegate
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -149,13 +148,6 @@ internal class FileManagerViewModel : ViewModel() {
     private val _pendingTreeDownload = MutableStateFlow<PendingTreeDownload?>(null)
     val pendingTreeDownload: StateFlow<PendingTreeDownload?> = _pendingTreeDownload.asStateFlow()
 
-    private val _snackbarEvents = Channel<String>(Channel.BUFFERED)
-    val snackbarEvents: Flow<String> = _snackbarEvents.receiveAsFlow()
-
-    private fun snackbar(msg: String) {
-        _snackbarEvents.trySend(msg)
-    }
-
     init {
         asBundleSync.start()
     }
@@ -187,22 +179,25 @@ internal class FileManagerViewModel : ViewModel() {
                 viewModelScope.launch {
                     val targetPath = resolveLinkTarget(entry)
                     if (targetPath == null) {
-                        snackbar("链接目标不可用，长按查看信息")
+                        AppRuntime.snackbar(R.string.fm_snack_link_unavailable)
                         return@launch
                     }
                     val result = runCatching { FileManagerService.stat(targetPath) }
                     withContext(Dispatchers.Main) {
                         result.onSuccess { targetStat ->
                             if (isDirectoryStat(targetStat)) jumpToPath(targetPath)
-                            else snackbar("链接目标不是文件夹，长按查看信息")
+                            else AppRuntime.snackbar(R.string.fm_snack_not_dir)
                         }.onFailure { error ->
-                            snackbar("读取链接目标失败: ${error.message ?: error.javaClass.simpleName}")
+                            AppRuntime.snackbar(
+                                R.string.fm_snack_link_read_failed,
+                                error.message ?: error.javaClass.simpleName,
+                            )
                         }
                     }
                 }
             }
 
-            else -> snackbar("长按可查看文件详情")
+            else -> AppRuntime.snackbar(R.string.fm_snack_long_press_details)
         }
     }
 
@@ -226,7 +221,7 @@ internal class FileManagerViewModel : ViewModel() {
     fun createFolder(folderName: String) {
         val name = folderName.trim()
         if (name.isBlank()) {
-            snackbar("文件夹名称不能为空")
+            AppRuntime.snackbar(R.string.fm_snack_folder_name_empty)
             return
         }
         viewModelScope.launch {
@@ -235,11 +230,14 @@ internal class FileManagerViewModel : ViewModel() {
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess {
-                    snackbar("已创建文件夹")
+                    AppRuntime.snackbar(R.string.fm_snack_folder_created)
                     invalidateCacheForCurrentDirectory()
                     _isRefreshing.value = true
                 }.onFailure { error ->
-                    snackbar("创建失败: ${error.message ?: error.javaClass.simpleName}")
+                    AppRuntime.snackbar(
+                        R.string.fm_snack_create_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
             }
         }
@@ -254,11 +252,14 @@ internal class FileManagerViewModel : ViewModel() {
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess {
-                    snackbar("已上传到 ${currentPath.value}")
+                    AppRuntime.snackbar(R.string.fm_snack_uploaded, currentPath.value)
                     invalidateCacheForCurrentDirectory()
                     _isRefreshing.value = true
                 }.onFailure { error ->
-                    snackbar("上传失败: ${error.message ?: error.javaClass.simpleName}")
+                    AppRuntime.snackbar(
+                        R.string.fm_snack_upload_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
             }
         }
@@ -287,7 +288,10 @@ internal class FileManagerViewModel : ViewModel() {
                 statResult
                     .onSuccess { _selectedStat.value = it }
                     .onFailure { error ->
-                        snackbar("读取详情失败: ${error.message ?: error.javaClass.simpleName}")
+                        AppRuntime.snackbar(
+                            R.string.fm_snack_read_details_failed,
+                            error.message ?: error.javaClass.simpleName,
+                        )
                         if (_selectedEntry.value === entry) _selectedEntry.value = null
                     }
                 targetStatResult
@@ -295,7 +299,10 @@ internal class FileManagerViewModel : ViewModel() {
                 snapshotResult
                     ?.onSuccess { _selectedSnapshot.value = it }
                     ?.onFailure { error ->
-                        snackbar("目录扫描失败: ${error.message ?: error.javaClass.simpleName}")
+                        AppRuntime.snackbar(
+                            R.string.fm_snack_scan_failed,
+                            error.message ?: error.javaClass.simpleName,
+                        )
                     }
             }
         }
@@ -331,26 +338,26 @@ internal class FileManagerViewModel : ViewModel() {
     fun requestDownload(entry: RemoteFileEntry) {
         val snapshot = _selectedSnapshot.value
         dismissDetails()
-        snackbar("开始下载")
+        AppRuntime.snackbar(R.string.fm_snack_download_starting)
         viewModelScope.launch {
             if (entry.isDirectory) {
                 if (snapshot == null) {
-                    snackbar("目录信息仍在加载，请稍后重试")
+                    AppRuntime.snackbar(R.string.fm_snack_dir_loading)
                     return@launch
                 }
                 val directSaved = FileManagerService.downloadDirectoryToPublicDownloads(snapshot)
                 if (directSaved)
-                    snackbar("已下载到 Download/Scrcpy")
+                    AppRuntime.snackbar(R.string.fm_snack_downloaded)
                 else _pendingTreeDownload.value = PendingTreeDownload.Directory(snapshot)
             } else {
                 val directSaved =
                     FileManagerService.downloadFileToPublicDownloads(entry.fullPath, entry.name)
-                if (directSaved) snackbar("已下载到 Download/Scrcpy")
+                if (directSaved) AppRuntime.snackbar(R.string.fm_snack_downloaded)
                 else _pendingTreeDownload.value =
                     PendingTreeDownload.File(entry.fullPath, entry.name)
             }
             if (_pendingTreeDownload.value != null)
-                snackbar("无法直接写入 Download/Scrcpy，请选择保存目录")
+                AppRuntime.snackbar(R.string.fm_snack_cannot_save)
         }
     }
 
@@ -402,8 +409,13 @@ internal class FileManagerViewModel : ViewModel() {
             }
             withContext(Dispatchers.Main) {
                 result
-                    .onSuccess { snackbar("下载完成") }
-                    .onFailure { error -> snackbar("下载失败: ${error.message ?: error.javaClass.simpleName}") }
+                    .onSuccess { AppRuntime.snackbar(R.string.fm_snack_download_complete) }
+                    .onFailure { error ->
+                        AppRuntime.snackbar(
+                            R.string.fm_snack_download_failed,
+                            error.message ?: error.javaClass.simpleName,
+                        )
+                    }
             }
         }
     }

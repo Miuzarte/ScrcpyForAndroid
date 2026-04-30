@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.password
 
+import android.annotation.SuppressLint
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,9 +13,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.fragment.app.FragmentActivity
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.CoroutineScope
@@ -38,8 +43,10 @@ fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
     val entries by PasswordRepository.entriesState.collectAsState()
     val appSettingsBundle by appSettings.bundleState.collectAsState()
 
-    val snackbar = LocalSnackbarController.current
-
+    val textInvalidated = stringResource(R.string.password_status_invalidated)
+    val textAuthenticated = stringResource(R.string.password_status_authenticated)
+    val textUnauthenticated = stringResource(R.string.password_status_unauthenticated)
+    val textBurned = stringResource(R.string.password_status_burned)
     val spinnerEntries = remember(entries) {
         entries.map { entry ->
             SpinnerEntry(
@@ -54,16 +61,17 @@ fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
                 },
                 title = entry.name,
                 summary =
-                    if (entry.cipherText == null) "已失效"
+                    if (entry.cipherText == null) textInvalidated
                     else when (entry.createdWithAuth) {
-                        PasswordCreatedState.AuthenticatedCreated -> "创建时已验证"
-                        PasswordCreatedState.UnauthenticatedCreated -> "创建时未经验证"
-                        PasswordCreatedState.AuthenticatedCreatedModified -> "创建时已验证（熔断）"
+                        PasswordCreatedState.AuthenticatedCreated -> textAuthenticated
+                        PasswordCreatedState.UnauthenticatedCreated -> textUnauthenticated
+                        PasswordCreatedState.AuthenticatedCreatedModified -> textBurned
                     },
             )
         }
     }
 
+    val textAuthFillTitle = stringResource(R.string.password_auth_fill_title)
     fun fillPassword(index: Int) {
         val entry = entries[index]
         scope.launch {
@@ -71,11 +79,15 @@ fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
                 activity = fragActivity!!,
                 entry = entry,
                 globalRequiresAuth = appSettingsBundle.passwordRequireAuth,
+                authTitle = textAuthFillTitle,
             ).onSuccess { password ->
                 InjectionController.inject(password)
                 onDismissRequest()
-            }.onFailure {
-                taskScope.launch { snackbar.show(it.message ?: "密码填充失败") }
+            }.onFailure { e ->
+                AppRuntime.snackbar(
+                    R.string.password_fill_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
             }
         }
     }
@@ -83,7 +95,7 @@ fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
     ListPopupColumn {
         if (spinnerEntries.isEmpty()) {
             Text(
-                text = "无可用密码",
+                text = stringResource(R.string.password_no_available),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(UiSpacing.PopupHorizontal),
@@ -95,7 +107,7 @@ fun PasswordPickerPopupContent(onDismissRequest: () -> Unit) {
 
         if (fragActivity == null) {
             Text(
-                text = "当前页面无法拉起验证",
+                text = stringResource(R.string.password_cannot_auth_here),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(UiSpacing.PopupHorizontal),

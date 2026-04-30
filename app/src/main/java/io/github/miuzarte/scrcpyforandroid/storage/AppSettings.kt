@@ -2,35 +2,48 @@ package io.github.miuzarte.scrcpyforandroid.storage
 
 import android.content.Context
 import android.os.Parcelable
+import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 
 class AppSettings(context: Context) : Settings(context, "AppSettings") {
+    object ThemeModes {
+        data class Option(
+            @field:StringRes val labelResId: Int,
+            val mode: ColorSchemeMode,
+        )
+
+        val baseOptions = listOf(
+            Option(R.string.theme_follow_system, ColorSchemeMode.System),
+            Option(R.string.theme_light, ColorSchemeMode.Light),
+            Option(R.string.theme_dark, ColorSchemeMode.Dark),
+        )
+    }
+
     enum class FullscreenVirtualButtonDock(
         val rawValue: String,
         val isFixed: Boolean,
-        val directionLabel: String,
+        @field:StringRes val directionLabelResId: Int,
     ) {
-        FOLLOW_TOP("FOLLOW_TOP", false, "上方"),
-        FOLLOW_BOTTOM("FOLLOW_BOTTOM", false, "下方"),
-        FOLLOW_LEFT("FOLLOW_LEFT", false, "左侧"),
-        FOLLOW_RIGHT("FOLLOW_RIGHT", false, "右侧"),
-        FIXED_TOP("FIXED_TOP", true, "上方"),
-        FIXED_BOTTOM("FIXED_BOTTOM", true, "下方"),
-        FIXED_LEFT("FIXED_LEFT", true, "左侧"),
-        FIXED_RIGHT("FIXED_RIGHT", true, "右侧");
+        FOLLOW_TOP("FOLLOW_TOP", false, R.string.dock_top),
+        FOLLOW_BOTTOM("FOLLOW_BOTTOM", false, R.string.dock_bottom),
+        FOLLOW_LEFT("FOLLOW_LEFT", false, R.string.dock_left),
+        FOLLOW_RIGHT("FOLLOW_RIGHT", false, R.string.dock_right),
+        FIXED_TOP("FIXED_TOP", true, R.string.dock_top),
+        FIXED_BOTTOM("FIXED_BOTTOM", true, R.string.dock_bottom),
+        FIXED_LEFT("FIXED_LEFT", true, R.string.dock_left),
+        FIXED_RIGHT("FIXED_RIGHT", true, R.string.dock_right);
 
         fun toStoredValue(): String = rawValue
-
-        val summary: String
-            get() = "${if (!isFixed) "跟随" else "固定"}显示在屏幕$directionLabel"
 
         val modeIndex: Int
             get() = if (!isFixed) 0 else 1
@@ -44,8 +57,16 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             }
 
         companion object {
-            val modeItems = listOf("跟随", "固定")
-            val directionItems = listOf("上方", "下方", "左侧", "右侧")
+            val modeItemsResIds = listOf(
+                R.string.dock_follow,
+                R.string.dock_fixed,
+            )
+            val directionItemsResIds = listOf(
+                R.string.dock_top,
+                R.string.dock_bottom,
+                R.string.dock_left,
+                R.string.dock_right,
+            )
 
             fun fromBundle(bundle: Bundle) =
                 entries.firstOrNull { it.rawValue == bundle.fullscreenVirtualButtonDock }
@@ -179,7 +200,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         )
         val PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT = Pair(
             booleanPreferencesKey("preview_virtual_button_show_text"),
-            true,
+            false,
         )
         val VIRTUAL_BUTTONS_LAYOUT = Pair(
             stringPreferencesKey("virtual_buttons_layout"),

@@ -21,6 +21,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         applyMainOrientationPolicy()
 
+        // no logEvent before context init
         AppRuntime.init(applicationContext)
         AppScreenOn.register(window)
 

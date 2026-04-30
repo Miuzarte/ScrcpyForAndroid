@@ -40,14 +40,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.DirectoryDownloadSnapshot
 import io.github.miuzarte.scrcpyforandroid.services.FileManagerService
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
@@ -91,7 +94,6 @@ fun FileManagerScreen(
 ) {
     val viewModel: FileManagerViewModel = viewModel()
     val context = LocalContext.current
-    val snackbar = LocalSnackbarController.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
     val pullToRefreshState = rememberPullToRefreshState()
@@ -136,9 +138,6 @@ fun FileManagerScreen(
             if (uri != null) viewModel.downloadToTree(context, uri)
         }
 
-    LaunchedEffect(Unit) {
-        viewModel.snackbarEvents.collect { snackbar.show(it) }
-    }
 
     LaunchedEffect(currentPath) {
         viewModel.reloadCurrentDirectory(force = false)
@@ -176,7 +175,7 @@ fun FileManagerScreen(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 SmallTopAppBar(
-                    title = "文件",
+                    title = stringResource(R.string.main_tab_files),
                     color =
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
@@ -187,7 +186,7 @@ fun FileManagerScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "上一层",
+                                contentDescription = stringResource(R.string.fm_cd_parent),
                             )
                         }
                     },
@@ -224,7 +223,7 @@ fun FileManagerScreen(
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.Tune,
-                                    contentDescription = "排序",
+                                    contentDescription = stringResource(R.string.fm_cd_sort),
                                 )
                             }
                             OverlayListPopup(
@@ -233,7 +232,12 @@ fun FileManagerScreen(
                                 onDismissRequest = { showSortMenu = false },
                             ) {
                                 ListPopupColumn {
-                                    val sortOptions = listOf("文件名", "大小", "时间", "扩展名")
+                                    val sortOptions = listOf(
+                                        stringResource(R.string.fm_sort_name),
+                                        stringResource(R.string.fm_sort_size),
+                                        stringResource(R.string.fm_sort_time),
+                                        stringResource(R.string.fm_sort_extension),
+                                    )
                                     val sortFieldIdx = when (sortField) {
                                         FileManagerSortField.NAME -> 0
                                         FileManagerSortField.SIZE -> 1
@@ -259,7 +263,10 @@ fun FileManagerScreen(
                                         )
                                     }
                                     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                                    val dirOptions = listOf("正序", "倒序")
+                                    val dirOptions = listOf(
+                                        stringResource(R.string.fm_sort_asc),
+                                        stringResource(R.string.fm_sort_desc),
+                                    )
                                     val dirIdx = if (sortDescending) 1 else 0
                                     dirOptions.forEachIndexed { i, option ->
                                         DropdownImpl(
@@ -284,7 +291,7 @@ fun FileManagerScreen(
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.More,
-                                    contentDescription = "更多",
+                                    contentDescription = stringResource(R.string.cd_more),
                                 )
                             }
                             OverlayListPopup(
@@ -294,7 +301,7 @@ fun FileManagerScreen(
                             ) {
                                 ListPopupColumn {
                                     DropdownImpl(
-                                        text = "创建文件夹",
+                                        text = stringResource(R.string.fm_menu_create_folder),
                                         optionSize = 2,
                                         isSelected = false,
                                         index = 0,
@@ -305,7 +312,7 @@ fun FileManagerScreen(
                                         },
                                     )
                                     DropdownImpl(
-                                        text = "上传文件到该目录",
+                                        text = stringResource(R.string.fm_menu_upload),
                                         optionSize = 2,
                                         isSelected = false,
                                         index = 1,
@@ -356,7 +363,7 @@ fun FileManagerScreen(
         FileDetailsBottomSheet(
             show = showDetailsSheet,
             content = when {
-                detailLoading -> "正在加载详情"
+                detailLoading -> stringResource(R.string.fm_loading_details)
                 entry != null && selectedStat != null -> buildDetailsText(
                     stat = selectedStat!!,
                     targetStat = selectedTargetStat,
@@ -366,7 +373,7 @@ fun FileManagerScreen(
                     showRaw = showRawDetails,
                 )
 
-                else -> "暂无详情"
+                else -> stringResource(R.string.fm_no_details)
             },
             onDismissRequest = viewModel::dismissDetails,
             onDismissFinished = viewModel::clearDetails,
@@ -429,31 +436,39 @@ private fun FileManagerPage(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         pullToRefreshState = pullToRefreshState,
-        refreshTexts = listOf("下拉刷新", "释放刷新", "正在刷新...", "刷新完成"),
+        refreshTexts = listOf(
+            stringResource(R.string.fm_pull_refresh),
+            stringResource(R.string.fm_release_refresh),
+            stringResource(R.string.fm_refreshing),
+            stringResource(R.string.fm_refresh_done),
+        ),
         contentPadding = PaddingValues(top = contentPadding.calculateTopPadding() + 12.dp),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val availableListWidth =
-                (maxWidth - listHorizontalPadding).coerceAtLeast(fileCardMinWidth)
+            val availableListWidth = (maxWidth - listHorizontalPadding)
+                .coerceAtLeast(fileCardMinWidth)
             val columns = ((availableListWidth.value + UiSpacing.PageItem.value) /
-                    (fileCardMinWidth.value + UiSpacing.PageItem.value)).toInt().coerceAtLeast(1)
-            val fileRows = remember(displayedEntries, columns) { displayedEntries.chunked(columns) }
+                    (fileCardMinWidth.value + UiSpacing.PageItem.value)).toInt()
+                .coerceAtLeast(1)
+            val fileRows = remember(displayedEntries, columns) {
+                displayedEntries.chunked(columns)
+            }
 
             @Composable
             fun FileStateContent() {
                 when {
                     loading -> FileManagerStatusCard(
-                        message = "加载中",
+                        message = stringResource(R.string.text_loading),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     errorText != null -> FileManagerStatusCard(
-                        message = "加载失败: $errorText",
+                        message = stringResource(R.string.fm_load_failed, errorText),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     displayedEntries.isEmpty() -> FileManagerStatusCard(
-                        message = "空目录",
+                        message = stringResource(R.string.fm_empty_dir),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -576,7 +591,7 @@ private fun FileDetailsBottomSheet(
 ) {
     OverlayBottomSheet(
         show = show,
-        title = "文件详情",
+        title = stringResource(R.string.fm_file_details),
         onDismissRequest = onDismissRequest,
         onDismissFinished = onDismissFinished,
         startAction = {
@@ -587,9 +602,10 @@ private fun FileDetailsBottomSheet(
                     imageVector =
                         if (!showingRaw) Icons.Rounded.RawOff
                         else Icons.Rounded.RawOn,
-                    contentDescription =
-                        if (!showingRaw) "显示原文"
-                        else "显示解析",
+                    contentDescription = stringResource(
+                        if (!showingRaw) R.string.fm_show_raw
+                        else R.string.fm_show_parsed
+                    ),
                 )
             }
         },
@@ -600,7 +616,7 @@ private fun FileDetailsBottomSheet(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Download,
-                    contentDescription = "下载",
+                    contentDescription = stringResource(R.string.fm_cd_download),
                 )
             }
         },
@@ -633,7 +649,7 @@ private fun PathJumpDialog(
 ) {
     OverlayDialog(
         show = show,
-        title = "跳转路径",
+        title = stringResource(R.string.fm_goto_path),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
     ) {
@@ -646,11 +662,11 @@ private fun PathJumpDialog(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(UiSpacing.PageItem)) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.button_cancel),
                     onClick = onDismissRequest,
                 )
                 TextButton(
-                    text = "确定",
+                    text = stringResource(R.string.button_confirm),
                     onClick = onConfirm,
                 )
             }
@@ -668,7 +684,7 @@ private fun CreateFolderDialog(
 ) {
     OverlayDialog(
         show = show,
-        title = "创建文件夹",
+        title = stringResource(R.string.fm_title_create_folder),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
     ) {
@@ -676,16 +692,16 @@ private fun CreateFolderDialog(
             TextField(
                 value = folderName,
                 onValueChange = onFolderNameChange,
-                label = "新建文件夹",
+                label = stringResource(R.string.fm_label_new_folder),
                 useLabelAsPlaceholder = true,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(UiSpacing.PageItem)) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.button_cancel),
                     onClick = onDismissRequest,
                 )
                 TextButton(
-                    text = "创建",
+                    text = stringResource(R.string.fm_button_create),
                     onClick = onConfirm,
                 )
             }
@@ -711,7 +727,7 @@ private fun buildDetailsText(
         else FileManagerService.formatStatDetails(stat, directorySnapshot)
     )
     if (targetStat != null) {
-        details.append("\n\n目标信息\n")
+        details.append("\n\n${AppRuntime.stringResource(R.string.fm_stat_target_info)}\n")
         details.append(
             if (showRaw) targetStat.rawOutput
             else FileManagerService.formatStatDetails(targetStat)

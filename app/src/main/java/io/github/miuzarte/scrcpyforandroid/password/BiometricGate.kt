@@ -33,8 +33,8 @@ object BiometricGate {
 
     suspend fun authenticate(
         activity: FragmentActivity,
-        title: String = "验证身份",
-        subtitle: String = "确认后继续",
+        title: String,
+        subtitle: String,
     ): Boolean = suspendCancellableCoroutine { continuation ->
         val sessionId = sessionIds.incrementAndGet()
         var resumed = false

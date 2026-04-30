@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -43,6 +44,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
@@ -50,6 +52,7 @@ import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.ConnectionController
 import io.github.miuzarte.scrcpyforandroid.services.ConnectionStateStore
 import io.github.miuzarte.scrcpyforandroid.services.DeviceAdbAutoReconnectManager
@@ -135,9 +138,10 @@ internal fun DeviceTabScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.SwapHoriz,
-                                contentDescription =
-                                    if (configPanelOnLeft) "配置显示在右侧"
-                                    else "配置显示在左侧"
+                                contentDescription = stringResource(
+                                    if (configPanelOnLeft) R.string.device_cd_config_right
+                                    else R.string.device_cd_config_left
+                                ),
                             )
                         }
                     }
@@ -148,7 +152,7 @@ internal fun DeviceTabScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.More,
-                                contentDescription = "更多",
+                                contentDescription = stringResource(R.string.cd_more),
                             )
                         }
                         OverlayListPopup(
@@ -159,7 +163,7 @@ internal fun DeviceTabScreen(
                         ) {
                             ListPopupColumn {
                                 DropdownImpl(
-                                    text = "快速设备排序",
+                                    text = stringResource(R.string.device_menu_quick_sort),
                                     optionSize = 3,
                                     isSelected = false,
                                     index = 0,
@@ -169,7 +173,7 @@ internal fun DeviceTabScreen(
                                     },
                                 )
                                 DropdownImpl(
-                                    text = "虚拟按钮排序",
+                                    text = stringResource(R.string.device_menu_virtual_button_sort),
                                     optionSize = 3,
                                     isSelected = false,
                                     index = 1,
@@ -179,7 +183,7 @@ internal fun DeviceTabScreen(
                                     },
                                 )
                                 DropdownImpl(
-                                    text = "清空日志",
+                                    text = stringResource(R.string.device_menu_clear_logs),
                                     optionSize = 3,
                                     isSelected = false,
                                     index = 2,
@@ -194,12 +198,12 @@ internal fun DeviceTabScreen(
                     }
                 }
                 if (useCompactTopAppBar) SmallTopAppBar(
-                    title = "设备",
+                    title = stringResource(R.string.device_title),
                     color = topAppBarColor,
                     actions = topAppBarActions
                 )
                 else TopAppBar(
-                    title = "设备",
+                    title = stringResource(R.string.device_title),
                     color = topAppBarColor,
                     actions = topAppBarActions,
                     scrollBehavior = scrollBehavior
@@ -271,7 +275,6 @@ internal fun DeviceTabPage(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val navigator = LocalRootNavigator.current
-    val snackbar = LocalSnackbarController.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val apps = remember(listingsRefreshVersion) { viewModel.scrcpyListings.apps }
@@ -319,10 +322,6 @@ internal fun DeviceTabPage(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.snackbarEvents.collect { message -> snackbar.show(message) }
     }
 
     LaunchedEffect(Unit) {
@@ -393,14 +392,14 @@ internal fun DeviceTabPage(
             editingDeviceId = editingDeviceId,
             onClick = { device ->
                 if (editingDeviceId != device.id)
-                    snackbar.show("长按可编辑")
+                    AppRuntime.snackbar(R.string.device_hint_long_press_edit)
             },
             onLongClick = { device ->
                 val connected = adbConnected
                         && currentTarget?.host == device.host
                         && currentTarget?.port == device.port
                 if (connected) {
-                    snackbar.show("无法修改已连接的设备")
+                    AppRuntime.snackbar(R.string.device_cannot_modify_connected)
                 } else {
                     viewModel.setEditingDeviceId(
                         if (editingDeviceId != device.id) device.id
@@ -443,7 +442,7 @@ internal fun DeviceTabPage(
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
                 viewModel.upsertShortcut(DeviceShortcut(host = target.host, port = target.port))
-                snackbar.show("已添加设备: ${target.host}:${target.port}")
+                AppRuntime.snackbar(R.string.device_added, target.host, target.port)
             },
             onConnect = {
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
@@ -455,7 +454,7 @@ internal fun DeviceTabPage(
 
     @Composable
     fun PairingSection() {
-        SectionSmallTitle("无线配对")
+        SectionSmallTitle(stringResource(R.string.device_section_wireless_pairing))
         PairingCard(
             busy = busy,
             autoDiscoverOnDialogOpen = asBundle.adbPairingAutoDiscoverOnDialogOpen,
@@ -480,7 +479,7 @@ internal fun DeviceTabPage(
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
                 apps.isNotEmpty() -> apps.size.toString()
-                else -> "空"
+                else -> stringResource(R.string.text_none)
             },
             onOpenAllApps = {
                 viewModel.showAllApps()
@@ -492,7 +491,7 @@ internal fun DeviceTabPage(
             recentTasksEndActionText = when {
                 listingsRefreshBusy -> "..."
                 recentTasks.isNotEmpty() -> recentTasks.size.toString()
-                else -> "空"
+                else -> stringResource(R.string.text_none)
             },
             onOpenRecentTasks = {
                 viewModel.showRecentTasks()
@@ -513,7 +512,10 @@ internal fun DeviceTabPage(
     }
 
     @Composable
-    fun PreviewSection(modifier: Modifier = Modifier, directControlEnabled: Boolean = false) {
+    fun PreviewSection(
+        modifier: Modifier = Modifier,
+        directControlEnabled: Boolean = false,
+    ) {
         PreviewCard(
             modifier = modifier,
             sessionInfo = sessionInfo,
@@ -589,7 +591,7 @@ internal fun DeviceTabPage(
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
                 apps.isNotEmpty() -> apps.size.toString()
-                else -> "空"
+                else -> stringResource(R.string.text_none)
             },
             onOpenAllApps = {
                 viewModel.showAllApps()
@@ -601,7 +603,7 @@ internal fun DeviceTabPage(
             recentTasksEndActionText = when {
                 listingsRefreshBusy -> "..."
                 recentTasks.isNotEmpty() -> recentTasks.size.toString()
-                else -> "空"
+                else -> stringResource(R.string.text_none)
             },
             onOpenRecentTasks = {
                 viewModel.showRecentTasks()
@@ -641,10 +643,13 @@ internal fun DeviceTabPage(
     @Composable
     fun LogsSection() {
         if (!asBundle.hideDeviceLogs && EventLogger.hasLogs()) {
-            SectionSmallTitle("日志")
+            val context = LocalContext.current
+            SectionSmallTitle(stringResource(R.string.device_section_logs))
             Card {
                 TextField(
-                    value = EventLogger.eventLog.joinToString(separator = "\n"),
+                    value = EventLogger.eventLog.joinToString(separator = "\n") {
+                        it.render(context)
+                    },
                     onValueChange = {},
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -800,9 +805,9 @@ internal fun DeviceTabPage(
 
     AppListBottomSheet(
         show = showRecentTasksSheet,
-        title = "最近任务",
-        loadingText = "最近任务加载中",
-        emptyText = "没有可用的最近任务",
+        title = stringResource(R.string.bottomsheet_recent_tasks),
+        loadingText = stringResource(R.string.bottomsheet_loading_tasks),
+        emptyText = stringResource(R.string.bottomsheet_no_tasks),
         entries = recentTasks.map { task ->
             val app = viewModel.findCachedApp(task.packageName)
             AppListEntry(
@@ -828,9 +833,9 @@ internal fun DeviceTabPage(
 
     AppListBottomSheet(
         show = showAllAppsSheet,
-        title = "所有应用",
-        loadingText = "应用列表加载中",
-        emptyText = "没有可用的应用列表",
+        title = stringResource(R.string.bottomsheet_all_apps),
+        loadingText = stringResource(R.string.bottomsheet_loading_apps),
+        emptyText = stringResource(R.string.bottomsheet_no_apps),
         entries = apps.map { app ->
             AppListEntry(
                 key = app.packageName,

@@ -1,6 +1,5 @@
 package io.github.miuzarte.scrcpyforandroid.widgets
 
-import android.annotation.SuppressLint
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
@@ -58,8 +57,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,6 +74,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -82,7 +84,7 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
@@ -119,6 +121,7 @@ import kotlin.math.roundToInt
 
 @Composable
 internal fun StatusCard(
+    // TODO: unused
     statusLine: String,
     adbConnected: Boolean,
     streaming: Boolean,
@@ -129,8 +132,6 @@ internal fun StatusCard(
     val appSettings = Storage.appSettings
     val appSettingsBundle by appSettings.bundleState.collectAsState()
     val themeBaseIndex = appSettingsBundle.themeBaseIndex
-
-    val cleanStatusLine = normalizeStatusLine(statusLine)
 
     // 根据应用主题设置决定是否使用深色模式
     val isDarkTheme = when (themeBaseIndex) {
@@ -159,7 +160,7 @@ internal fun StatusCard(
             }
             StatusCardSpec(
                 big = StatusBigCardSpec(
-                    title = "投屏中 (视频流)",
+                    title = stringResource(R.string.device_status_mirroring),
                     subtitle = sessionInfo.deviceName,
                     containerColor = streamCardColor,
                     titleColor = streamTextColor,
@@ -168,11 +169,11 @@ internal fun StatusCard(
                     iconTint = streamIconColor,
                 ),
                 firstSmall = StatusSmallCardSpec(
-                    "分辨率",
+                    stringResource(R.string.device_status_resolution),
                     "${sessionInfo.width}×${sessionInfo.height}",
                 ),
                 secondSmall = StatusSmallCardSpec(
-                    "编解码器",
+                    stringResource(R.string.device_status_codec),
                     sessionInfo.codec?.displayName ?: "null",
                 ),
             )
@@ -180,8 +181,8 @@ internal fun StatusCard(
 
         adbConnected -> StatusCardSpec(
             big = StatusBigCardSpec(
-                title = "ADB 已连接",
-                subtitle = cleanStatusLine,
+                title = stringResource(R.string.device_status_adb_connected),
+                subtitle = connectedDeviceLabel,
                 containerColor = colorScheme.primaryContainer,
                 titleColor = colorScheme.onPrimaryContainer,
                 subtitleColor = colorScheme.onPrimaryContainer,
@@ -189,18 +190,18 @@ internal fun StatusCard(
                 iconTint = colorScheme.primary.copy(alpha = 0.6f),
             ),
             firstSmall = StatusSmallCardSpec(
-                "当前设备",
+                stringResource(R.string.device_status_current),
                 connectedDeviceLabel,
             ),
             secondSmall = StatusSmallCardSpec(
-                "状态",
-                "空闲",
+                stringResource(R.string.label_status),
+                stringResource(R.string.device_status_idle),
             ),
         )
 
         else -> StatusCardSpec(
             big = StatusBigCardSpec(
-                title = "ADB 未连接",
+                title = stringResource(R.string.device_status_adb_disconnected),
                 subtitle = "",
                 containerColor = colorScheme.secondaryContainer,
                 titleColor = colorScheme.onSecondaryContainer,
@@ -209,11 +210,11 @@ internal fun StatusCard(
                 iconTint = colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
             ),
             firstSmall = StatusSmallCardSpec(
-                "当前设备",
+                stringResource(R.string.device_status_current),
                 "N/A",
             ),
             secondSmall = StatusSmallCardSpec(
-                "状态",
+                stringResource(R.string.label_status),
                 "N/A",
             ),
         )
@@ -234,7 +235,7 @@ internal fun PairingCard(
 
     Card {
         ArrowPreference(
-            title = "使用配对码配对设备",
+            title = stringResource(R.string.device_pairing_title),
             onClick = {
                 showPairDialog.value = true
                 holdDownState.value = true
@@ -435,11 +436,11 @@ internal fun PreviewCard(
                         modifier = Modifier.alpha(alpha),
                     ) {
                         Icon(
-                            Icons.Rounded.Fullscreen,
-                            contentDescription = "全屏",
+                            imageVector = Icons.Rounded.Fullscreen,
+                            contentDescription = stringResource(R.string.cd_fullscreen),
                         )
                         Spacer(Modifier.width(UiSpacing.SectionTitleBottom))
-                        Text("全屏")
+                        Text(stringResource(R.string.button_fullscreen))
                     }
                 }
             }
@@ -506,8 +507,6 @@ internal fun ConfigPanel(
 ) {
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
-    val snackbar = LocalSnackbarController.current
-
     val sessionStarted = sessionInfo != null
 
     val activeProfileIdLatest by rememberUpdatedState(activeProfileId)
@@ -515,28 +514,25 @@ internal fun ConfigPanel(
     var soBundle by rememberSaveable(activeProfileId, activeBundle) { mutableStateOf(activeBundle) }
     val soBundleLatest by rememberUpdatedState(soBundle)
     LaunchedEffect(activeProfileId, activeBundle) {
-        if (soBundle != activeBundle) {
+        if (soBundle != activeBundle)
             soBundle = activeBundle
-        }
     }
     LaunchedEffect(soBundle) {
         delay(Settings.BUNDLE_SAVE_DELAY)
         if (soBundle != activeBundleLatest) {
-            if (activeProfileIdLatest == ScrcpyOptions.GLOBAL_PROFILE_ID) {
+            if (activeProfileIdLatest == ScrcpyOptions.GLOBAL_PROFILE_ID)
                 scrcpyOptions.saveBundle(soBundle)
-            } else {
+            else
                 Storage.scrcpyProfiles.updateBundle(activeProfileIdLatest, soBundle)
-            }
         }
     }
     DisposableEffect(Unit) {
         onDispose {
             taskScope.launch {
-                if (activeProfileIdLatest == ScrcpyOptions.GLOBAL_PROFILE_ID) {
+                if (activeProfileIdLatest == ScrcpyOptions.GLOBAL_PROFILE_ID)
                     scrcpyOptions.saveBundle(soBundleLatest)
-                } else {
+                else
                     Storage.scrcpyProfiles.updateBundle(activeProfileIdLatest, soBundleLatest)
-                }
             }
         }
     }
@@ -562,31 +558,36 @@ internal fun ConfigPanel(
     Card {
         if (!hideSimpleConfigItems) {
             SwitchPreference(
-                title = "音频转发",
-                summary = "转发设备音频到本机 (Android 11+)",
+                title = stringResource(R.string.device_config_audio_forwarding),
+                summary = stringResource(R.string.device_config_audio_forwarding_desc),
                 checked = soBundle.audio,
-                onCheckedChange = { soBundle = soBundle.copy(audio = it) },
+                onCheckedChange = {
+                    soBundle = soBundle.copy(
+                        audio = it
+                    )
+                },
                 enabled = !sessionStarted
                         && audioForwardingSupported,
             )
 
             OverlayDropdownPreference(
-                title = "音频编码",
+                title = stringResource(R.string.device_config_audio_codec),
                 summary = "--audio-codec",
                 items = audioCodecItems,
                 selectedIndex = audioCodecIndex,
                 onSelectedIndexChange = {
                     val codec = Codec.AUDIO[it]
-                    soBundle = soBundle.copy(audioCodec = codec.string)
-                    if (codec == Codec.FLAC) {
-                        snackbar.show("注意：FLAC编解码会引入较大的延迟")
-                    }
+                    soBundle = soBundle.copy(
+                        audioCodec = codec.string
+                    )
+                    if (codec == Codec.FLAC)
+                        AppRuntime.snackbar(R.string.device_config_audio_codec_note)
                 },
                 enabled = !sessionStarted && soBundle.audio,
             )
             AnimatedVisibility(audioBitRateVisibility) {
                 SuperSlider(
-                    title = "音频码率",
+                    title = stringResource(R.string.device_config_audio_bitrate),
                     summary = "--audio-bit-rate",
                     value = ScrcpyPresets.AudioBitRate
                         .indexOfOrNearest(soBundle.audioBitRate / 1000)
@@ -601,7 +602,7 @@ internal fun ConfigPanel(
                     valueRange = 0f..ScrcpyPresets.AudioBitRate.lastIndex.toFloat(),
                     steps = (ScrcpyPresets.AudioBitRate.size - 2).coerceAtLeast(0),
                     unit = "Kbps",
-                    zeroStateText = "默认",
+                    zeroStateText = stringResource(R.string.text_default),
                     displayText = (soBundle.audioBitRate / 1_000).toString(),
                     inputInitialValue =
                         if (soBundle.audioBitRate <= 0) ""
@@ -618,22 +619,22 @@ internal fun ConfigPanel(
             }
 
             OverlayDropdownPreference(
-                title = "视频编码",
+                title = stringResource(R.string.device_config_video_codec),
                 summary = "--video-codec",
                 items = videoCodecItems,
                 selectedIndex = videoCodecIndex,
                 onSelectedIndexChange = {
                     val codec = Codec.VIDEO[it]
-                    soBundle = soBundle.copy(videoCodec = codec.string)
-                    if (codec == Codec.AV1) {
-                        snackbar.show("注意：绝大部分设备不支持AV1硬件编码")
-                    }
+                    soBundle = soBundle.copy(
+                        videoCodec = codec.string
+                    )
+                    if (codec == Codec.AV1)
+                        AppRuntime.snackbar(R.string.device_config_video_codec_note)
                 },
                 enabled = !sessionStarted,
             )
-            @SuppressLint("DefaultLocale")
             SuperSlider(
-                title = "视频码率",
+                title = stringResource(R.string.device_config_video_bitrate),
                 summary = "--video-bit-rate",
                 value = soBundle.videoBitRate / 1_000_000f,
                 onValueChange = { mbps ->
@@ -642,13 +643,13 @@ internal fun ConfigPanel(
                     )
                 },
                 valueRange = 0f..40f,
-                steps = 400 - 1,
+                steps = 400 - 0 - 1,
                 unit = "Mbps",
-                zeroStateText = "默认",
-                displayFormatter = { String.format("%.1f", it) },
+                zeroStateText = stringResource(R.string.text_default),
+                displayFormatter = { "%.1f".format(it) },
                 inputInitialValue =
                     if (soBundle.videoBitRate <= 0) ""
-                    else String.format("%.1f", soBundle.videoBitRate / 1_000_000f),
+                    else "%.1f".format(soBundle.videoBitRate / 1_000_000f),
                 inputFilter = { text ->
                     var dotUsed = false
                     text.filter { ch ->
@@ -678,8 +679,11 @@ internal fun ConfigPanel(
         }
 
         ArrowPreference(
-            title = if (!hideSimpleConfigItems) "更多参数" else "所有参数",
-            summary = "所有 scrcpy 参数",
+            title = stringResource(
+                if (!hideSimpleConfigItems) R.string.device_config_more_params
+                else R.string.device_config_all_params
+            ),
+            summary = stringResource(R.string.device_config_all_scrcpy_params),
             endActions = {
                 Text(
                     text = advancedEndActionText,
@@ -692,7 +696,7 @@ internal fun ConfigPanel(
         )
 
         ArrowPreference(
-            title = "所有应用",
+            title = stringResource(R.string.bottomsheet_all_apps),
             endActions = {
                 Text(
                     text = allAppsEndActionText,
@@ -704,7 +708,7 @@ internal fun ConfigPanel(
             enabled = !busy && !adbConnecting,
         )
         ArrowPreference(
-            title = "最近任务",
+            title = stringResource(R.string.bottomsheet_recent_tasks),
             endActions = {
                 Text(
                     text = recentTasksEndActionText,
@@ -732,7 +736,7 @@ internal fun ConfigPanel(
             @Composable
             fun DisconnectButton() {
                 if (isQuickConnected) TextButton(
-                    text = "断开",
+                    text = stringResource(R.string.button_disconnect),
                     onClick = {
                         onStartStopHaptic()
                         onDisconnect()
@@ -745,7 +749,7 @@ internal fun ConfigPanel(
             @Composable
             fun MainButton() {
                 if (!sessionStarted) TextButton(
-                    text = "启动",
+                    text = stringResource(R.string.button_start),
                     onClick = {
                         onStartStopHaptic()
                         onStart()
@@ -755,7 +759,7 @@ internal fun ConfigPanel(
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
                 if (sessionStarted) TextButton(
-                    text = "停止",
+                    text = stringResource(R.string.button_stop),
                     onClick = {
                         onStartStopHaptic()
                         onStop()
@@ -768,7 +772,7 @@ internal fun ConfigPanel(
             @Composable
             fun FullscreenButton() {
                 if (showFullscreenAction) TextButton(
-                    text = "全屏",
+                    text = stringResource(R.string.button_fullscreen),
                     onClick = {
                         onStartStopHaptic()
                         onOpenFullscreen()
@@ -840,8 +844,8 @@ private fun PairingDialog(
 
     OverlayDialog(
         show = showDialog,
-        title = "使用配对码配对设备",
-        summary = "使用六位数的配对码配对新设备",
+        title = stringResource(R.string.device_pairing_title),
+        summary = stringResource(R.string.device_pairing_desc),
         defaultWindowInsetsPadding = false,
         onDismissRequest = {
             onDismissRequest()
@@ -856,7 +860,7 @@ private fun PairingDialog(
             TextField(
                 value = host,
                 onValueChange = { host = it },
-                label = "IP 地址",
+                label = stringResource(R.string.label_ip_address),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -870,7 +874,7 @@ private fun PairingDialog(
             TextField(
                 value = port,
                 onValueChange = { port = it.filter(Char::isDigit) },
-                label = "端口",
+                label = stringResource(R.string.label_port),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -884,7 +888,7 @@ private fun PairingDialog(
             TextField(
                 value = code,
                 onValueChange = { code = it },
-                label = "WLAN 配对码",
+                label = stringResource(R.string.label_wlan_pairing_code),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -903,7 +907,10 @@ private fun PairingDialog(
             verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
         ) {
             TextButton(
-                text = if (!discoveringPort) "自动发现" else "发现中...",
+                text = stringResource(
+                    if (!discoveringPort) R.string.button_auto_discover
+                    else R.string.button_discovering
+                ),
                 onClick = {
                     if (enabled && onDiscoverTarget != null && !discoveringPort)
                         scope.launch { doDiscover() }
@@ -915,14 +922,14 @@ private fun PairingDialog(
                 horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
             ) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.button_cancel),
                     onClick = {
                         onDismissRequest()
                     },
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(
-                    text = "配对",
+                    text = stringResource(R.string.button_pair),
                     onClick = {
                         onConfirm(host.trim(), port.trim(), code.trim())
                         onDismissRequest()
@@ -1141,7 +1148,6 @@ internal fun DeviceTile(
     onEditorCancel: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    val snackbar = LocalSnackbarController.current
     val scrcpyProfilesState by Storage.scrcpyProfiles.state.collectAsState()
 
     var draft by remember(editing, device.id) {
@@ -1253,14 +1259,17 @@ internal fun DeviceTile(
                     Spacer(Modifier.width(UiSpacing.Medium))
                 }
                 TextButton(
-                    text = if (!isConnected) "连接" else "断开",
+                    text = stringResource(
+                        if (!isConnected) R.string.button_connect
+                        else R.string.button_disconnect
+                    ),
                     onClick = onAction,
                     enabled = actionEnabled && !actionInProgress,
-                    colors = if (!isConnected && device.startScrcpyOnConnect) {
-                        ButtonDefaults.textButtonColorsPrimary()
-                    } else {
-                        ButtonDefaults.textButtonColors()
-                    },
+                    colors =
+                        if (!isConnected && device.startScrcpyOnConnect)
+                            ButtonDefaults.textButtonColorsPrimary()
+                        else
+                            ButtonDefaults.textButtonColors(),
                 )
             }
         }
@@ -1277,14 +1286,14 @@ internal fun DeviceTile(
                     SuperTextField(
                         value = currentDraft.name,
                         onValueChange = { draft = currentDraft.copy(name = it) },
-                        label = "设备名",
+                        label = stringResource(R.string.label_device_name),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     SuperTextField(
                         value = currentDraft.host,
                         onValueChange = { draft = currentDraft.copy(host = it) },
-                        label = "IP 地址",
+                        label = stringResource(R.string.label_ip_address),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
@@ -1297,13 +1306,13 @@ internal fun DeviceTile(
                                 port = draftPortText?.toIntOrNull() ?: Defaults.ADB_PORT
                             )
                         },
-                        label = "端口",
+                        label = stringResource(R.string.label_port),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     CheckboxPreference(
-                        title = "连接后立即启动 scrcpy",
+                        title = stringResource(R.string.device_config_start_immediately),
                         checkboxLocation = CheckboxLocation.End,
                         checked = currentDraft.startScrcpyOnConnect,
                         onCheckedChange = {
@@ -1312,7 +1321,7 @@ internal fun DeviceTile(
                     )
                     AnimatedVisibility(currentDraft.startScrcpyOnConnect) {
                         CheckboxPreference(
-                            title = "直接进入全屏",
+                            title = stringResource(R.string.device_config_direct_fullscreen),
                             checkboxLocation = CheckboxLocation.End,
                             checked = currentDraft.startScrcpyOnConnect
                                     && currentDraft.openFullscreenOnStart,
@@ -1322,18 +1331,23 @@ internal fun DeviceTile(
                             },
                         )
                     }
+                    val textGlobal = stringResource(R.string.text_global)
                     OverlayDropdownPreference(
-                        title = "scrcpy 配置",
+                        title = stringResource(R.string.device_config_scrcpy_config),
                         items = profileNames,
                         selectedIndex = profileDropdownIndex,
                         onSelectedIndexChange = {
                             val profileId = profileIds.getOrElse(it) {
                                 ScrcpyOptions.GLOBAL_PROFILE_ID
                             }
-                            val profileName = profileNames.getOrElse(it) { "全局" }
+                            val profileName = profileNames.getOrElse(it) { textGlobal }
                             val deviceName = currentDraft.name.ifBlank { currentDraft.host }
                             draft = currentDraft.copy(scrcpyProfileId = profileId)
-                            snackbar.show("$deviceName 已切换到配置 $profileName")
+                            AppRuntime.snackbar(
+                                R.string.device_switched_profile,
+                                deviceName,
+                                profileName,
+                            )
                         },
                     )
                 }
@@ -1344,7 +1358,7 @@ internal fun DeviceTile(
                     horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
                 ) {
                     TextButton(
-                        text = "取消",
+                        text = stringResource(R.string.button_cancel),
                         onClick = {
                             onEditorSave(currentOriginalDraft)
                             onEditorCancel()
@@ -1352,12 +1366,12 @@ internal fun DeviceTile(
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(
-                        text = "删除",
+                        text = stringResource(R.string.button_delete),
                         onClick = onEditorDelete,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(
-                        text = "完成",
+                        text = stringResource(R.string.button_done),
                         onClick = onEditorCancel,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -1431,12 +1445,12 @@ internal fun QuickConnectCard(
                 horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
             ) {
                 Icon(
-                    Icons.Rounded.AddLink,
-                    contentDescription = "连接 / 添加设备",
+                    imageVector = Icons.Rounded.AddLink,
+                    contentDescription = stringResource(R.string.device_quick_connect_title),
                     tint = colorScheme.onPrimaryContainer,
                 )
                 Text(
-                    "连接 / 添加设备",
+                    stringResource(R.string.device_quick_connect_title),
                     fontWeight = FontWeight.Bold,
                     color = colorScheme.onPrimaryContainer,
                 )
@@ -1458,13 +1472,13 @@ internal fun QuickConnectCard(
                 horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
             ) {
                 TextButton(
-                    text = "添加设备",
+                    text = stringResource(R.string.button_add_device),
                     onClick = onAddDevice,
                     modifier = Modifier.weight(1f),
                     enabled = enabled,
                 )
                 TextButton(
-                    text = "直接连接",
+                    text = stringResource(R.string.button_direct_connect),
                     onClick = onConnect,
                     modifier = Modifier.weight(1f),
                     enabled = enabled,

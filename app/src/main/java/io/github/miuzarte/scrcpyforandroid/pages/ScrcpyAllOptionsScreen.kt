@@ -1,6 +1,5 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
-import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,10 +39,12 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
@@ -65,7 +66,6 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.LogLevel
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyProfiles
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
@@ -119,7 +119,6 @@ internal fun ScrcpyAllOptionsScreen(
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
     val scope = rememberCoroutineScope()
-    val snackbar = LocalSnackbarController.current
     var showProfileMenu by rememberSaveable { mutableStateOf(false) }
     var showManageProfilesSheet by rememberSaveable { mutableStateOf(false) }
     val qdBundleShared by quickDevices.bundleState.collectAsState()
@@ -142,13 +141,11 @@ internal fun ScrcpyAllOptionsScreen(
     var selectedProfileId by selectedProfileIdState
     val soBundleState = rememberSaveable(selectedProfileId, soBundleShared, scrcpyProfilesState) {
         mutableStateOf(
-            if (selectedProfileId == ScrcpyOptions.GLOBAL_PROFILE_ID) {
+            if (selectedProfileId == ScrcpyOptions.GLOBAL_PROFILE_ID)
                 soBundleShared
-            } else {
-                scrcpyProfilesState.profiles
-                    .firstOrNull { it.id == selectedProfileId }
-                    ?.bundle ?: soBundleShared
-            }
+            else scrcpyProfilesState.profiles
+                .firstOrNull { it.id == selectedProfileId }
+                ?.bundle ?: soBundleShared
         )
     }
     val lastValidSoBundleState = rememberSaveable(selectedProfileId) {
@@ -165,15 +162,12 @@ internal fun ScrcpyAllOptionsScreen(
     }
     val currentConnectedDeviceName = remember(qdBundleShared.quickDevicesList) {
         val currentTarget = AppRuntime.currentConnectionTarget
-        if (currentTarget == null) {
-            null
-        } else {
-            DeviceShortcuts.unmarshalFrom(qdBundleShared.quickDevicesList)
-                .get(currentTarget.host, currentTarget.port)
-                ?.name
-                ?.ifBlank { currentTarget.host }
-                ?: currentTarget.host
-        }
+        if (currentTarget == null) null
+        else DeviceShortcuts.unmarshalFrom(qdBundleShared.quickDevicesList)
+            .get(currentTarget.host, currentTarget.port)
+            ?.name
+            ?.ifBlank { currentTarget.host }
+            ?: currentTarget.host
     }
     var activeProfileDialog by rememberSaveable { mutableStateOf<ProfileDialogMode?>(null) }
     var profileDialogTargetId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -182,22 +176,19 @@ internal fun ScrcpyAllOptionsScreen(
     var deletingProfileId by rememberSaveable { mutableStateOf<String?>(null) }
 
     suspend fun saveBundleForProfile(profileId: String, bundle: ScrcpyOptions.Bundle) {
-        if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID) {
+        if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID)
             scrcpyOptions.saveBundle(bundle)
-        } else {
+        else
             scrcpyProfiles.updateBundle(profileId, bundle)
-        }
     }
 
     suspend fun rebindDeletedProfileReferences(profileId: String) {
         val shortcuts = DeviceShortcuts.unmarshalFrom(qdBundleShared.quickDevicesList)
         val updated = shortcuts.copy(
             devices = shortcuts.map { device ->
-                if (device.scrcpyProfileId == profileId) {
+                if (device.scrcpyProfileId == profileId)
                     device.copy(scrcpyProfileId = ScrcpyOptions.GLOBAL_PROFILE_ID)
-                } else {
-                    device
-                }
+                else device
             }
         )
         if (updated != shortcuts) {
@@ -226,15 +217,15 @@ internal fun ScrcpyAllOptionsScreen(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 TopAppBar(
-                    title = "所有参数",
+                    title = stringResource(R.string.scrcpyopt_title),
                     color =
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
                     navigationIcon = {
                         IconButton(onClick = navigator.pop) {
                             Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "返回"
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
                             )
                         }
                     },
@@ -246,7 +237,7 @@ internal fun ScrcpyAllOptionsScreen(
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.More,
-                                    contentDescription = "配置管理",
+                                    contentDescription = stringResource(R.string.scrcpyopt_cd_profile_manage),
                                 )
                             }
                             OverlayListPopup(
@@ -257,7 +248,7 @@ internal fun ScrcpyAllOptionsScreen(
                             ) {
                                 ListPopupColumn {
                                     DropdownImpl(
-                                        text = "管理配置",
+                                        text = stringResource(R.string.scrcpyopt_manage_profiles),
                                         optionSize = 1,
                                         isSelected = false,
                                         index = 0,
@@ -272,6 +263,7 @@ internal fun ScrcpyAllOptionsScreen(
                     },
                     scrollBehavior = scrollBehavior,
                     bottomContent = {
+                        val textGlobal = stringResource(R.string.text_global)
                         TabRow(
                             tabs = profileTabs,
                             selectedTabIndex = selectedProfileIndex,
@@ -283,9 +275,13 @@ internal fun ScrcpyAllOptionsScreen(
                                     saveBundleForProfile(selectedProfileId, soBundleState.value)
                                     bindCurrentConnectedDevice(nextProfileId)
                                     selectedProfileId = nextProfileId
-                                    val profileName = profileTabs.getOrElse(index) { "全局" }
+                                    val profileName = profileTabs.getOrElse(index) { textGlobal }
                                     currentConnectedDeviceName?.let { deviceName ->
-                                        snackbar.show("$deviceName 已切换到配置 $profileName")
+                                        AppRuntime.snackbar(
+                                            R.string.device_switched_profile,
+                                            deviceName,
+                                            profileName,
+                                        )
                                     }
                                 }
                             },
@@ -301,15 +297,12 @@ internal fun ScrcpyAllOptionsScreen(
                 )
             }
         },
-        snackbarHost = {
-            val snackbar = LocalSnackbarController.current
-            SnackbarHost(snackbar.hostState)
-        },
+        snackbarHost = { AppRuntime.snackbarHostState?.let { SnackbarHost(it) } },
     ) { contentPadding ->
         Box(
             modifier =
                 if (blurActive) Modifier.layerBackdrop(blurBackdrop)
-                else Modifier,
+                else Modifier
         ) {
             ScrcpyAllOptionsPage(
                 contentPadding = contentPadding,
@@ -370,6 +363,7 @@ internal fun ScrcpyAllOptionsScreen(
             }
         }
 
+        val textNewProfile = stringResource(R.string.scrcpyopt_new_profile)
         ManageProfilesSheet(
             show = showManageProfilesSheet,
             profiles = scrcpyProfilesState.profiles,
@@ -377,7 +371,7 @@ internal fun ScrcpyAllOptionsScreen(
             onDismissRequest = { showManageProfilesSheet = false },
             onCreateProfile = {
                 profileDialogTargetId = null
-                profileDialogInput = "新配置"
+                profileDialogInput = textNewProfile
                 profileDialogCopySourceId = selectedProfileId
                 activeProfileDialog = ProfileDialogMode.Create
             },
@@ -410,9 +404,8 @@ internal fun ScrcpyAllOptionsScreen(
                 val deleted = scrcpyProfiles.deleteProfile(profileId)
                 if (deleted) {
                     rebindDeletedProfileReferences(profileId)
-                    if (selectedProfileId == profileId) {
+                    if (selectedProfileId == profileId)
                         selectedProfileId = ScrcpyOptions.GLOBAL_PROFILE_ID
-                    }
                 }
                 deletingProfileId = null
             }
@@ -436,7 +429,6 @@ internal fun ScrcpyAllOptionsPage(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val taskScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
-    val snackbar = LocalSnackbarController.current
 
     val refreshBusy by scrcpy.listings.refreshBusyState.collectAsState()
     val listRefreshVersion by scrcpy.listings.refreshVersionState.collectAsState()
@@ -501,9 +493,14 @@ internal fun ScrcpyAllOptionsPage(
             .coerceAtLeast(0)
     }
 
+    val textAuto = stringResource(R.string.text_auto)
+    val textDefault = stringResource(R.string.text_default)
+    val textNone = stringResource(R.string.text_none)
+    val textCustom = stringResource(R.string.text_custom)
+
     val displays = scrcpy.listings.displays
-    val displayDropdownItems = rememberSaveable(displays, listRefreshVersion) {
-        listOf("默认") + displays.map { "${it.id} (${it.width}x${it.height})" }
+    val displayDropdownItems = rememberSaveable(textDefault, displays, listRefreshVersion) {
+        listOf(textDefault) + displays.map { "${it.id} (${it.width}x${it.height})" }
     }
     val displaySpinnerItems = remember(displayDropdownItems) {
         displayDropdownItems.map { SpinnerEntry(title = it) }
@@ -523,8 +520,8 @@ internal fun ScrcpyAllOptionsPage(
     }
 
     val cameras = scrcpy.listings.cameras
-    val cameraDropdownItems = rememberSaveable(cameras, listRefreshVersion) {
-        listOf("默认") + cameras.map { info ->
+    val cameraDropdownItems = rememberSaveable(textDefault, cameras, listRefreshVersion) {
+        listOf(textDefault) + cameras.map { info ->
             buildString {
                 append(info.id)
                 append(" (")
@@ -554,19 +551,17 @@ internal fun ScrcpyAllOptionsPage(
         else null
     }
 
-    val cameraFacingItems = rememberSaveable {
-        listOf("默认") + CameraFacing.entries
+    val cameraFacingItems = rememberSaveable(textDefault) {
+        listOf(textDefault) + CameraFacing.entries
             .drop(1)
             .map { it.string }
     }
     val cameraFacingIndex = rememberSaveable(soBundle.cameraFacing) {
-        if (soBundle.cameraFacing.isEmpty()) {
-            0
-        } else {
-            val idx = CameraFacing.entries
-                .indexOfFirst { it.string == soBundle.cameraFacing }
-            if (idx > 0) idx else 0
-        }
+        if (soBundle.cameraFacing.isEmpty()) 0
+        else CameraFacing.entries
+            .indexOfFirst { it.string == soBundle.cameraFacing }
+            .takeIf { it > 0 }
+            ?: 0
     }
 
     var cameraSizeCustomInput by rememberSaveable(soBundle.cameraSizeCustom) {
@@ -574,8 +569,13 @@ internal fun ScrcpyAllOptionsPage(
     }
 
     val cameraSizes = scrcpy.listings.cameraSizes
-    val cameraSizeDropdownItems = rememberSaveable(cameraSizes, listRefreshVersion) {
-        listOf("默认", "自定义") + cameraSizes
+    val cameraSizeDropdownItems = rememberSaveable(
+        textDefault,
+        textCustom,
+        cameraSizes,
+        listRefreshVersion,
+    ) {
+        listOf(textDefault, textCustom) + cameraSizes
     }
     val cameraSizeSpinnerItems = remember(cameraSizeDropdownItems) {
         cameraSizeDropdownItems.map { SpinnerEntry(title = it) }
@@ -630,8 +630,20 @@ internal fun ScrcpyAllOptionsPage(
             .indexOfFirst { it.string == soBundle.audioSource }
             .coerceAtLeast(0)
     }
-    val keyInjectModeItems = rememberSaveable {
-        listOf("默认", "优先文本", "原始按键事件")
+
+    val keyInjectModeTextDefaultMixed = stringResource(R.string.scrcpyopt_default_mixed)
+    val keyInjectModeTextPreferText = stringResource(R.string.scrcpyopt_prefer_text)
+    val keyInjectModeTextRawKeyEvent = stringResource(R.string.scrcpyopt_raw_key_events)
+    val keyInjectModeItems = rememberSaveable(
+        keyInjectModeTextDefaultMixed,
+        keyInjectModeTextPreferText,
+        keyInjectModeTextRawKeyEvent,
+    ) {
+        listOf(
+            keyInjectModeTextDefaultMixed,
+            keyInjectModeTextPreferText,
+            keyInjectModeTextRawKeyEvent,
+        )
     }
     val keyInjectModeIndex = rememberSaveable(soBundle.keyInjectMode) {
         when (soBundle.keyInjectMode) {
@@ -658,10 +670,10 @@ internal fun ScrcpyAllOptionsPage(
     }
 
     val videoEncoders = scrcpy.listings.videoEncoders
-    val videoEncoderItems by remember(videoEncoders, listRefreshVersion) {
+    val videoEncoderItems by remember(textAuto, videoEncoders, listRefreshVersion) {
         derivedStateOf {
             buildList {
-                add(SpinnerEntry(title = "自动"))
+                add(SpinnerEntry(title = textAuto))
                 videoEncoders.forEach { info ->
                     add(
                         SpinnerEntry(
@@ -692,7 +704,7 @@ internal fun ScrcpyAllOptionsPage(
     val audioEncoderItems by remember(audioEncoders, listRefreshVersion) {
         derivedStateOf {
             buildList {
-                add(SpinnerEntry(title = "自动"))
+                add(SpinnerEntry(title = textAuto))
                 audioEncoders.forEach { info ->
                     add(
                         SpinnerEntry(
@@ -720,28 +732,26 @@ internal fun ScrcpyAllOptionsPage(
     }
 
     val displayImePolicyItems = rememberSaveable {
-        listOf("默认") + DisplayImePolicy.entries
+        listOf(textDefault) + DisplayImePolicy.entries
             .drop(1)
             .map { it.string }
     }
     val displayImePolicyIndex = rememberSaveable(soBundle.displayImePolicy) {
-        if (soBundle.displayImePolicy.isEmpty()) {
-            0
-        } else {
-            val idx = DisplayImePolicy.entries
-                .indexOfFirst { it.string == soBundle.displayImePolicy }
-            if (idx > 0) idx else 0
-        }
+        if (soBundle.displayImePolicy.isEmpty()) 0
+        else DisplayImePolicy.entries
+            .indexOfFirst { it.string == soBundle.displayImePolicy }
+            .takeIf { it > 0 }
+            ?: 0
     }
 
     val apps = remember(scrcpy.listings.apps, listRefreshVersion) {
-        scrcpy.listings.apps // .sortedBy { it.packageName }
+        scrcpy.listings.apps
     }
     val appDropdownItems by remember(apps, listRefreshVersion) {
         derivedStateOf {
             buildList {
-                add(SpinnerEntry(title = "无"))
-                add(SpinnerEntry(title = "自定义"))
+                add(SpinnerEntry(title = textNone))
+                add(SpinnerEntry(title = textCustom))
                 apps.forEach { app ->
                     add(
                         SpinnerEntry(
@@ -749,7 +759,7 @@ internal fun ScrcpyAllOptionsPage(
                                 {
                                     Icon(
                                         imageVector =
-                                            if (system) Icons.Rounded.Android // MiuixIcons.Tune
+                                            if (system) Icons.Rounded.Android
                                             else MiuixIcons.Store,
                                         contentDescription = app.label ?: app.packageName,
                                         modifier = Modifier.padding(end = UiSpacing.ContentVertical),
@@ -848,7 +858,10 @@ internal fun ScrcpyAllOptionsPage(
             clientOptions.validate()
         } catch (e: IllegalArgumentException) {
             if (soBundle != lastValidSoBundle) {
-                snackbar.show("Invalid options: ${e.message}")
+                AppRuntime.snackbar(
+                    R.string.scrcpyopt_invalid_options,
+                    e.message ?: e.javaClass.simpleName,
+                )
                 soBundle = lastValidSoBundle
             }
             return@LaunchedEffect
@@ -883,23 +896,23 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 SwitchPreference(
-                    title = "scrcpy 启动后熄灭设备屏幕",
+                    title = stringResource(R.string.scrcpyopt_turn_screen_off),
                     summary = "--turn-screen-off",
                     checked = soBundle.turnScreenOff,
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             turnScreenOff = it
                         )
-                        if (it) snackbar.show(
+                        if (it) AppRuntime.snackbar(
                             // github.com/Genymobile/scrcpy/issues/3376
                             // github.com/Genymobile/scrcpy/issues/4587
                             // github.com/Genymobile/scrcpy/issues/5676
-                            "注意：大部分设备在关闭屏幕后刷新率会降低/减半"
+                            R.string.scrcpyopt_turn_screen_off_note
                         )
                     },
                 )
                 SwitchPreference(
-                    title = "禁用控制",
+                    title = stringResource(R.string.scrcpyopt_no_control),
                     summary = "--no-control",
                     checked = !soBundle.control,
                     onCheckedChange = {
@@ -909,7 +922,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用视频",
+                    title = stringResource(R.string.scrcpyopt_no_video),
                     summary = "--no-video",
                     checked = !soBundle.video,
                     onCheckedChange = {
@@ -919,7 +932,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "仅转发不播放视频",
+                    title = stringResource(R.string.scrcpyopt_no_video_playback),
                     summary = "--no-video-playback",
                     checked = !soBundle.videoPlayback,
                     onCheckedChange = {
@@ -930,7 +943,7 @@ internal fun ScrcpyAllOptionsPage(
                     enabled = soBundle.video,
                 )
                 SwitchPreference(
-                    title = "禁用音频",
+                    title = stringResource(R.string.scrcpyopt_no_audio),
                     summary = "--no-audio",
                     checked = !soBundle.audio,
                     onCheckedChange = {
@@ -940,7 +953,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "仅转发不播放",
+                    title = stringResource(R.string.scrcpyopt_no_audio_playback),
                     summary = "--no-audio-playback",
                     checked = !soBundle.audioPlayback,
                     onCheckedChange = {
@@ -951,7 +964,7 @@ internal fun ScrcpyAllOptionsPage(
                     enabled = soBundle.audio,
                 )
                 SuperSlider(
-                    title = "scrcpy 启动后受控机的息屏时间",
+                    title = stringResource(R.string.scrcpyopt_screen_off_timeout),
                     summary = "--screen-off-timeout",
                     value = screenOffTimeoutPresetIndex.toFloat(),
                     onValueChange = { value ->
@@ -969,7 +982,7 @@ internal fun ScrcpyAllOptionsPage(
                     valueRange = 0f..ScrcpyPresets.ScreenOffTimeout.lastIndex.toFloat(),
                     steps = (ScrcpyPresets.ScreenOffTimeout.size - 2).coerceAtLeast(0),
                     unit = "s",
-                    zeroStateText = "不修改",
+                    zeroStateText = stringResource(R.string.scrcpyopt_dont_modify),
                     showKeyPoints = true,
                     keyPoints = ScrcpyPresets.ScreenOffTimeout.indices.map { it.toFloat() },
                     displayText = Tick(soBundle.screenOffTimeout).sec.toString(),
@@ -989,7 +1002,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "scrcpy 启动时不唤醒屏幕",
+                    title = stringResource(R.string.scrcpyopt_no_power_on),
                     summary = "--no-power-on",
                     checked = !soBundle.powerOn,
                     onCheckedChange = {
@@ -999,7 +1012,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "scrcpy 结束后息屏",
+                    title = stringResource(R.string.scrcpyopt_power_off_on_close),
                     summary = "--power-off-on-close",
                     checked = soBundle.powerOffOnClose,
                     onCheckedChange = {
@@ -1009,7 +1022,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "scrcpy 启动后保持设备唤醒状态（插入电源）",
+                    title = stringResource(R.string.scrcpyopt_stay_awake),
                     summary = "--stay-awake",
                     checked = soBundle.stayAwake,
                     onCheckedChange = {
@@ -1019,7 +1032,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "显示物理触控",
+                    title = stringResource(R.string.scrcpyopt_show_touches),
                     summary = "--show-touches",
                     checked = soBundle.showTouches,
                     onCheckedChange = {
@@ -1029,7 +1042,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "启动后进入全屏",
+                    title = stringResource(R.string.scrcpyopt_fullscreen),
                     summary = "--fullscreen",
                     checked = soBundle.fullscreen,
                     onCheckedChange = {
@@ -1039,15 +1052,15 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "scrcpy 启动后保持本机屏幕常亮",
+                    title = stringResource(R.string.scrcpyopt_disable_screensaver),
                     summary = "--disable-screensaver",
                     checked = soBundle.disableScreensaver,
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             disableScreensaver = it
                         )
-                        if (it) snackbar.show(
-                            "注意防烧屏，画中画也生效"
+                        if (it) AppRuntime.snackbar(
+                            R.string.scrcpyopt_disable_screensaver_note
                         )
                     },
                 )
@@ -1061,7 +1074,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "scrcpy 结束时断开 adb",
+                    title = stringResource(R.string.scrcpyopt_kill_adb_on_close),
                     summary = "--kill-adb-on-close",
                     checked = soBundle.killAdbOnClose,
                     onCheckedChange = {
@@ -1076,7 +1089,7 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 OverlayDropdownPreference(
-                    title = "音频编码",
+                    title = stringResource(R.string.scrcpyopt_audio_codec),
                     summary = "--audio-codec",
                     items = audioCodecItems,
                     selectedIndex = audioCodecIndex,
@@ -1087,7 +1100,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SuperSlider(
-                    title = "音频码率",
+                    title = stringResource(R.string.scrcpyopt_audio_bitrate),
                     summary = "--audio-bit-rate",
                     value = ScrcpyPresets.AudioBitRate
                         .indexOfOrNearest(soBundle.audioBitRate / 1000)
@@ -1102,7 +1115,7 @@ internal fun ScrcpyAllOptionsPage(
                     valueRange = 0f..ScrcpyPresets.AudioBitRate.lastIndex.toFloat(),
                     steps = (ScrcpyPresets.AudioBitRate.size - 2).coerceAtLeast(0),
                     unit = "Kbps",
-                    zeroStateText = "默认",
+                    zeroStateText = stringResource(R.string.text_default),
                     displayText = (soBundle.audioBitRate / 1_000).toString(),
                     inputInitialValue =
                         if (soBundle.audioBitRate <= 0) ""
@@ -1121,7 +1134,7 @@ internal fun ScrcpyAllOptionsPage(
                 )
 
                 OverlayDropdownPreference(
-                    title = "视频编码",
+                    title = stringResource(R.string.scrcpyopt_video_codec),
                     summary = "--video-codec",
                     items = videoCodecItems,
                     selectedIndex = videoCodecIndex,
@@ -1131,9 +1144,8 @@ internal fun ScrcpyAllOptionsPage(
                         )
                     },
                 )
-                @SuppressLint("DefaultLocale")
                 SuperSlider(
-                    title = "视频码率",
+                    title = stringResource(R.string.scrcpyopt_video_bitrate),
                     summary = "--video-bit-rate",
                     value = soBundle.videoBitRate / 1_000_000f,
                     onValueChange = { mbps ->
@@ -1144,11 +1156,11 @@ internal fun ScrcpyAllOptionsPage(
                     valueRange = 0f..40f,
                     steps = 400 - 1,
                     unit = "Mbps",
-                    zeroStateText = "默认",
-                    displayFormatter = { String.format("%.1f", it) },
+                    zeroStateText = stringResource(R.string.text_default),
+                    displayFormatter = { "%.1f".format(it) },
                     inputInitialValue =
                         if (soBundle.videoBitRate <= 0) ""
-                        else String.format("%.1f", soBundle.videoBitRate / 1_000_000f),
+                        else "%.1f".format(soBundle.videoBitRate / 1_000_000f),
                     inputFilter = { text ->
                         var dotUsed = false
                         text.filter { ch ->
@@ -1180,7 +1192,7 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 OverlayDropdownPreference(
-                    title = "视频来源",
+                    title = stringResource(R.string.scrcpyopt_video_source),
                     summary = "--video-source",
                     items = videoSourceItems,
                     selectedIndex = videoSourceIndex,
@@ -1193,7 +1205,7 @@ internal fun ScrcpyAllOptionsPage(
                 AnimatedVisibility(soBundle.videoSource == "display") {
                     Column {
                         OverlaySpinnerWithFallback(
-                            title = "监视器 ID",
+                            title = stringResource(R.string.scrcpyopt_display_id),
                             summary = "--display-id",
                             items = displaySpinnerItems,
                             selectedIndex = displayDropdownIndex,
@@ -1203,14 +1215,17 @@ internal fun ScrcpyAllOptionsPage(
                             onExpandedChange = { expanded ->
                                 if (expanded && displays.isEmpty()) {
                                     scope.launch {
-                                        snackbar.show("获取中")
+                                        AppRuntime.snackbar(R.string.text_fetching)
                                         try {
                                             withContext(Dispatchers.IO) {
                                                 scrcpy.listings.getDisplays(forceRefresh = false)
                                             }
-                                            snackbar.show("获取成功")
+                                            AppRuntime.snackbar(R.string.text_fetch_success)
                                         } catch (e: Exception) {
-                                            snackbar.show("刷新失败: ${e.message}")
+                                            AppRuntime.snackbar(
+                                                R.string.text_fetch_failed,
+                                                e.message ?: "",
+                                            )
                                         }
                                     }
                                 }
@@ -1224,7 +1239,7 @@ internal fun ScrcpyAllOptionsPage(
                             },
                         )
                         SuperSlider(
-                            title = "最大分辨率",
+                            title = stringResource(R.string.scrcpyopt_max_size),
                             summary = "--max-size",
                             value = maxSizePresetIndex.toFloat(),
                             onValueChange = {
@@ -1237,7 +1252,7 @@ internal fun ScrcpyAllOptionsPage(
                             valueRange = 0f..ScrcpyPresets.MaxSize.lastIndex.toFloat(),
                             steps = (ScrcpyPresets.MaxSize.size - 2).coerceAtLeast(0),
                             unit = "px",
-                            zeroStateText = "关闭",
+                            zeroStateText = stringResource(R.string.text_off),
                             showUnitWhenZeroState = false,
                             showKeyPoints = true,
                             keyPoints = ScrcpyPresets.MaxSize.indices.map { it.toFloat() },
@@ -1255,7 +1270,7 @@ internal fun ScrcpyAllOptionsPage(
                             },
                         )
                         SuperSlider(
-                            title = "最大帧率",
+                            title = stringResource(R.string.scrcpyopt_max_fps),
                             summary = "--max-fps",
                             value = maxFpsPresetIndex.toFloat(),
                             onValueChange = { value ->
@@ -1270,7 +1285,7 @@ internal fun ScrcpyAllOptionsPage(
                             valueRange = 0f..ScrcpyPresets.MaxFPS.lastIndex.toFloat(),
                             steps = (ScrcpyPresets.MaxFPS.size - 2).coerceAtLeast(0),
                             unit = "fps",
-                            zeroStateText = "关闭",
+                            zeroStateText = stringResource(R.string.text_off),
                             showUnitWhenZeroState = false,
                             showKeyPoints = true,
                             keyPoints = ScrcpyPresets.MaxFPS.indices.map { it.toFloat() },
@@ -1289,7 +1304,7 @@ internal fun ScrcpyAllOptionsPage(
                 AnimatedVisibility(soBundle.videoSource == "camera") {
                     Column {
                         OverlaySpinnerWithFallback(
-                            title = "摄像头 ID",
+                            title = stringResource(R.string.scrcpyopt_camera_id),
                             summary = "--camera-id",
                             items = cameraSpinnerItems,
                             selectedIndex = cameraDropdownIndex,
@@ -1299,14 +1314,17 @@ internal fun ScrcpyAllOptionsPage(
                             onExpandedChange = { expanded ->
                                 if (expanded && cameras.isEmpty()) {
                                     scope.launch {
-                                        snackbar.show("获取中")
+                                        AppRuntime.snackbar(R.string.text_fetching)
                                         try {
                                             withContext(Dispatchers.IO) {
                                                 scrcpy.listings.getCameras(forceRefresh = false)
                                             }
-                                            snackbar.show("获取成功")
+                                            AppRuntime.snackbar(R.string.text_fetch_success)
                                         } catch (e: Exception) {
-                                            snackbar.show("刷新失败: ${e.message}")
+                                            AppRuntime.snackbar(
+                                                R.string.text_fetch_failed,
+                                                e.message ?: "",
+                                            )
                                         }
                                     }
                                 }
@@ -1320,7 +1338,7 @@ internal fun ScrcpyAllOptionsPage(
                             },
                         )
                         OverlayDropdownPreference(
-                            title = "摄像头朝向",
+                            title = stringResource(R.string.scrcpyopt_camera_facing),
                             summary = "--camera-facing",
                             items = cameraFacingItems,
                             selectedIndex = cameraFacingIndex,
@@ -1333,7 +1351,7 @@ internal fun ScrcpyAllOptionsPage(
                             },
                         )
                         OverlaySpinnerWithFallback(
-                            title = "摄像头分辨率",
+                            title = stringResource(R.string.scrcpyopt_camera_size),
                             summary = "--camera-size",
                             items = cameraSizeSpinnerItems,
                             selectedIndex = cameraSizeDropdownIndex,
@@ -1343,14 +1361,17 @@ internal fun ScrcpyAllOptionsPage(
                             onExpandedChange = { expanded ->
                                 if (expanded && cameraSizes.isEmpty()) {
                                     scope.launch {
-                                        snackbar.show("获取中")
+                                        AppRuntime.snackbar(R.string.text_fetching)
                                         try {
                                             withContext(Dispatchers.IO) {
                                                 scrcpy.listings.getCameraSizes(forceRefresh = false)
                                             }
-                                            snackbar.show("获取成功")
+                                            AppRuntime.snackbar(R.string.text_fetch_success)
                                         } catch (e: Exception) {
-                                            snackbar.show("刷新失败: ${e.message}")
+                                            AppRuntime.snackbar(
+                                                R.string.text_fetch_failed,
+                                                e.message ?: "",
+                                            )
                                         }
                                     }
                                 }
@@ -1427,7 +1448,7 @@ internal fun ScrcpyAllOptionsPage(
                                 .padding(all = UiSpacing.Large),
                         )
                         SuperSlider(
-                            title = "摄像头帧率",
+                            title = stringResource(R.string.scrcpyopt_camera_fps),
                             summary = "--camera-fps",
                             value = cameraFpsPresetIndex.toFloat(),
                             onValueChange = { value ->
@@ -1440,7 +1461,7 @@ internal fun ScrcpyAllOptionsPage(
                             valueRange = 0f..ScrcpyPresets.CameraFps.lastIndex.toFloat(),
                             steps = (ScrcpyPresets.CameraFps.size - 2).coerceAtLeast(0),
                             unit = "fps",
-                            zeroStateText = "默认",
+                            zeroStateText = stringResource(R.string.text_default),
                             showKeyPoints = true,
                             keyPoints = ScrcpyPresets.CameraFps.indices.map { it.toFloat() },
                             displayText = soBundle.cameraFps.toString(),
@@ -1456,7 +1477,7 @@ internal fun ScrcpyAllOptionsPage(
                             },
                         )
                         SwitchPreference(
-                            title = "高帧率模式",
+                            title = stringResource(R.string.scrcpyopt_camera_high_speed),
                             summary = "--camera-high-speed",
                             checked = soBundle.cameraHighSpeed,
                             onCheckedChange = {
@@ -1474,7 +1495,7 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 OverlayDropdownPreference(
-                    title = "音频来源",
+                    title = stringResource(R.string.scrcpyopt_audio_source),
                     summary = "--audio-source",
                     items = audioSourceItems,
                     selectedIndex = audioSourceIndex,
@@ -1485,7 +1506,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "音频双路输出",
+                    title = stringResource(R.string.scrcpyopt_audio_dup),
                     summary = "--audio-dup",
                     checked = soBundle.audioDup,
                     onCheckedChange = {
@@ -1495,7 +1516,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "音频转发失败时终止",
+                    title = stringResource(R.string.scrcpyopt_require_audio),
                     summary = "--require-audio",
                     checked = soBundle.requireAudio,
                     onCheckedChange = {
@@ -1510,7 +1531,7 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 OverlaySpinnerWithFallback(
-                    title = "视频编码器",
+                    title = stringResource(R.string.scrcpyopt_video_encoder),
                     summary = "--video-encoder",
                     items = videoEncoderItems,
                     selectedIndex = videoEncoderIndex,
@@ -1520,14 +1541,17 @@ internal fun ScrcpyAllOptionsPage(
                     onExpandedChange = { expanded ->
                         if (expanded && videoEncoders.isEmpty()) {
                             scope.launch {
-                                snackbar.show("获取中")
+                                AppRuntime.snackbar(R.string.text_fetching)
                                 try {
                                     withContext(Dispatchers.IO) {
                                         scrcpy.listings.getEncoders(forceRefresh = false)
                                     }
-                                    snackbar.show("获取成功")
+                                    AppRuntime.snackbar(R.string.text_fetch_success)
                                 } catch (e: Exception) {
-                                    snackbar.show("刷新失败: ${e.message}")
+                                    AppRuntime.snackbar(
+                                        R.string.text_fetch_failed,
+                                        e.message ?: "",
+                                    )
                                 }
                             }
                         }
@@ -1555,7 +1579,7 @@ internal fun ScrcpyAllOptionsPage(
                         .padding(all = UiSpacing.Large),
                 )
                 OverlaySpinnerWithFallback(
-                    title = "音频编码器",
+                    title = stringResource(R.string.scrcpyopt_audio_encoder),
                     summary = "--audio-encoder",
                     items = audioEncoderItems,
                     selectedIndex = audioEncoderIndex,
@@ -1565,14 +1589,17 @@ internal fun ScrcpyAllOptionsPage(
                     onExpandedChange = { expanded ->
                         if (expanded && audioEncoders.isEmpty()) {
                             scope.launch {
-                                snackbar.show("获取中")
+                                AppRuntime.snackbar(R.string.text_fetching)
                                 try {
                                     withContext(Dispatchers.IO) {
                                         scrcpy.listings.getEncoders(forceRefresh = false)
                                     }
-                                    snackbar.show("获取成功")
+                                    AppRuntime.snackbar(R.string.text_fetch_success)
                                 } catch (e: Exception) {
-                                    snackbar.show("刷新失败: ${e.message}")
+                                    AppRuntime.snackbar(
+                                        R.string.text_fetch_failed,
+                                        e.message ?: "",
+                                    )
                                 }
                             }
                         }
@@ -1605,7 +1632,7 @@ internal fun ScrcpyAllOptionsPage(
         if (soBundle.videoSource == "display") item {
             Card {
                 OverlayDropdownPreference(
-                    title = "输入法显示策略",
+                    title = stringResource(R.string.scrcpyopt_ime_display_policy),
                     summary = "--display-ime-policy",
                     items = displayImePolicyItems,
                     selectedIndex = displayImePolicyIndex,
@@ -1618,7 +1645,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "关闭虚拟显示器时保留内容",
+                    title = stringResource(R.string.scrcpyopt_no_vd_destroy_content),
                     summary = "--no-vd-destroy-content",
                     checked = !soBundle.vdDestroyContent,
                     onCheckedChange = {
@@ -1628,7 +1655,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用虚拟显示器系统装饰",
+                    title = stringResource(R.string.scrcpyopt_no_vd_decorations),
                     summary = "--no-vd-system-decorations",
                     checked = !soBundle.vdSystemDecorations,
                     onCheckedChange = {
@@ -1638,23 +1665,20 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用 MediaCodec 出错时自动降级",
+                    title = stringResource(R.string.scrcpyopt_no_downsize_on_error),
                     summary = "--no-downsize-on-error",
                     checked = !soBundle.downsizeOnError,
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             downsizeOnError = !it
                         )
-                        if (it) snackbar.show(
-                            """
-                                默认情况下，在 MediaCodec 出错时，scrcpy 会自动尝试使用更低的分辨率重新开始
-                                此选项将禁用此行为
-                            """.trimIndent()
+                        if (it) AppRuntime.snackbar(
+                            R.string.scrcpyopt_no_downsize_on_error_desc
                         )
                     },
                 )
                 SwitchPreference(
-                    title = "粘贴兼容回退（仅支持ASCII/英文字符）",
+                    title = stringResource(R.string.scrcpyopt_legacy_paste),
                     summary = "--legacy-paste",
                     checked = soBundle.legacyPaste,
                     onCheckedChange = {
@@ -1664,11 +1688,11 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 OverlayDropdownPreference(
-                    title = "键盘注入策略",
+                    title = stringResource(R.string.scrcpyopt_key_inject_mode),
                     summary = when (keyInjectModeIndex) {
                         1 -> "--prefer-text"
                         2 -> "--raw-key-events"
-                        else -> "默认"
+                        else -> stringResource(R.string.text_default)
                     },
                     items = keyInjectModeItems,
                     selectedIndex = keyInjectModeIndex,
@@ -1683,7 +1707,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用按键重复转发",
+                    title = stringResource(R.string.scrcpyopt_no_key_repeat),
                     summary = "--no-key-repeat",
                     checked = !soBundle.forwardKeyRepeat,
                     onCheckedChange = {
@@ -1694,7 +1718,7 @@ internal fun ScrcpyAllOptionsPage(
                     enabled = soBundle.keyInjectMode != ClientOptions.KeyInjectMode.PREFER_TEXT.string,
                 )
                 SwitchPreference(
-                    title = "禁用剪贴板双向同步",
+                    title = stringResource(R.string.scrcpyopt_no_clipboard_autosync),
                     summary = "--no-clipboard-autosync",
                     checked = !soBundle.clipboardAutosync,
                     onCheckedChange = {
@@ -1704,7 +1728,7 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用鼠标悬停转发",
+                    title = stringResource(R.string.scrcpyopt_no_mouse_hover),
                     summary = "--no-mouse-hover",
                     checked = !soBundle.mouseHover,
                     onCheckedChange = {
@@ -1714,18 +1738,15 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "禁用结束后清理",
+                    title = stringResource(R.string.scrcpyopt_no_cleanup),
                     summary = "--no-cleanup",
                     checked = !soBundle.cleanup,
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             cleanup = !it
                         )
-                        if (it) snackbar.show(
-                            """
-                                默认情况下，scrcpy 会从设备中移除服务器二进制文件，并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）
-                                此选项将禁用此清理操作
-                            """.trimIndent()
+                        if (it) AppRuntime.snackbar(
+                            R.string.scrcpyopt_no_cleanup_desc
                         )
                     },
                 )
@@ -1735,7 +1756,7 @@ internal fun ScrcpyAllOptionsPage(
         if (soBundle.videoSource == "display") item {
             Card {
                 OverlaySpinnerWithFallback(
-                    title = "scrcpy 启动后打开应用",
+                    title = stringResource(R.string.scrcpyopt_start_app),
                     summary = "--start-app",
                     items = appDropdownItems,
                     selectedIndex = appDropdownIndex,
@@ -1745,14 +1766,17 @@ internal fun ScrcpyAllOptionsPage(
                     onExpandedChange = { expanded ->
                         if (expanded && apps.isEmpty()) {
                             scope.launch {
-                                snackbar.show("获取中")
+                                AppRuntime.snackbar(R.string.text_fetching)
                                 try {
                                     withContext(Dispatchers.IO) {
                                         scrcpy.listings.getApps(forceRefresh = false)
                                     }
-                                    snackbar.show("获取成功")
+                                    AppRuntime.snackbar(R.string.text_fetch_success)
                                 } catch (e: Exception) {
-                                    snackbar.show("刷新失败: ${e.message}")
+                                    AppRuntime.snackbar(
+                                        R.string.text_fetch_failed,
+                                        e.message ?: "",
+                                    )
                                 }
                             }
                         }
@@ -1914,7 +1938,7 @@ internal fun ScrcpyAllOptionsPage(
                             horizontalArrangement = Arrangement.spacedBy(gap),
                         ) {
                             TextButton(
-                                text = "清空",
+                                text = stringResource(R.string.cd_clear),
                                 onClick = {
                                     newDisplayWidthInput = ""
                                     newDisplayHeightInput = ""
@@ -1925,9 +1949,10 @@ internal fun ScrcpyAllOptionsPage(
                                 enabled = !newDisplayAllBlank,
                             )
                             TextButton(
-                                text =
-                                    if (newDisplayWidthBlank || newDisplayHeightBlank) "本机"
-                                    else "交换",
+                                text = stringResource(
+                                    if (newDisplayWidthBlank || newDisplayHeightBlank) R.string.scrcpyopt_native
+                                    else R.string.button_swap
+                                ),
                                 onClick = {
                                     if (newDisplayWidthBlank || newDisplayHeightBlank) {
                                         val metrics = resources.displayMetrics
@@ -2090,7 +2115,7 @@ internal fun ScrcpyAllOptionsPage(
         item {
             Card {
                 OverlayDropdownPreference(
-                    title = "日志等级",
+                    title = stringResource(R.string.scrcpyopt_log_level),
                     summary = "--verbosity",
                     items = logLevelItems,
                     selectedIndex = logLevelIndex,
@@ -2122,10 +2147,15 @@ private fun ProfileNameDialog(
 ) {
     if (mode == null) return
     val focusManager = LocalFocusManager.current
+
+    val textDefault = stringResource(R.string.text_default)
+
     var input by rememberSaveable(mode, initialInput) { mutableStateOf(initialInput) }
     val profileNames = remember(profiles) { profiles.map { it.name } }
     val profileIds = remember(profiles) { profiles.map { it.id } }
-    val copySourceItems = remember(profileNames) { listOf("默认") + profileNames }
+    val copySourceItems = remember(profileNames) {
+        listOf(textDefault) + profileNames
+    }
     var copySourceProfileId by rememberSaveable(mode, initialCopySourceProfileId) {
         mutableStateOf(initialCopySourceProfileId)
     }
@@ -2134,13 +2164,14 @@ private fun ProfileNameDialog(
             ?.let { profileIds.indexOf(it).takeIf { index -> index >= 0 }?.plus(1) }
             ?: 0
     }
+
     OverlayDialog(
         show = true,
         title = when (mode) {
-            ProfileDialogMode.Create -> "新建配置"
-            ProfileDialogMode.Rename -> "重命名配置"
+            ProfileDialogMode.Create -> stringResource(R.string.scrcpyopt_new_profile)
+            ProfileDialogMode.Rename -> stringResource(R.string.scrcpyopt_rename_profile)
         },
-        summary = "配置名重复时会自动追加序号",
+        summary = stringResource(R.string.scrcpyopt_duplicate_name_hint),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
     ) {
@@ -2150,7 +2181,7 @@ private fun ProfileNameDialog(
             TextField(
                 value = input,
                 onValueChange = { input = it },
-                label = "配置名",
+                label = stringResource(R.string.scrcpyopt_profile_name),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
@@ -2160,7 +2191,7 @@ private fun ProfileNameDialog(
             )
             AnimatedVisibility(mode == ProfileDialogMode.Create) {
                 OverlayDropdownPreference(
-                    title = "复制配置",
+                    title = stringResource(R.string.scrcpyopt_copy_from),
                     items = copySourceItems,
                     selectedIndex = copySourceDropdownIndex,
                     onSelectedIndexChange = { index ->
@@ -2178,12 +2209,12 @@ private fun ProfileNameDialog(
                 horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
             ) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.button_cancel),
                     onClick = onDismissRequest,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(
-                    text = "确定",
+                    text = stringResource(R.string.button_confirm),
                     onClick = { onConfirm(input, copySourceProfileId) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -2206,30 +2237,30 @@ private fun ManageProfilesSheet(
 ) {
     OverlayBottomSheet(
         show = show,
-        title = "管理配置",
+        title = stringResource(R.string.scrcpyopt_manage_profiles),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
         endAction = {
-            IconButton(
-                onClick = onCreateProfile,
-            ) {
+            IconButton(onClick = onCreateProfile) {
                 Icon(
                     imageVector = Icons.Rounded.Add,
-                    contentDescription = "新建配置",
+                    contentDescription = stringResource(R.string.scrcpyopt_new_profile),
                 )
             }
         },
     ) {
+        val textCurrent = stringResource(R.string.scrcpyopt_current_profile)
+        val textRename = stringResource(R.string.scrcpyopt_rename_profile)
+        val textDelete = stringResource(R.string.scrcpyopt_delete_profile)
         ReorderableList(
             itemsProvider = {
                 profiles.map { profile ->
                     ReorderableList.Item(
                         id = profile.id,
                         title = profile.name,
-                        subtitle = when (profile.id) {
-                            selectedProfileId -> "当前配置"
-                            else -> ""
-                        },
+                        subtitle =
+                            if (profile.id == selectedProfileId) textCurrent
+                            else "",
                         onClick =
                             if (profile.id != ScrcpyOptions.GLOBAL_PROFILE_ID) {
                                 { onRenameProfile(profile.id) }
@@ -2240,14 +2271,14 @@ private fun ManageProfilesSheet(
                                 add(
                                     ReorderableList.EndAction.Icon(
                                         icon = Icons.Rounded.Edit,
-                                        contentDescription = "重命名配置",
+                                        contentDescription = textRename,
                                         onClick = { onRenameProfile(profile.id) },
                                     )
                                 )
                                 add(
                                     ReorderableList.EndAction.Icon(
                                         icon = Icons.Rounded.DeleteOutline,
-                                        contentDescription = "删除配置",
+                                        contentDescription = textDelete,
                                         onClick = { onDeleteProfile(profile.id) },
                                     )
                                 )
@@ -2272,8 +2303,8 @@ private fun DeleteProfileDialog(
     if (!show) return
     OverlayDialog(
         show = true,
-        title = "删除配置",
-        summary = "确认删除 \"$profileName\"？",
+        title = stringResource(R.string.scrcpyopt_delete_profile),
+        summary = stringResource(R.string.scrcpyopt_delete_confirm, profileName),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
     ) {
@@ -2281,12 +2312,12 @@ private fun DeleteProfileDialog(
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
         ) {
             TextButton(
-                text = "取消",
+                text = stringResource(R.string.button_cancel),
                 onClick = onDismissRequest,
                 modifier = Modifier.weight(1f),
             )
             TextButton(
-                text = "删除",
+                text = stringResource(R.string.button_delete),
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.textButtonColorsPrimary(),

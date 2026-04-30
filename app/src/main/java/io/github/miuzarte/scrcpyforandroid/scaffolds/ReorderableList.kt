@@ -19,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.ui.confirm
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
@@ -148,8 +150,8 @@ class ReorderableList(
                                                     ),
                                             ) {
                                                 Icon(
-                                                    Icons.Rounded.DragIndicator,
-                                                    contentDescription = "拖动排序",
+                                                    imageVector = Icons.Rounded.DragIndicator,
+                                                    contentDescription = stringResource(R.string.cd_drag_sort),
                                                     tint = colorScheme.onSurfaceVariantSummary,
                                                 )
                                             }
@@ -210,8 +212,8 @@ class ReorderableList(
                                                     ),
                                             ) {
                                                 Icon(
-                                                    Icons.Rounded.DragIndicator,
-                                                    contentDescription = "拖动排序",
+                                                    imageVector = Icons.Rounded.DragIndicator,
+                                                    contentDescription = stringResource(R.string.cd_drag_sort),
                                                     tint = colorScheme.onSurfaceVariantSummary,
                                                 )
                                             }

@@ -94,6 +94,10 @@ fun StreamScreen(activity: StreamActivity) {
     val snackbarController = remember(snackbarScope, snackbarHostState) {
         SnackbarController(scope = snackbarScope, hostState = snackbarHostState)
     }
+    DisposableEffect(snackbarHostState) {
+        val unregister = AppRuntime.registerSnackbarHostState(snackbarHostState)
+        onDispose(unregister)
+    }
 
     MiuixTheme(
         controller = themeController,

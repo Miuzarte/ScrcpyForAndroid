@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.widgets
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -50,12 +51,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -83,103 +86,103 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 enum class VirtualButtonAction(
     val id: String,
-    val title: String,
+    @field:StringRes val titleResId: Int,
     val icon: ImageVector,
     val keycode: Int?,
 ) {
     MORE(
         "more",
-        "更多",
+        R.string.vb_more,
         MiuixIcons.More,
         null
     ),
     HOME(
         "home",
-        "主页",
+        R.string.vb_home,
         Icons.Rounded.Home,
         UiAndroidKeycodes.HOME
     ),
     BACK(
         "back",
-        "返回",
+        R.string.vb_back,
         Icons.AutoMirrored.Rounded.ArrowBack,
         UiAndroidKeycodes.BACK
     ),
     APP_SWITCH(
         "app_switch",
-        "多任务",
+        R.string.vb_app_switch,
         Icons.Rounded.Apps,
         UiAndroidKeycodes.APP_SWITCH
     ),
     MENU(
         "menu",
-        "菜单",
+        R.string.vb_menu,
         Icons.Rounded.Menu,
         UiAndroidKeycodes.MENU
     ),
     NOTIFICATION(
         "notification",
-        "通知栏",
+        R.string.vb_notifications,
         Icons.Rounded.Notifications,
         UiAndroidKeycodes.NOTIFICATION
     ),
     VOLUME_UP(
         "volume_up",
-        "音量+",
+        R.string.vb_volume_up,
         Icons.AutoMirrored.Rounded.VolumeUp,
         UiAndroidKeycodes.VOLUME_UP
     ),
     VOLUME_DOWN(
         "volume_down",
-        "音量-",
+        R.string.vb_volume_down,
         Icons.AutoMirrored.Rounded.VolumeDown,
         UiAndroidKeycodes.VOLUME_DOWN
     ),
     VOLUME_MUTE(
         "volume_mute",
-        "静音",
+        R.string.vb_volume_mute,
         Icons.AutoMirrored.Rounded.VolumeOff,
         UiAndroidKeycodes.VOLUME_MUTE
     ),
     POWER(
         "power",
-        "锁屏",
+        R.string.vb_lock_screen,
         Icons.Rounded.PowerSettingsNew,
         UiAndroidKeycodes.POWER
     ),
     SCREENSHOT(
         "screenshot",
-        "截图",
+        R.string.vb_screenshot,
         Icons.Rounded.Screenshot,
         UiAndroidKeycodes.SYSRQ
     ),
     PASSWORD_INPUT(
         "password_input",
-        "填充锁屏密码",
+        R.string.vb_fill_password,
         Icons.Rounded.Password,
         null
     ),
     ALL_APPS(
         "all_apps",
-        "所有应用",
+        R.string.vb_all_apps,
         Icons.Rounded.Apps,
         null
     ),
     RECENT_TASKS(
         "recent_tasks",
-        "最近任务",
+        R.string.vb_recent_tasks,
         Icons.Rounded.DashboardCustomize,
         null
     ),
     TOGGLE_IME(
         "toggle_ime",
-        "拉起输入法",
+        R.string.vb_toggle_ime,
         Icons.Rounded.Keyboard,
         null
     ),
     PASTE_LOCAL_CLIPBOARD(
         "paste_local_clipboard",
-        "粘贴本机剪贴板",
+        R.string.vb_paste_clipboard,
         Icons.Rounded.ContentPaste,
         null
     );
@@ -304,14 +307,14 @@ class VirtualButtonBar(
                             if (enabled) activeContentColor
                             else disabledContentColor
                         Icon(
-                            action.icon,
-                            contentDescription = action.title,
+                            imageVector = action.icon,
+                            contentDescription = stringResource(action.titleResId),
                             modifier = Modifier.size(18.dp),
                             tint = contentColor,
                         )
                         if (showText) {
                             Spacer(Modifier.width(UiSpacing.Small))
-                            Text(action.title, color = contentColor)
+                            Text(stringResource(action.titleResId), color = contentColor)
                         }
                     }
                     if (action == VirtualButtonAction.MORE) {
@@ -412,7 +415,11 @@ class VirtualButtonBar(
                             color = Color.Black.copy(alpha = 0.1f),
                         ),
                     ) {
-                        Icon(action.icon, contentDescription = action.title, tint = Color.White)
+                        Icon(
+                            imageVector = action.icon,
+                            contentDescription = stringResource(action.titleResId),
+                            tint = Color.White
+                        )
                     }
 
                     if (action == VirtualButtonAction.MORE) {
@@ -465,7 +472,11 @@ class VirtualButtonBar(
                             color = Color.Black.copy(alpha = 0.1f),
                         ),
                     ) {
-                        Icon(action.icon, contentDescription = action.title, tint = Color.White)
+                        Icon(
+                            imageVector = action.icon,
+                            contentDescription = stringResource(action.titleResId),
+                            tint = Color.White
+                        )
                     }
 
                     if (action == VirtualButtonAction.MORE) {
@@ -677,20 +688,19 @@ class VirtualButtonBar(
     ) {
         val scope = rememberCoroutineScope()
         val haptic = LocalHapticFeedback.current
-        val spinnerItems = remember(actions) {
-            actions.map { action ->
-                SpinnerEntry(
-                    icon = {
-                        Icon(
-                            action.icon,
-                            contentDescription = action.title,
-                            modifier = Modifier
-                                .padding(end = UiSpacing.ContentVertical),
-                        )
-                    },
-                    title = action.title,
-                )
-            }
+        val spinnerItems = actions.map { action ->
+            val title = stringResource(action.titleResId)
+            SpinnerEntry(
+                icon = {
+                    Icon(
+                        imageVector = action.icon,
+                        contentDescription = title,
+                        modifier = Modifier
+                            .padding(end = UiSpacing.ContentVertical),
+                    )
+                },
+                title = title,
+            )
         }
 
         NavOverlayListPopup(

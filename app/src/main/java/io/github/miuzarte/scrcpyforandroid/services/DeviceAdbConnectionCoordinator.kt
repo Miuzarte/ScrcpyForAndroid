@@ -8,15 +8,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.parcelize.Parcelize
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 
 @Parcelize
 internal data class DeviceAdbSessionState(
     val isConnected: Boolean = false,
-    val statusLine: String = "未连接",
+    val statusLine: String = "Disconnected",
     val currentTarget: ConnectionTarget? = null,
-    val connectedDeviceLabel: String = "未连接",
+    val connectedDeviceLabel: String = "Disconnected",
     val isQuickConnected: Boolean = false,
     val connectedScrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
     val audioForwardingSupported: Boolean = true,
@@ -28,8 +29,9 @@ internal class DeviceAdbConnectionCoordinator(
 ) {
     suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long) {
         withContext(Dispatchers.IO) {
+            val resolved = resolveHost(host)
             withTimeout(timeoutMs) {
-                adbService.connect(host, port)
+                adbService.connect(resolved, port)
             }
         }
     }
@@ -38,6 +40,15 @@ internal class DeviceAdbConnectionCoordinator(
         withContext(Dispatchers.IO) {
             adbService.disconnect()
         }
+    }
+
+    private fun resolveHost(host: String): String {
+        val bareHost = if (host.startsWith('[') && host.endsWith(']'))
+            host.substring(1, host.length - 1)
+        else
+            host
+        return runCatching { InetAddress.getByName(bareHost).hostAddress }
+            .getOrDefault(host)
     }
 
     suspend fun isConnected(timeoutMs: Long): Boolean {
@@ -50,9 +61,10 @@ internal class DeviceAdbConnectionCoordinator(
 
     suspend fun probeTcpReachable(host: String, port: Int, timeoutMs: Int): Boolean {
         return withContext(Dispatchers.IO) {
+            val resolved = resolveHost(host)
             runCatching {
                 Socket().use { socket ->
-                    socket.connect(InetSocketAddress(host, port), timeoutMs)
+                    socket.connect(InetSocketAddress(resolved, port), timeoutMs)
                     true
                 }
             }.getOrDefault(false)
@@ -89,7 +101,8 @@ internal class DeviceAdbConnectionCoordinator(
 
     suspend fun pair(host: String, port: Int, pairingCode: String): Boolean {
         return withContext(Dispatchers.IO) {
-            adbService.pair(host, port, pairingCode)
+            val resolved = resolveHost(host)
+            adbService.pair(resolved, port, pairingCode)
         }
     }
 

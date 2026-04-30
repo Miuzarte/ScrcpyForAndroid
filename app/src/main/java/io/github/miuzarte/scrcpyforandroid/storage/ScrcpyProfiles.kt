@@ -2,8 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.storage
 
 import android.content.Context
 import androidx.datastore.preferences.core.stringPreferencesKey
-import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions.Companion.GLOBAL_PROFILE_ID
-import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions.Companion.GLOBAL_PROFILE_NAME
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
 import org.json.JSONObject
@@ -98,7 +97,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
     }
 
     suspend fun renameProfile(id: String, requestedName: String): Profile? {
-        if (id == GLOBAL_PROFILE_ID) return null
+        if (id == ScrcpyOptions.GLOBAL_PROFILE_ID) return null
         val current = loadState()
         val existing = current.profiles.firstOrNull { it.id == id } ?: return null
         val updated = existing.copy(
@@ -116,7 +115,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
     }
 
     suspend fun deleteProfile(id: String): Boolean {
-        if (id == GLOBAL_PROFILE_ID) return false
+        if (id == ScrcpyOptions.GLOBAL_PROFILE_ID) return false
         val current = loadState()
         if (current.profiles.none { it.id == id }) return false
         val next = normalizeState(
@@ -150,8 +149,11 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
         requestedName: String,
         excludeId: String? = null,
     ): String {
-        val baseName = requestedName.trim().ifBlank { "配置" }
-        if (baseName == GLOBAL_PROFILE_NAME) return ensureUniqueName(state, "配置", excludeId)
+        val textGlobal = AppRuntime.stringResource(ScrcpyOptions.GLOBAL_PROFILE_NAME_RES_ID)
+        val textNewProfile = AppRuntime.stringResource(ScrcpyOptions.NEW_PROFILE_NAME_RES_ID)
+        val baseName = requestedName.trim().ifBlank { textNewProfile }
+        if (baseName == textGlobal)
+            return ensureUniqueName(state, textNewProfile, excludeId)
         val existingNames = state.profiles
             .filterNot { it.id == excludeId }
             .map { it.name }
@@ -166,11 +168,13 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
     }
 
     private fun normalizeState(state: State): State {
-        val global = state.profiles.firstOrNull { it.id == GLOBAL_PROFILE_ID }
-            ?.copy(name = GLOBAL_PROFILE_NAME, isBuiltinGlobal = true)
+        val textGlobal = AppRuntime.stringResource(ScrcpyOptions.GLOBAL_PROFILE_NAME_RES_ID)
+        val textNewProfile = AppRuntime.stringResource(ScrcpyOptions.NEW_PROFILE_NAME_RES_ID)
+        val global = state.profiles.firstOrNull { it.id == ScrcpyOptions.GLOBAL_PROFILE_ID }
+            ?.copy(name = textGlobal, isBuiltinGlobal = true)
             ?: Profile(
-                id = GLOBAL_PROFILE_ID,
-                name = GLOBAL_PROFILE_NAME,
+                id = ScrcpyOptions.GLOBAL_PROFILE_ID,
+                name = textGlobal,
                 bundle = ScrcpyOptions.defaultBundle(),
                 isBuiltinGlobal = true,
             )
@@ -178,11 +182,11 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
         val others = buildList {
             state.profiles
                 .asSequence()
-                .filterNot { it.id == GLOBAL_PROFILE_ID }
+                .filterNot { it.id == ScrcpyOptions.GLOBAL_PROFILE_ID }
                 .forEach { profile ->
-                    val baseName = profile.name.trim().ifBlank { "配置" }
-                        .takeUnless { it == GLOBAL_PROFILE_NAME }
-                        ?: "配置"
+                    val baseName = profile.name.trim().ifBlank { textNewProfile }
+                        .takeUnless { it == textGlobal }
+                        ?: textNewProfile
                     var normalizedName = baseName
                     if (normalizedName in usedNames) {
                         var suffix = 1
@@ -216,6 +220,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
     }
 
     private fun decodeState(raw: String): State {
+        val textNewProfile = AppRuntime.stringResource(ScrcpyOptions.NEW_PROFILE_NAME_RES_ID)
         if (raw.isBlank()) return State(emptyList())
         val array = JSONArray(raw)
         val profiles = buildList {
@@ -228,9 +233,9 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
                 add(
                     Profile(
                         id = id,
-                        name = name.ifBlank { "配置" },
+                        name = name.ifBlank { textNewProfile },
                         bundle = decodeBundle(item.optJSONObject("bundle")),
-                        isBuiltinGlobal = id == GLOBAL_PROFILE_ID,
+                        isBuiltinGlobal = id == ScrcpyOptions.GLOBAL_PROFILE_ID,
                     )
                 )
             }

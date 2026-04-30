@@ -30,7 +30,7 @@ internal class ConnectionController(
     suspend fun disconnectAdbConnection(
         clearQuickOnlineForTarget: ConnectionTarget? = state.adbSession.currentTarget,
         cause: DisconnectCause = DisconnectCause.Unknown,
-        statusLine: String = "未连接",
+        statusLine: String = "Disconnected",
     ): ConnectionDisconnectResult {
         stateStore.markDisconnected(cause = cause, statusLine = statusLine)
         AppRuntime.currentConnectionTarget = null
@@ -155,7 +155,7 @@ internal class ConnectionController(
 
     fun markScrcpyStarted() {
         stateStore.updateSession {
-            it.copy(statusLine = "scrcpy 运行中")
+            it.copy(statusLine = "scrcpy running")
         }
     }
 

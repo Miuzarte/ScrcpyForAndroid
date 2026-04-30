@@ -29,6 +29,10 @@ internal class DeviceAdbAutoReconnectManager(
                 onReconnectSuccess(host, port)
             },
             onReconnectFailure = onReconnectFailure,
+            shouldAutoReconnect = {
+                stateStore.state.value.disconnectCause != DisconnectCause.User &&
+                    stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
+            },
         )
     }
 

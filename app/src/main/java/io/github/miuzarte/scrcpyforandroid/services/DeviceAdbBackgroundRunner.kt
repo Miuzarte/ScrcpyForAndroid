@@ -23,6 +23,7 @@ internal class DeviceAdbBackgroundRunner : Closeable {
         reconnect: suspend (host: String, port: Int) -> Unit,
         onReconnectSuccess: suspend (host: String, port: Int) -> Unit,
         onReconnectFailure: suspend (Throwable) -> Unit,
+        shouldAutoReconnect: () -> Boolean = { true },
     ) = withContext(dispatcher) {
         val target = sessionState().currentTarget ?: return@withContext
         val host = target.host
@@ -39,6 +40,7 @@ internal class DeviceAdbBackgroundRunner : Closeable {
                 keepAliveCheck(host, port)
             }.getOrElse { false }
             if (alive) continue
+            if (!shouldAutoReconnect()) break
 
             try {
                 reconnect(host, port)

@@ -58,11 +58,6 @@ internal data class StatusCardSpec(
     val secondSmall: StatusSmallCardSpec,
 )
 
-internal fun normalizeStatusLine(statusLine: String): String {
-    val cleaned = statusLine.removePrefix("ADB 已连接:").trim()
-    return cleaned.ifBlank { statusLine }
-}
-
 @Composable
 internal fun StatusCardLayout(
     spec: StatusCardSpec,
@@ -93,7 +88,7 @@ internal fun StatusCardLayout(
                     contentAlignment = Alignment.BottomEnd,
                 ) {
                     Icon(
-                        spec.big.icon,
+                        imageVector = spec.big.icon,
                         contentDescription = null,
                         modifier = Modifier.size(170.dp),
                         tint = spec.big.iconTint,
@@ -137,25 +132,29 @@ internal fun StatusCardLayout(
                 .fillMaxHeight()
         ) {
             StatusMetricCard(
-                spec = spec.firstSmall,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
+                spec = spec.firstSmall,
             )
             Spacer(Modifier.height(UiSpacing.PageItem))
             StatusMetricCard(
-                spec = spec.secondSmall,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
+                spec = spec.secondSmall,
             )
         }
     }
 }
 
 @Composable
-private fun StatusMetricCard(spec: StatusSmallCardSpec, modifier: Modifier) {
+private fun StatusMetricCard(
+    modifier: Modifier,
+    spec: StatusSmallCardSpec,
+) {
     val haptic = LocalHapticFeedback.current
+
     Card(
         modifier = modifier,
         insideMargin = PaddingValues(UiSpacing.Large),

@@ -19,6 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ReorderableList
@@ -51,20 +54,21 @@ internal fun VirtualButtonOrderScreen(
     val navigator = LocalRootNavigator.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 TopAppBar(
-                    title = "虚拟按钮排序",
+                    title = stringResource(R.string.vb_order_title),
                     color =
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
                     navigationIcon = {
                         IconButton(onClick = navigator.pop) {
                             Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "返回"
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
                             )
                         }
                     },
@@ -87,6 +91,7 @@ internal fun VirtualButtonOrderPage(
     contentPadding: PaddingValues,
     scrollBehavior: ScrollBehavior,
 ) {
+    val context = LocalContext.current
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     val asBundleShared by appSettings.bundleState.collectAsState()
@@ -94,15 +99,13 @@ internal fun VirtualButtonOrderPage(
     var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
     val asBundleLatest by rememberUpdatedState(asBundle)
     LaunchedEffect(asBundleShared) {
-        if (asBundle != asBundleShared) {
+        if (asBundle != asBundleShared)
             asBundle = asBundleShared
-        }
     }
     LaunchedEffect(asBundle) {
         delay(Settings.BUNDLE_SAVE_DELAY)
-        if (asBundle != asBundleSharedLatest) {
+        if (asBundle != asBundleSharedLatest)
             appSettings.saveBundle(asBundle)
-        }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -124,8 +127,8 @@ internal fun VirtualButtonOrderPage(
         item {
             Card {
                 SwitchPreference(
-                    title = "按钮显示文本",
-                    summary = "超过3个建议关闭，只对预览卡下方的虚拟按钮生效",
+                    title = stringResource(R.string.vb_order_button_text),
+                    summary = stringResource(R.string.vb_order_hint),
                     checked = asBundle.previewVirtualButtonShowText,
                     onCheckedChange = {
                         asBundle = asBundle.copy(previewVirtualButtonShowText = it)
@@ -137,19 +140,22 @@ internal fun VirtualButtonOrderPage(
         item { Spacer(Modifier.height(UiSpacing.Medium)) }
 
         item {
+            val textExternal = stringResource(R.string.vb_order_display_external)
+            val textMoreMenu = stringResource(R.string.vb_order_display_more_menu)
             ReorderableList(
                 itemsProvider = {
                     buttonItems.map { item ->
                         val action = item.action
+                        val actionTitle = context.getString(action.titleResId)
                         ReorderableList.Item(
                             id = action.id,
                             icon = action.icon,
                             title =
-                                if (action.keycode == null) action.title
-                                else "${action.title} (${action.keycode})",
+                                if (action.keycode == null) actionTitle
+                                else "$actionTitle (${action.keycode})",
                             subtitle =
-                                if (item.showOutside) "显示在外部"
-                                else "显示在更多菜单内",
+                                if (item.showOutside) textExternal
+                                else textMoreMenu,
                             endActions = listOf(
                                 ReorderableList.EndAction.Checkbox(
                                     checked = item.showOutside,

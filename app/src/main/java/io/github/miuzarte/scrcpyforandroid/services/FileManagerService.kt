@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import kotlinx.coroutines.Dispatchers
@@ -117,10 +118,10 @@ object FileManagerService {
     ): String = withContext(Dispatchers.IO) {
         NativeAdbService.ensureConnectionResponsive()
         val fileName = queryDisplayName(context.contentResolver, uri)
-            ?: throw IOException("无法读取文件名")
+            ?: throw IOException(AppRuntime.stringResource(R.string.fm_exception_cannot_read_filename))
         val remotePath = joinRemotePath(remoteDirectory, fileName)
         context.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "无法读取选择的文件" }
+            requireNotNull(input) { AppRuntime.stringResource(R.string.fm_exception_cannot_read_selected_file) }
             NativeAdbService.push(input, remotePath)
         }
         return@withContext remotePath
@@ -131,7 +132,7 @@ object FileManagerService {
         directoryName: String,
     ): String = withContext(Dispatchers.IO) {
         val sanitizedName = directoryName.trim().trim('/').takeIf { it.isNotBlank() }
-            ?: throw IOException("文件夹名称不能为空")
+            ?: throw IOException(AppRuntime.stringResource(R.string.fm_exception_folder_name_empty))
         val remotePath = joinRemotePath(parentDirectory, sanitizedName)
         NativeAdbService.ensureConnectionResponsive()
         NativeAdbService.shell("mkdir -p ${quoteShellArg(remotePath)}")
@@ -192,7 +193,7 @@ object FileManagerService {
         )
         val target = createUniqueDocument(context, rootDocument, fileName, guessMimeType(fileName))
         context.contentResolver.openOutputStream(target, "w").use { output ->
-            requireNotNull(output) { "无法写入目标文件" }
+            requireNotNull(output) { AppRuntime.stringResource(R.string.fm_exception_cannot_write_target) }
             NativeAdbService.pull(remotePath, output)
         }
     }
@@ -221,54 +222,49 @@ object FileManagerService {
             val target =
                 createUniqueDocument(context, parentDocument, fileName, guessMimeType(fileName))
             context.contentResolver.openOutputStream(target, "w").use { output ->
-                requireNotNull(output) { "无法写入目标文件" }
+                requireNotNull(output) { AppRuntime.stringResource(R.string.fm_exception_cannot_write_target) }
                 NativeAdbService.pull(joinRemotePath(snapshot.remoteRootPath, relativePath), output)
             }
         }
     }
 
     fun formatSummary(entry: RemoteFileEntry): String {
-        val timeText = entry.modifiedAt?.format(displayTimeFormatter) ?: "未知时间"
-        return if (entry.isDirectory || entry.sizeBytes == null) {
-            timeText
-        } else {
-            "$timeText ${formatSize(entry.sizeBytes)}"
-        }
+        val timeText = entry.modifiedAt?.format(displayTimeFormatter)
+            ?: AppRuntime.stringResource(R.string.fm_unknown)
+        return if (entry.isDirectory || entry.sizeBytes == null) timeText
+        else "$timeText ${formatSize(entry.sizeBytes)}"
     }
 
     fun formatStatDetails(
         stat: RemoteFileStat,
         directorySnapshot: DirectoryDownloadSnapshot? = null,
     ): String {
-        val lines = mutableListOf<String>()
-        val resolvedSizeBytes = directorySnapshot?.totalBytes ?: stat.sizeBytes
-        lines += "路径: ${stat.path}"
-        stat.typeLabel?.let { lines += "类型: $it" }
-        resolvedSizeBytes?.let { lines += "大小: ${formatSize(it)} ($it B)" }
-        stat.blocks?.let { lines += "块数: $it" }
-        stat.ioBlockBytes?.let { lines += "IO 块大小: ${it}B" }
-        stat.inode?.let { lines += "inode: $it" }
-        stat.hardLinks?.let { lines += "硬链接: $it" }
-        if (!stat.octalMode.isNullOrBlank() || !stat.permissions.isNullOrBlank()) {
-            lines += "权限: ${stat.octalMode ?: "?"}/${stat.permissions ?: "?"}"
-        }
-        if (stat.uid != null || stat.uidName != null) {
-            lines += "Uid: ${stat.uid ?: "?"}/${stat.uidName ?: "?"}"
-        }
-        if (stat.gid != null || stat.gidName != null) {
-            lines += "Gid: ${stat.gid ?: "?"}/${stat.gidName ?: "?"}"
-        }
-        stat.device?.let { lines += "设备: $it" }
-        stat.deviceType?.let { lines += "设备类型: $it" }
-        stat.accessTime?.let { lines += "访问时间: $it" }
-        stat.modifyTime?.let { lines += "修改时间: $it" }
-        stat.changeTime?.let { lines += "变更时间: $it" }
-        stat.symlinkTarget?.let { lines += "链接目标: $it" }
+        val entries = mutableListOf<Pair<String, String>>()
+        entries.add(AppRuntime.stringResource(R.string.fm_stat_path) to stat.path)
+        stat.typeLabel?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_type) to it) }
+        (directorySnapshot?.totalBytes ?: stat.sizeBytes)
+            ?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_size) to "${formatSize(it)} ($it B)") }
+        stat.blocks?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_blocks) to "$it") }
+        stat.ioBlockBytes?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_io_block_size) to "${it}B") }
+        stat.inode?.let { entries.add("inode" to "$it") }
+        stat.hardLinks?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_hard_links) to "$it") }
+        if (!stat.octalMode.isNullOrBlank() || !stat.permissions.isNullOrBlank())
+            entries.add(AppRuntime.stringResource(R.string.fm_stat_permissions) to "${stat.octalMode ?: "?"}/${stat.permissions ?: "?"}")
+        if (stat.uid != null || stat.uidName != null)
+            entries.add("Uid" to "${stat.uid ?: "?"}/${stat.uidName ?: "?"}")
+        if (stat.gid != null || stat.gidName != null)
+            entries.add("Gid" to "${stat.gid ?: "?"}/${stat.gidName ?: "?"}")
+        stat.device?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_device) to "$it") }
+        stat.deviceType?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_device_type) to "$it") }
+        stat.accessTime?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_access_time) to "$it") }
+        stat.modifyTime?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_modify_time) to "$it") }
+        stat.changeTime?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_change_time) to "$it") }
+        stat.symlinkTarget?.let { entries.add(AppRuntime.stringResource(R.string.fm_stat_link_target) to "$it") }
         directorySnapshot?.let {
-            lines += "目录数: ${it.directories.size}"
-            lines += "文件数: ${it.files.size}"
+            entries.add(AppRuntime.stringResource(R.string.fm_stat_directories) to "${it.directories.size}")
+            entries.add(AppRuntime.stringResource(R.string.fm_stat_files) to "${it.files.size}")
         }
-        return lines.joinToString(separator = "\n")
+        return entries.joinToString(separator = "\n") { "${it.first}: ${it.second}" }
     }
 
     fun formatSize(bytes: Long): String {
@@ -506,13 +502,13 @@ object FileManagerService {
     }
 
     private fun ensureDirectoryExists(directory: File?) {
-        requireNotNull(directory) { "目录不存在" }
+        requireNotNull(directory) { AppRuntime.stringResource(R.string.fm_exception_directory_not_found) }
         if (directory.exists()) {
-            require(directory.isDirectory) { "目标不是文件夹: ${directory.absolutePath}" }
+            require(directory.isDirectory) { "${AppRuntime.stringResource(R.string.fm_exception_not_directory)}: ${directory.absolutePath}" }
             return
         }
         if (!directory.mkdirs()) {
-            throw IOException("无法创建目录: ${directory.absolutePath}")
+            throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_dir)}: ${directory.absolutePath}")
         }
     }
 
@@ -550,7 +546,8 @@ object FileManagerService {
     ): Uri {
         var name = baseName
         var index = 1
-        while (findChildDocument(
+        while (
+            findChildDocument(
                 context,
                 parentDocument,
                 name,
@@ -565,7 +562,7 @@ object FileManagerService {
             parentDocument,
             DocumentsContract.Document.MIME_TYPE_DIR,
             name,
-        ) ?: throw IOException("无法创建目录: $name")
+        ) ?: throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_dir)}: $name")
     }
 
     private fun createUniqueDocument(
@@ -579,11 +576,9 @@ object FileManagerService {
         var candidate = baseName
         var index = 1
         while (findChildDocument(context, parentDocument, candidate, mimeType) != null) {
-            candidate = if (extension.isBlank() || fileBase == baseName) {
-                "$baseName ($index)"
-            } else {
-                "$fileBase ($index).$extension"
-            }
+            candidate =
+                if (extension.isBlank() || fileBase == baseName) "$baseName ($index)"
+                else "$fileBase ($index).$extension"
             index++
         }
         return DocumentsContract.createDocument(
@@ -591,7 +586,7 @@ object FileManagerService {
             parentDocument,
             mimeType,
             candidate,
-        ) ?: throw IOException("无法创建文件: $candidate")
+        ) ?: throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_file)}: $candidate")
     }
 
     private fun ensureTreeDirectory(
@@ -600,9 +595,7 @@ object FileManagerService {
         relativePath: String
     ): Uri {
         var current = rootDocument
-        if (relativePath.isBlank()) {
-            return current
-        }
+        if (relativePath.isBlank()) return current
         relativePath.split('/')
             .filter { it.isNotBlank() }
             .forEach { segment ->
@@ -617,7 +610,7 @@ object FileManagerService {
                     current,
                     DocumentsContract.Document.MIME_TYPE_DIR,
                     segment,
-                ) ?: throw IOException("无法创建目录: $segment")
+                ) ?: throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_dir)}: $segment")
             }
         return current
     }
@@ -649,7 +642,7 @@ object FileManagerService {
                 if (childDisplayName == displayName && childMimeType == mimeType) {
                     return DocumentsContract.buildDocumentUriUsingTree(
                         parentDocument,
-                        cursor.getString(0)
+                        cursor.getString(0),
                     )
                 }
             }
@@ -722,11 +715,8 @@ class DirectorySnapshotSession private constructor(
 
         private fun relativePath(root: String, fullPath: String): String {
             val prefix = root.trimEnd('/') + "/"
-            return if (fullPath.startsWith(prefix)) {
-                fullPath.removePrefix(prefix)
-            } else {
-                fullPath
-            }
+            return if (fullPath.startsWith(prefix)) fullPath.removePrefix(prefix)
+            else fullPath
         }
     }
 }
@@ -771,9 +761,9 @@ private class InteractiveShellSession private constructor(
 
         while (true) {
             val count = stream.inputStream.read(buffer)
-            if (count <= 0) {
-                throw IOException("远端 shell 已关闭")
-            }
+            if (count <= 0)
+                throw IOException(AppRuntime.stringResource(R.string.fm_exception_remote_shell_closed))
+
             builder.append(String(buffer, 0, count, StandardCharsets.UTF_8))
             val markerStart = builder.indexOf(markerPrefix)
             if (markerStart >= 0) {
@@ -784,7 +774,7 @@ private class InteractiveShellSession private constructor(
                     val status = statusText.toIntOrNull() ?: 1
                     val output = builder.substring(0, markerStart).trimEnd('\r', '\n')
                     if (status != 0) {
-                        throw IOException(output.ifBlank { "命令执行失败 ($status)" })
+                        throw IOException(output.ifBlank { "${AppRuntime.stringResource(R.string.fm_exception_command_failed)} ($status)" })
                     }
                     return output
                 }

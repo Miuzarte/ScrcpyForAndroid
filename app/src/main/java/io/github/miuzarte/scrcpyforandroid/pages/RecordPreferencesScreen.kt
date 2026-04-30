@@ -27,16 +27,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.RecordFilenameTemplate
 import io.github.miuzarte.scrcpyforandroid.services.RecordingFileResolver
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
@@ -74,25 +75,24 @@ internal fun RecordPreferencesScreen(
     scrcpy: Scrcpy,
 ) {
     val navigator = LocalRootNavigator.current
-    val snackbar = LocalSnackbarController.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        snackbarHost = { SnackbarHost(snackbar.hostState) },
+        snackbarHost = { AppRuntime.snackbarHostState?.let { SnackbarHost(it) } },
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 TopAppBar(
-                    title = "录制",
+                    title = stringResource(R.string.record_title),
                     color =
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
                     navigationIcon = {
                         IconButton(onClick = navigator.pop) {
                             Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "返回",
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
                             )
                         }
                     },
@@ -241,7 +241,7 @@ private fun RecordPreferencesPage(
             TextField(
                 value = draftTemplate,
                 onValueChange = { draftTemplate = it.sanitizeRecordFilenameInput() },
-                label = "文件名，不为空时启用",
+                label = stringResource(R.string.record_filename_hint),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             )
@@ -249,7 +249,7 @@ private fun RecordPreferencesPage(
 
         if (draftTemplate.text.isNotEmpty()) item {
             Text(
-                text = "预览：\n$previewFilename",
+                text = stringResource(R.string.record_preview) + "\n$previewFilename",
                 color = colorScheme.onSurfaceVariantSummary,
                 fontSize = textStyles.body2.fontSize,
                 modifier = Modifier.padding(horizontal = UiSpacing.Large),
@@ -296,7 +296,9 @@ private fun RecordPreferencesPage(
                                 fontSize = textStyles.body1.fontSize,
                             )
                             Text(
-                                text = entry.description ?: "纯文本",
+                                text = stringResource(
+                                    entry.descriptionResId ?: R.string.record_plain_text
+                                ),
                                 color = colorScheme.onSurfaceVariantSummary,
                                 fontSize = textStyles.body2.fontSize,
                             )
@@ -328,11 +330,10 @@ private suspend fun saveRecordBundleForProfile(
     bundle: ScrcpyOptions.Bundle,
 ) {
     val normalizedBundle = bundle.copy(recordFilename = bundle.recordFilename.trim())
-    if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID) {
+    if (profileId == ScrcpyOptions.GLOBAL_PROFILE_ID)
         scrcpyOptions.saveBundle(normalizedBundle)
-    } else {
+    else
         scrcpyProfiles.updateBundle(profileId, normalizedBundle)
-    }
 }
 
 private fun TextFieldValue.replaceSelection(replacement: String): TextFieldValue {
@@ -352,9 +353,7 @@ private fun TextFieldValue.replaceSelection(replacement: String): TextFieldValue
 
 private fun TextFieldValue.sanitizeRecordFilenameInput(): TextFieldValue {
     val sanitizedText = RecordingFileResolver.sanitizeFileName(text)
-    if (sanitizedText == text) {
-        return this
-    }
+    if (sanitizedText == text) return this
     val sanitizedSelection = TextRange(
         start = selection.start.coerceIn(0, sanitizedText.length),
         end = selection.end.coerceIn(0, sanitizedText.length),

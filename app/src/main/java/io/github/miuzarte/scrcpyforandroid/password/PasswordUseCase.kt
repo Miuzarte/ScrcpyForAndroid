@@ -1,31 +1,34 @@
 package io.github.miuzarte.scrcpyforandroid.password
 
 import androidx.fragment.app.FragmentActivity
+import io.github.miuzarte.scrcpyforandroid.R
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 
 class PasswordUseCase {
     suspend fun preparePassword(
         activity: FragmentActivity,
         entry: PasswordEntry,
         globalRequiresAuth: Boolean,
+        authTitle: String,
     ): Result<CharArray> {
         val canAuthNow = BiometricGate.canAuthenticate()
 
         if (globalRequiresAuth) {
-            val ok = BiometricGate.authenticate(
-                activity = activity,
-                title = "验证以填充锁屏密码",
-                subtitle = entry.name,
-            )
-            if (!ok) {
-                return Result.failure(IllegalStateException("认证失败"))
-            }
+            if (
+                !BiometricGate.authenticate(
+                    activity = activity,
+                    title = authTitle,
+                    subtitle = entry.name,
+                )
+            ) return Result.failure(IllegalStateException(AppRuntime.stringResource(R.string.password_auth_failed)))
         } else if (entry.createdWithAuth.hasAuthenticatedOrigin && !canAuthNow) {
-            return Result.failure(IllegalStateException("设备安全状态已变更，请重新设置密码"))
+            return Result.failure(IllegalStateException(AppRuntime.stringResource(R.string.password_security_state_changed)))
         }
 
-        val password = entry.cipherText ?: return Result.failure(
-            IllegalStateException("密码已失效，请重新设置")
-        )
+        val password = entry.cipherText
+            ?: return Result.failure(
+                IllegalStateException(AppRuntime.stringResource(R.string.password_expired))
+            )
         return Result.success(password.copyOf())
     }
 }

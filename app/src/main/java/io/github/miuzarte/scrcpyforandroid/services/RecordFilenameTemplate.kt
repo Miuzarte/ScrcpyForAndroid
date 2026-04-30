@@ -1,12 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
+import androidx.annotation.StringRes
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import java.time.LocalDateTime
 
 object RecordFilenameTemplate {
     data class Entry(
         val value: String,
-        val description: String?,
+        @field:StringRes val descriptionResId: Int?,
         val isTemplate: Boolean,
     )
 
@@ -45,28 +47,28 @@ object RecordFilenameTemplate {
         get() = listOf(
             Entry("-", null, false),
             Entry("_", null, false),
-            Entry($$"${YYYY}", "四位年份，例如 2026", true),
-            Entry($$"${YY}", "两位年份，例如 26", true),
-            Entry($$"${MM}", "月份，两位，例如 09", true),
-            Entry($$"${M}", "月份，一位或两位，例如 9", true),
-            Entry($$"${DD}", "日期，两位，例如 19", true),
-            Entry($$"${D}", "日期，一位或两位，例如 9", true),
-            Entry($$"${HH}", "24 小时制小时，两位，例如 23", true),
-            Entry($$"${H}", "24 小时制小时，一位或两位，例如 9", true),
-            Entry($$"${hh}", "12 小时制小时，两位，例如 11", true),
-            Entry($$"${h}", "12 小时制小时，一位或两位，例如 9", true),
-            Entry($$"${mm}", "分钟，两位，例如 09", true),
-            Entry($$"${m}", "分钟，一位或两位，例如 9", true),
-            Entry($$"${SS}", "秒，两位，例如 09", true),
-            Entry($$"${S}", "秒，一位或两位，例如 9", true),
-            Entry($$"${timestamp}", "秒级时间戳，例如 1776952809", true),
-            Entry($$"${deviceName}", "设备名", true),
-            Entry($$"${deviceIp}", "设备 IP", true),
-            Entry($$"${devicePort}", "设备端口", true),
-            Entry($$"${videoCodec}", "视频串流编码（非文件实际编码）", true),
-            Entry($$"${audioCodec}", "音频串流编码（非文件实际编码）", true),
-            Entry($$"${width}", "视频宽度", true),
-            Entry($$"${height}", "视频高度", true),
+            Entry($$"${YYYY}", R.string.record_desc_yyyy, true),
+            Entry($$"${YY}", R.string.record_desc_yy, true),
+            Entry($$"${MM}", R.string.record_desc_MM, true),
+            Entry($$"${M}", R.string.record_desc_M, true),
+            Entry($$"${DD}", R.string.record_desc_dd, true),
+            Entry($$"${D}", R.string.record_desc_d, true),
+            Entry($$"${HH}", R.string.record_desc_HH, true),
+            Entry($$"${H}", R.string.record_desc_H, true),
+            Entry($$"${hh}", R.string.record_desc_hh, true),
+            Entry($$"${h}", R.string.record_desc_h, true),
+            Entry($$"${mm}", R.string.record_desc_mm, true),
+            Entry($$"${m}", R.string.record_desc_m, true),
+            Entry($$"${SS}", R.string.record_desc_ss, true),
+            Entry($$"${S}", R.string.record_desc_s, true),
+            Entry($$"${timestamp}", R.string.record_desc_timestamp, true),
+            Entry($$"${deviceName}", R.string.record_desc_device_name, true),
+            Entry($$"${deviceIp}", R.string.record_desc_device_ip, true),
+            Entry($$"${devicePort}", R.string.record_desc_device_port, true),
+            Entry($$"${videoCodec}", R.string.record_desc_video_codec, true),
+            Entry($$"${audioCodec}", R.string.record_desc_audio_codec, true),
+            Entry($$"${width}", R.string.record_desc_width, true),
+            Entry($$"${height}", R.string.record_desc_height, true),
             Entry(".mp4", null, false),
             Entry(".m4a", null, false),
             Entry(".aac", null, false),

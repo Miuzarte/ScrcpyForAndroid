@@ -1,10 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.scaffolds
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.miuix.OverlaySpinnerPreference
 import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
@@ -18,7 +22,7 @@ import top.yukonga.miuix.kmp.basic.SpinnerDefaults
  *
  * When [dataLoaded] is false and [overrideEndActionValue] is set, the saved value is
  * appended as a synthetic item so it remains visible before the list is fetched.
- * When [dataLoading] is true, a "加载中..." entry with an [InfiniteProgressIndicator]
+ * When [dataLoading] is true, a stringResource(R.string.text_loading) entry with an [InfiniteProgressIndicator]
  * icon is appended at the end.
  */
 @Composable
@@ -46,6 +50,7 @@ fun OverlaySpinnerWithFallback(
 ) {
     val fallbackActive = !dataLoaded && !overrideEndActionValue.isNullOrBlank()
     val fallbackIdx = items.size
+    val textLoading = stringResource(R.string.text_loading)
     val effectiveItems = remember(items, dataLoading, fallbackActive, overrideEndActionValue) {
         buildList {
             addAll(items)
@@ -61,7 +66,7 @@ fun OverlaySpinnerWithFallback(
                 add(
                     SpinnerEntry(
                         icon = { mod -> InfiniteProgressIndicator(mod) },
-                        title = "加载中...",
+                        title = textLoading,
                         enabled = false,
                     )
                 )

@@ -1,19 +1,23 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppScreenOn
 import io.github.miuzarte.scrcpyforandroid.services.DisconnectCause
+import io.github.miuzarte.scrcpyforandroid.services.EventLogMessage
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
+import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
+import io.github.miuzarte.scrcpyforandroid.services.render
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
@@ -189,19 +193,20 @@ internal class DeviceTabViewModel(
             false,
         )
 
-    val connectedScrcpyProfileName: StateFlow<String> = combine(
-        connectedScrcpyProfileId,
-        scrcpyProfilesState,
-    ) { profileId, profiles ->
-        profiles.profiles
-            .firstOrNull { it.id == profileId }
-            ?.name
-            ?: ScrcpyOptions.GLOBAL_PROFILE_NAME
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        ScrcpyOptions.GLOBAL_PROFILE_NAME,
-    )
+    val connectedScrcpyProfileName: StateFlow<String> =
+        combine(
+            connectedScrcpyProfileId,
+            scrcpyProfilesState,
+        ) { profileId, profiles ->
+            profiles.profiles
+                .firstOrNull { it.id == profileId }
+                ?.name
+                ?: AppRuntime.stringResource(ScrcpyOptions.GLOBAL_PROFILE_NAME_RES_ID)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            AppRuntime.stringResource(ScrcpyOptions.GLOBAL_PROFILE_NAME_RES_ID),
+        )
 
     val canShowPreviewControls: StateFlow<Boolean> = combine(
         adbConnected,
@@ -227,9 +232,6 @@ internal class DeviceTabViewModel(
                 VirtualButtonActions.parseStoredLayout(_asBundle.value.virtualButtonsLayout)
             ),
         )
-
-    private val _snackbarEvents = Channel<String>(Channel.BUFFERED)
-    val snackbarEvents: Flow<String> = _snackbarEvents.receiveAsFlow()
 
     private val _fullscreenRequests = Channel<Unit>(Channel.BUFFERED)
     val fullscreenRequests: Flow<Unit> = _fullscreenRequests.receiveAsFlow()
@@ -391,7 +393,12 @@ internal class DeviceTabViewModel(
 
             else -> {
                 val keycode = action.keycode ?: return
-                runBusy("发送 ${action.title}") {
+                runBusy(
+                    EventLogMessage.Resource(
+                        R.string.vm_send_action,
+                        listOf(EventLogMessage.Resource(action.titleResId)),
+                    )
+                ) {
                     scrcpy.injectKeycode(0, keycode)
                     scrcpy.injectKeycode(1, keycode)
                 }
@@ -399,35 +406,31 @@ internal class DeviceTabViewModel(
         }
     }
 
-    private fun snackbar(message: String) {
-        _snackbarEvents.trySend(message)
+    fun startScrcpy() = runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
+        startScrcpySession()
     }
 
-    fun startScrcpy() = runBusy("启动 scrcpy") { startScrcpySession() }
+    fun stopScrcpy() = runBusy(EventLogMessage.Resource(R.string.vm_stop_scrcpy)) {
+        stopScrcpySession()
+    }
 
-    fun stopScrcpy() = runBusy("停止 scrcpy") { stopScrcpySession() }
-
-    fun startScrcpy(packageName: String) = runBusy("启动 scrcpy") {
+    fun startScrcpy(packageName: String) = runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
         startScrcpySession(startAppOverride = packageName)
     }
 
-    fun launchAppWithFallback(packageName: String) = runBusy("启动应用") {
+    fun launchAppWithFallback(packageName: String) = runBusy(EventLogMessage.Resource(R.string.vm_launch_app)) {
         runCatching { scrcpy.startApp(packageName) }
-            .onSuccess { logEvent("已在当前显示启动应用: $packageName") }
+            .onSuccess { logEvent(R.string.vm_app_started_on_display, packageName) }
             .onFailure { error ->
-                snackbar("通过 scrcpy 控制通道启动应用失败，回退 ADB")
-                logEvent(
-                    "通过 scrcpy 控制通道启动应用失败，回退 ADB" +
-                            ": ${error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName}",
-                    Log.WARN, error,
-                )
+                AppRuntime.snackbar(R.string.vm_start_app_fallback_adb)
+                logEvent(R.string.vm_start_app_fallback_adb, level = Log.WARN, error = error)
                 adbCoordinator.startApp(packageName = packageName)
-                logEvent("已通过 ADB 启动应用: $packageName")
+                logEvent(R.string.vm_app_started_via_adb, packageName)
             }
     }
 
     private fun runBusy(
-        label: String,
+        label: EventLogMessage,
         onFinished: (() -> Unit)? = null,
         block: suspend () -> Unit
     ) {
@@ -437,14 +440,14 @@ internal class DeviceTabViewModel(
             try {
                 block()
             } catch (_: TimeoutCancellationException) {
-                logEvent("$label 超时", Log.WARN)
+                logEvent(R.string.vm_label_timeout, label, level = Log.WARN)
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                logEvent("$label 参数错误: $detail", Log.WARN, e)
-                snackbar("$label 参数错误: $detail")
+                logEvent(R.string.vm_label_param_error, label, detail, level = Log.WARN, error = e)
+                AppRuntime.snackbar(R.string.vm_label_param_error, label.render(AppRuntime.context), detail)
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                logEvent("$label 失败: $detail", Log.ERROR, e)
+                logEvent(R.string.vm_label_failed, label, detail, level = Log.ERROR, error = e)
             } finally {
                 _busy.value = false
                 onFinished?.invoke()
@@ -453,7 +456,7 @@ internal class DeviceTabViewModel(
     }
 
     private fun runAdbConnect(
-        label: String,
+        label: EventLogMessage,
         onStarted: (() -> Unit)? = null,
         onFinished: (() -> Unit)? = null,
         block: suspend () -> Unit,
@@ -465,14 +468,14 @@ internal class DeviceTabViewModel(
             try {
                 block()
             } catch (_: TimeoutCancellationException) {
-                logEvent("$label 超时", Log.WARN)
+                logEvent(R.string.vm_label_timeout, label, level = Log.WARN)
             } catch (e: IllegalArgumentException) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                logEvent("$label 参数错误: $detail", Log.WARN, e)
-                snackbar("$label 参数错误: $detail")
+                logEvent(R.string.vm_label_param_error, label, detail, level = Log.WARN, error = e)
+                AppRuntime.snackbar(R.string.vm_label_param_error, label.render(AppRuntime.context), detail)
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                logEvent("$label 失败: $detail", Log.ERROR, e)
+                logEvent(R.string.vm_label_failed, label, detail, level = Log.ERROR, error = e)
             } finally {
                 _adbConnecting.value = false
                 onFinished?.invoke()
@@ -483,9 +486,8 @@ internal class DeviceTabViewModel(
     suspend fun disconnectAdbConnection(
         clearQuickOnlineForTarget: ConnectionTarget? = currentTarget.value,
         logMessage: String? = null,
-        showSnackMessage: String? = null,
         cause: DisconnectCause = DisconnectCause.User,
-        statusLine: String = "未连接",
+        statusLine: String = "Disconnected",
     ) {
         val result = connectionController.disconnectAdbConnection(
             clearQuickOnlineForTarget,
@@ -497,7 +499,6 @@ internal class DeviceTabViewModel(
                 _savedShortcuts.update { it.update(host = target.host, port = target.port) }
         }
         logMessage?.let { logEvent(it) }
-        if (!showSnackMessage.isNullOrBlank()) snackbar(showSnackMessage)
     }
 
     suspend fun disconnectCurrentTargetBeforeConnecting(newHost: String, newPort: Int) {
@@ -517,7 +518,8 @@ internal class DeviceTabViewModel(
     }
 
     suspend fun handleAdbConnected(
-        host: String, port: Int,
+        host: String,
+        port: Int,
         autoStartScrcpy: Boolean = false,
         autoEnterFullScreen: Boolean = false,
         scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
@@ -538,27 +540,28 @@ internal class DeviceTabViewModel(
         }
 
         logEvent(
-            "ADB 已连接: model=${info.model}, serial=${info.serial.ifBlank { "unknown" }}, " +
+            "ADB connected: model=${info.model}, serial=${info.serial.ifBlank { "unknown" }}, " +
                     "manufacturer=${info.manufacturer.ifBlank { "unknown" }}, brand=${info.brand.ifBlank { "unknown" }}, " +
                     "device=${info.device.ifBlank { "unknown" }}, android=${info.androidRelease.ifBlank { "unknown" }}, sdk=${info.sdkInt}"
         )
-        snackbar("ADB 已连接")
+        AppRuntime.snackbar(R.string.vm_adb_connected)
 
         if (_asBundle.value.adbAutoLoadAppListOnConnect) {
             viewModelScope.launch(Dispatchers.IO) {
                 runCatching { scrcpy.listings.getApps(forceRefresh = true) }
                     .onFailure { error ->
                         logEvent(
-                            "获取应用列表失败: ${error.message}",
-                            Log.WARN,
-                            error
+                            R.string.vm_failed_app_list_msg,
+                            error.message ?: error.javaClass.simpleName,
+                            level = Log.WARN,
+                            error = error,
                         )
                     }
             }
         }
 
         if (autoStartScrcpy && sessionInfo.value == null) {
-            runBusy("启动 scrcpy") {
+            runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
                 startScrcpySession(openFullscreen = autoStartScrcpy && autoEnterFullScreen)
             }
         }
@@ -579,11 +582,15 @@ internal class DeviceTabViewModel(
 
         if (resolvedOptions.startApp.isNotBlank() && resolvedOptions.control) {
             runCatching { scrcpy.startApp(resolvedOptions.startApp) }
-                .onSuccess { logEvent("已请求 scrcpy 启动应用: ${resolvedOptions.startApp}") }
+                .onSuccess {
+                    logEvent(R.string.vm_scrcpy_requested_app, resolvedOptions.startApp)
+                }
                 .onFailure { error ->
                     logEvent(
-                        "通过 scrcpy 控制通道启动应用失败: ${error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName}",
-                        Log.WARN, error
+                        R.string.vm_scrcpy_start_app_failed,
+                        error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName,
+                        level = Log.WARN,
+                        error = error,
                     )
                 }
         }
@@ -596,26 +603,28 @@ internal class DeviceTabViewModel(
         if (resolvedOptions.disableScreensaver) AppScreenOn.acquire()
         connectionController.markScrcpyStarted()
 
-        @SuppressLint("DefaultLocale")
-        val videoDetail = if (!resolvedOptions.video) "off"
-        else if (activeBundle.videoBitRate <= 0) "${session.codec?.string ?: "null"} ${session.width}x${session.height} @default"
-        else "${session.codec?.string ?: "null"} ${session.width}x${session.height} @${
-            String.format(
-                "%.1f",
-                activeBundle.videoBitRate / 1_000_000f
-            )
-        }Mbps"
+        val videoDetail =
+            if (!resolvedOptions.video) "off"
+            else if (activeBundle.videoBitRate <= 0) "${session.codec?.string ?: "null"} ${session.width}x${session.height} @default"
+            else "${session.codec?.string ?: "null"} ${session.width}x${session.height} " +
+                    "@%.1fMbps".format(activeBundle.videoBitRate / 1_000_000f)
 
-        val audioDetail = if (!activeBundle.audio) "off"
-        else if (activeBundle.audioBitRate <= 0) "${resolvedOptions.audioCodec} default source=${resolvedOptions.audioSource}"
-        else "${resolvedOptions.audioCodec} ${activeBundle.audioBitRate / 1_000f}Kbps source=${resolvedOptions.audioSource}${if (!resolvedOptions.audioPlayback) "(no-playback)" else ""}"
+        val audioDetail =
+            if (!activeBundle.audio) "off"
+            else if (activeBundle.audioBitRate <= 0) "${resolvedOptions.audioCodec} default source=${resolvedOptions.audioSource}"
+            else "${resolvedOptions.audioCodec} ${activeBundle.audioBitRate / 1_000f}Kbps" +
+                    " source=${resolvedOptions.audioSource}" +
+                    if (!resolvedOptions.audioPlayback) "(no-playback)" else ""
 
         logEvent(
             "scrcpy 已启动: device=${session.deviceName}, video=$videoDetail, audio=$audioDetail, " +
                     "control=${resolvedOptions.control}, turnScreenOff=${resolvedOptions.turnScreenOff}, " +
                     "maxSize=${resolvedOptions.maxSize}, maxFps=${resolvedOptions.maxFps}"
         )
-        snackbar("scrcpy 已启动" + if (resolvedOptions.recordFilename.isNotBlank()) "并开始录制" else "")
+        AppRuntime.snackbar(
+            if (resolvedOptions.recordFilename.isNotBlank()) R.string.vm_scrcpy_started_recording
+            else R.string.vm_scrcpy_started
+        )
     }
 
     suspend fun stopScrcpySession() {
@@ -628,12 +637,12 @@ internal class DeviceTabViewModel(
                 if (target.host.isNotBlank())
                     _savedShortcuts.update { it.update(host = target.host, port = target.port) }
             }
-            logEvent("scrcpy 已停止，ADB 已断开")
-            snackbar("scrcpy 已停止，ADB 已断开")
+            logEvent(R.string.vm_scrcpy_stopped_adb_disconnected_log)
+            AppRuntime.snackbar(R.string.vm_scrcpy_stopped_adb_disconnected)
         } else {
             connectionController.stopScrcpySession(killAdbOnClose = false)
-            logEvent("scrcpy 已停止")
-            snackbar("scrcpy 已停止")
+            logEvent(R.string.vm_scrcpy_stopped)
+            AppRuntime.snackbar(R.string.vm_scrcpy_stopped)
         }
     }
 
@@ -646,25 +655,36 @@ internal class DeviceTabViewModel(
     suspend fun refreshApps() {
         runCatching { scrcpy.listings.getApps(forceRefresh = true) }
             .onFailure { error ->
-                logEvent("获取应用列表失败: ${error.message}", Log.WARN, error)
-                withContext(Dispatchers.Main) { snackbar("获取应用列表失败") }
+                val detail = error.message ?: error.javaClass.simpleName
+                logEvent(R.string.vm_failed_app_list_msg, detail, level = Log.WARN, error = error)
+                withContext(Dispatchers.Main) {
+                    AppRuntime.snackbar(
+                        R.string.vm_failed_app_list_msg,
+                        detail,
+                    )
+                }
             }
     }
 
     suspend fun refreshRecentTasks() {
         runCatching { scrcpy.listings.getRecentTasks(forceRefresh = true) }
             .onFailure { error ->
-                logEvent("获取最近任务失败: ${error.message}", Log.WARN, error)
-                withContext(Dispatchers.Main) { snackbar("获取最近任务失败") }
+                val detail = error.message ?: error.javaClass.simpleName
+                logEvent(R.string.vm_failed_recent_tasks_msg, detail, level = Log.WARN, error = error)
+                withContext(Dispatchers.Main) {
+                    AppRuntime.snackbar(
+                        R.string.vm_failed_recent_tasks_msg,
+                        detail,
+                    )
+                }
             }
     }
 
     suspend fun pasteLocalClipboard(context: Context) {
-        val text =
-            io.github.miuzarte.scrcpyforandroid.services.LocalInputService.getClipboardText(context)
-                ?.takeIf { it.isNotBlank() }
+        val text = LocalInputService.getClipboardText(context)
+            ?.takeIf { it.isNotBlank() }
         if (text == null) {
-            snackbar("本机剪贴板为空或不是文本")
+            AppRuntime.snackbar(R.string.vm_clipboard_paste_failed)
             return
         }
         val useLegacyPaste = connectedScrcpyBundle.value.legacyPaste
@@ -673,10 +693,16 @@ internal class DeviceTabViewModel(
                 if (useLegacyPaste) scrcpy.injectText(text)
                 else scrcpy.setClipboard(text, paste = true)
             }
-            logEvent(if (useLegacyPaste) "已使用 legacy paste 注入本机剪贴板文本" else "已同步本机剪贴板到设备并触发粘贴")
+            logEvent(
+                if (useLegacyPaste) R.string.vm_legacy_paste_injected
+                else R.string.vm_clipboard_synced_paste
+            )
         }.onFailure { error ->
-            logEvent("本机剪贴板粘贴失败: ${error.message}", Log.WARN, error)
-            snackbar(if (useLegacyPaste) "legacy 粘贴失败" else "剪贴板同步粘贴失败，可尝试开启 --legacy-paste")
+            logEvent(R.string.vm_clipboard_paste_failed, level = Log.WARN, error = error)
+            AppRuntime.snackbar(
+                if (useLegacyPaste) R.string.fullscreen_legacy_paste_failed
+                else R.string.fullscreen_clipboard_sync_failed
+            )
         }
     }
 
@@ -685,63 +711,75 @@ internal class DeviceTabViewModel(
             scrcpy = scrcpy, text = text,
             keyInjectMode = scrcpyOptions.toClientOptions(connectedScrcpyBundle.value).keyInjectMode,
         ) { error, useClipboardPaste ->
-            logEvent("输入法文本提交失败: ${error.message}", Log.WARN, error)
-            snackbar(if (useClipboardPaste) "非 ASCII 文本粘贴失败" else "文本输入失败")
+            logEvent(
+                R.string.vm_ime_text_failed,
+                error.message ?: error.javaClass.simpleName,
+                level = Log.WARN,
+                error = error,
+            )
+            AppRuntime.snackbar(
+                if (useClipboardPaste) R.string.fullscreen_paste_non_ascii
+                else R.string.fullscreen_text_input_failed
+            )
         }
     }
 
     fun onDeviceAction(device: DeviceShortcut) {
-        val connected = adbConnected.value &&
-                currentTarget.value?.host == device.host && currentTarget.value?.port == device.port
+        val connected = adbConnected.value
+                && currentTarget.value?.host == device.host
+                && currentTarget.value?.port == device.port
 
         if (!connected) {
             runAdbConnect(
-                "连接 ADB",
-                { _activeDeviceActionId.value = device.id },
-                { _activeDeviceActionId.value = null }) {
+                label = EventLogMessage.Resource(R.string.vm_connect_adb),
+                onStarted = { _activeDeviceActionId.value = device.id },
+                onFinished = { _activeDeviceActionId.value = null },
+            ) {
                 disconnectCurrentTargetBeforeConnecting(device.host, device.port)
                 try {
                     connectWithTimeout(device.host, device.port)
                     handleAdbConnected(
-                        device.host,
-                        device.port,
-                        device.startScrcpyOnConnect,
-                        device.startScrcpyOnConnect && device.openFullscreenOnStart,
-                        device.scrcpyProfileId
+                        host = device.host,
+                        port = device.port,
+                        autoStartScrcpy = device.startScrcpyOnConnect,
+                        autoEnterFullScreen = device.startScrcpyOnConnect && device.openFullscreenOnStart,
+                        scrcpyProfileId = device.scrcpyProfileId
                     )
                     connectionController.updateQuickConnected(false)
                 } catch (error: Exception) {
                     connectionController.markConnectionFailed(error)
-                    logEvent("ADB 连接失败: ${error.message}", Log.ERROR)
-                    snackbar("ADB 连接失败")
+                    logEvent(R.string.vm_adb_connection_failed, level = Log.ERROR, error = error)
+                    AppRuntime.snackbar(R.string.vm_adb_connection_failed)
                 }
             }
             return
         }
 
         runAdbConnect(
-            "断开 ADB",
-            { _activeDeviceActionId.value = device.id },
-            { _activeDeviceActionId.value = null }) {
+            label = EventLogMessage.Resource(R.string.vm_disconnect_adb),
+            onStarted = { _activeDeviceActionId.value = device.id },
+            onFinished = { _activeDeviceActionId.value = null },
+        ) {
             sessionReconnectBlacklistHosts += device.host
             disconnectAdbConnection(
                 ConnectionTarget(device.host, device.port),
-                "ADB 已断开: ${device.name}",
-                "ADB 已断开"
+                logMessage = "ADB disconnected: ${device.name}",
             )
         }
     }
 
     fun onQuickConnect(target: ConnectionTarget) {
         runAdbConnect(
-            "连接 ADB",
-            { _activeDeviceActionId.value = target.toString() },
-            { _activeDeviceActionId.value = null }) {
+            label = EventLogMessage.Resource(R.string.vm_connect_adb),
+            onStarted = { _activeDeviceActionId.value = target.toString() },
+            onFinished = { _activeDeviceActionId.value = null },
+        ) {
             disconnectCurrentTargetBeforeConnecting(target.host, target.port)
             try {
                 connectWithTimeout(target.host, target.port)
                 handleAdbConnected(
-                    target.host, target.port,
+                    host = target.host,
+                    port = target.port,
                     autoStartScrcpy = false,
                     autoEnterFullScreen = false,
                     scrcpyProfileId = ScrcpyOptions.GLOBAL_PROFILE_ID,
@@ -749,29 +787,35 @@ internal class DeviceTabViewModel(
                 connectionController.updateQuickConnected(true)
             } catch (error: Exception) {
                 connectionController.markConnectionFailed(error)
-                logEvent("ADB 连接失败: ${error.message}", Log.ERROR)
-                snackbar("ADB 连接失败")
+                logEvent(R.string.vm_adb_connection_failed, level = Log.ERROR, error = error)
+                AppRuntime.snackbar(R.string.vm_adb_connection_failed)
             }
         }
     }
 
     fun onDisconnectCurrent(target: ConnectionTarget?) {
-        runAdbConnect("断开 ADB") {
+        runAdbConnect(EventLogMessage.Resource(R.string.vm_disconnect_adb)) {
             target?.let {
                 sessionReconnectBlacklistHosts += it.host
-                disconnectAdbConnection(it, "ADB 已断开", "ADB 已断开")
+                disconnectAdbConnection(it, logMessage = "ADB disconnected")
             }
         }
     }
 
     fun onPair(host: String, port: String, code: String) {
-        runBusy("执行配对") {
+        runBusy(EventLogMessage.Resource(R.string.vm_execute_pairing)) {
             val h = host.trim()
             val p = port.trim().toIntOrNull() ?: return@runBusy
             val c = code.trim()
             val ok = adbCoordinator.pair(h, p, c)
-            logEvent(if (ok) "配对成功" else "配对失败", if (ok) Log.INFO else Log.ERROR)
-            snackbar(if (ok) "配对成功" else "配对失败")
+            logEvent(
+                if (ok) R.string.vm_pairing_succeeded else R.string.vm_pairing_failed,
+                level = if (ok) Log.INFO else Log.ERROR,
+            )
+            AppRuntime.snackbar(
+                if (ok) R.string.vm_pairing_succeeded
+                else R.string.vm_pairing_failed
+            )
         }
     }
 
@@ -779,6 +823,7 @@ internal class DeviceTabViewModel(
         return adbCoordinator.discoverPairingService(includeLanDevices = _asBundle.value.adbMdnsLanDiscovery)
     }
 
+    // TODO: unused
     fun blacklistHost(host: String) {
         sessionReconnectBlacklistHosts += host
     }
@@ -794,18 +839,18 @@ internal class DeviceTabViewModel(
                     connectTimeoutMs = ADB_CONNECT_TIMEOUT_MS,
                     keepAliveTimeoutMs = ADB_KEEPALIVE_TIMEOUT_MS,
                     onReconnectSuccess = { host, port ->
-                        logEvent("ADB 自动重连成功: $host:$port")
-                        snackbar("ADB 自动重连成功")
+                        logEvent(R.string.vm_quick_probe_success, host, port)
+                        AppRuntime.snackbar(R.string.vm_auto_reconnect_succeeded)
                     },
                     onReconnectFailure = { error ->
                         viewModelScope.launch {
                             disconnectAdbConnection(
                                 cause = DisconnectCause.KeepAliveFailed,
-                                statusLine = "ADB 连接断开"
+                                statusLine = "ADB disconnected"
                             )
                         }
-                        logEvent("ADB 自动重连失败: $error", Log.ERROR)
-                        snackbar("ADB 自动重连失败")
+                        logEvent(R.string.vm_auto_reconnect_failed, level = Log.ERROR, error = error)
+                        AppRuntime.snackbar(R.string.vm_auto_reconnect_failed)
                     },
                 )
             } finally {
@@ -833,7 +878,7 @@ internal class DeviceTabViewModel(
                 discoverConnectService = {
                     adbCoordinator.discoverConnectService(
                         ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS,
-                        _asBundle.value.adbMdnsLanDiscovery
+                        _asBundle.value.adbMdnsLanDiscovery,
                     )
                 },
                 onMdnsPortChanged = { host, oldPort, newPort ->
@@ -841,18 +886,18 @@ internal class DeviceTabViewModel(
                         it.update(
                             host = host,
                             port = oldPort,
-                            newPort = newPort
+                            newPort = newPort,
                         )
                     }
-                    logEvent("mDNS 发现新端口，已更新快速设备: $host:$oldPort -> $host:$newPort")
+                    logEvent(R.string.vm_mdns_updated, host, oldPort, newPort)
                 },
                 onKnownDeviceReconnected = { target ->
                     _savedShortcuts.update { it.update(host = target.host, port = target.port) }
-                    logEvent("ADB 快速探测连接成功: ${target.host}:${target.port}")
+                    logEvent(R.string.vm_quick_probe_success, target.host, target.port)
                 },
                 onDiscoveredDeviceReconnected = { host, port, _ ->
                     _savedShortcuts.update { it.update(host = host, port = port) }
-                    logEvent("ADB 自动重连成功: $host:$port")
+                    logEvent(R.string.vm_quick_probe_success, host, port)
                 },
                 retryIntervalMs = ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS,
             )
@@ -873,7 +918,7 @@ internal class DeviceTabViewModel(
                     ?.scrcpyProfileId ?: ScrcpyOptions.GLOBAL_PROFILE_ID
                 if (boundProfileId != connectionState.value.adbSession.connectedScrcpyProfileId) {
                     connectionController.syncConnectedScrcpyProfileId(boundProfileId)
-                    logEvent("当前连接设备已切换为配置: $boundProfileId")
+                    logEvent(R.string.vm_device_switched_profile, boundProfileId)
                 }
             }
         }
@@ -893,9 +938,10 @@ internal class DeviceTabViewModel(
                     runCatching { scrcpy.listings.getRecentTasks(forceRefresh = true) }
                         .onFailure { error ->
                             logEvent(
-                                "获取最近任务失败: ${error.message}",
-                                Log.WARN,
-                                error
+                                R.string.vm_failed_recent_tasks_msg,
+                                error.message ?: error.javaClass.simpleName,
+                                level = Log.WARN,
+                                error = error,
                             )
                         }
                 }
@@ -910,9 +956,15 @@ internal class DeviceTabViewModel(
     }
 
     suspend fun injectTouch(
-        action: Int, pointerId: Long, x: Int, y: Int,
-        screenWidth: Int, screenHeight: Int, pressure: Float,
-        actionButton: Int = 0, buttons: Int = 0,
+        action: Int,
+        pointerId: Long,
+        x: Int,
+        y: Int,
+        screenWidth: Int,
+        screenHeight: Int,
+        pressure: Float,
+        actionButton: Int = 0,
+        buttons: Int = 0,
     ) {
         scrcpy.injectTouch(
             action,

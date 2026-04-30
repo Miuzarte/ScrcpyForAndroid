@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Scrcpy for Android</string>
+
+    <!-- Main Tab Labels -->
+    <string name="main_tab_devices">设备</string>
+    <string name="main_tab_terminal">终端</string>
+    <string name="main_tab_files">文件</string>
+    <string name="main_tab_settings">设置</string>
+    <string name="main_press_back_again">再按一次返回键退出</string>
+    <string name="main_font_read_error">无法读取字体文件</string>
+    <string name="main_terminal_font_imported">终端字体导入成功</string>
+    <string name="main_terminal_font_import_failed">终端字体导入失败：%1$s</string>
+    <string name="main_update_check_failed">检查更新失败：%1$s</string>
+
+    <!-- About -->
+    <string name="about_title">关于</string>
+    <string name="about_project_repo">项目仓库</string>
+    <string name="about_releases">版本发布</string>
+    <string name="about_error">错误</string>
+
+    <!-- Common / Shared -->
+    <string name="cd_back">返回</string>
+    <string name="cd_more">更多</string>
+    <string name="cd_clear">清空</string>
+    <string name="cd_select_file">选择文件</string>
+    <string name="cd_select_font">选择字体</string>
+    <string name="cd_fullscreen">全屏</string>
+    <string name="cd_close">关闭</string>
+    <string name="cd_save">保存</string>
+    <string name="cd_edit">编辑</string>
+    <string name="cd_drag_sort">拖动排序</string>
+    <string name="cd_refresh">刷新%1$s</string>
+    <string name="text_none">无</string>
+    <string name="text_default">默认</string>
+    <string name="text_global">全局</string>
+    <string name="text_loading">加载中…</string>
+    <string name="text_not_available">没有可用的</string>
+    <string name="text_off">关闭</string>
+    <string name="text_auto">自动</string>
+    <string name="text_custom">自定义</string>
+    <string name="text_fetching">获取中…</string>
+    <string name="text_fetch_success">获取成功</string>
+    <string name="text_fetch_failed">刷新失败：%1$s</string>
+    <string name="button_cancel">取消</string>
+    <string name="button_delete">删除</string>
+    <string name="button_done">完成</string>
+    <string name="button_connect">连接</string>
+    <string name="button_disconnect">断开</string>
+    <string name="button_start">启动</string>
+    <string name="button_stop">停止</string>
+    <string name="button_fullscreen">全屏</string>
+    <string name="button_pair">配对</string>
+    <string name="button_confirm">确定</string>
+    <string name="button_add_device">添加设备</string>
+    <string name="button_direct_connect">直接连接</string>
+    <string name="button_auto_discover">自动发现</string>
+    <string name="button_discovering">发现中…</string>
+    <string name="button_swap">交换</string>
+    <string name="label_ip_address">IP 地址</string>
+    <string name="label_port">端口</string>
+    <string name="label_device_name">设备名</string>
+    <string name="label_name">名称</string>
+    <string name="label_wlan_pairing_code">WLAN 配对码</string>
+    <string name="label_resolution">分辨率</string>
+    <string name="label_codec">编解码器</string>
+    <string name="label_status">状态</string>
+    <string name="label_fps">FPS</string>
+    <string name="label_touches">触点</string>
+
+    <!-- Device Tab -->
+    <string name="device_title">设备</string>
+    <string name="device_cd_config_right">配置显示在右侧</string>
+    <string name="device_cd_config_left">配置显示在左侧</string>
+    <string name="device_menu_quick_sort">快速设备排序</string>
+    <string name="device_menu_virtual_button_sort">虚拟按钮排序</string>
+    <string name="device_menu_clear_logs">清空日志</string>
+    <string name="device_hint_long_press_edit">长按可编辑</string>
+    <string name="device_cannot_modify_connected">无法修改已连接的设备</string>
+    <string name="device_added">已添加设备：%1$s:%2$s</string>
+    <string name="device_section_wireless_pairing">无线配对</string>
+    <string name="device_section_scrcpy">Scrcpy</string>
+    <string name="device_section_logs">日志</string>
+    <string name="device_pairing_title">使用配对码配对设备</string>
+    <string name="device_pairing_desc">使用六位数的配对码配对新设备</string>
+    <string name="device_quick_connect_title">连接 / 添加设备</string>
+    <string name="device_status_mirroring">投屏中</string>
+    <string name="device_status_resolution">分辨率</string>
+    <string name="device_status_codec">编解码器</string>
+    <string name="device_status_adb_connected">ADB 已连接</string>
+    <string name="device_status_adb_disconnected">ADB 未连接</string>
+    <string name="device_status_current">当前设备</string>
+    <string name="device_status_state">状态</string>
+    <string name="device_status_idle">空闲</string>
+    <string name="device_config_audio_forwarding">音频转发</string>
+    <string name="device_config_audio_forwarding_desc">转发设备音频到本机 (Android 11+)</string>
+    <string name="device_config_audio_codec">音频编码</string>
+    <string name="device_config_audio_codec_note">注意：FLAC编解码会引入较大的延迟</string>
+    <string name="device_config_audio_bitrate">音频码率</string>
+    <string name="device_config_video_codec">视频编码</string>
+    <string name="device_config_video_codec_note">注意：绝大部分设备不支持AV1硬件编码</string>
+    <string name="device_config_video_bitrate">视频码率</string>
+    <string name="device_config_more_params">更多参数</string>
+    <string name="device_config_all_params">所有参数</string>
+    <string name="device_config_all_scrcpy_params">所有 scrcpy 参数</string>
+    <string name="device_config_start_immediately">连接后立即启动 scrcpy</string>
+    <string name="device_config_direct_fullscreen">直接进入全屏</string>
+    <string name="device_config_scrcpy_config">scrcpy 配置</string>
+    <string name="device_switched_profile">%1$s 已切换到配置 %2$s</string>
+
+    <!-- Recent Tasks / All Apps -->
+    <string name="bottomsheet_recent_tasks">最近任务</string>
+    <string name="bottomsheet_loading_tasks">最近任务加载中</string>
+    <string name="bottomsheet_no_tasks">没有可用的最近任务</string>
+    <string name="bottomsheet_all_apps">所有应用</string>
+    <string name="bottomsheet_loading_apps">应用列表加载中</string>
+    <string name="bottomsheet_no_apps">没有可用的应用列表</string>
+
+    <!-- Fullscreen Control -->
+    <string name="fullscreen_failed_app_list">获取应用列表失败</string>
+    <string name="fullscreen_failed_tasks">获取最近任务失败</string>
+    <string name="fullscreen_paste_non_ascii">非 ASCII 文本粘贴失败</string>
+    <string name="fullscreen_text_input_failed">文本输入失败</string>
+    <string name="fullscreen_clipboard_empty">本机剪贴板为空或不是文本</string>
+    <string name="fullscreen_legacy_paste_failed">legacy 粘贴失败</string>
+    <string name="fullscreen_clipboard_sync_failed">剪贴板同步粘贴失败，可尝试开启 --legacy-paste</string>
+    <string name="fullscreen_start_app_failed">启动应用失败：%1$s</string>
+    <string name="fullscreen_debug_resolution">分辨率：%1$sx%2$s</string>
+    <string name="fullscreen_debug_fps">帧率：%1$s</string>
+    <string name="fullscreen_debug_touches">触点：%1$d</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+
+    <!-- Settings - Update -->
+    <string name="pref_update_current">当前版本 %1$s</string>
+    <string name="pref_update_checking">，正在检查更新</string>
+    <string name="pref_update_failed">，检查更新失败</string>
+    <string name="pref_update_found">，发现新版本 %1$s</string>
+    <string name="pref_update_latest">，已是最新版本</string>
+    <string name="pref_update_newer">，高于最新发布版本 %1$s</string>
+
+    <!-- Settings - Theme -->
+    <string name="section_theme">主题</string>
+    <string name="pref_title_appearance_mode">外观模式</string>
+    <string name="pref_summary_appearance_mode">选择应用的外观模式</string>
+    <string name="pref_title_monet">Monet 颜色</string>
+    <string name="pref_summary_monet">开启后使用 Monet 动态配色</string>
+    <string name="pref_title_monet_key_color">Monet Key Color</string>
+    <string name="pref_summary_monet_key_color">设置 Monet 强调色</string>
+    <string name="pref_title_monet_palette_style">Monet Palette Style</string>
+    <string name="pref_summary_monet_palette_style">设置 Monet 调色板风格</string>
+    <string name="pref_title_monet_color_spec">Monet Color Spec</string>
+    <string name="pref_summary_monet_color_spec">设置 Monet 色彩规格</string>
+    <string name="pref_title_blur">模糊</string>
+    <string name="pref_summary_blur">启用顶栏和底栏的模糊效果</string>
+    <string name="pref_title_floating_bottom_bar">悬浮底栏</string>
+    <string name="pref_summary_floating_bottom_bar">使用 Apple 风格的悬浮底栏</string>
+    <string name="pref_title_liquid_glass">液态玻璃</string>
+    <string name="pref_summary_liquid_glass">启用悬浮底栏的液态玻璃效果</string>
+    <string name="pref_title_smooth_corners">平滑圆角</string>
+    <string name="pref_summary_smooth_corners">启用全局平滑圆角效果</string>
+
+    <!-- Settings - Screen Mirroring -->
+    <string name="section_screen_mirroring">投屏</string>
+    <string name="pref_title_low_latency_audio">低延迟音频（实验性）</string>
+    <string name="pref_summary_low_latency_audio">启用后将尝试使用低延迟音频路径\n推荐配合 RAW PCM 编解码\n修改后建议划卡重启应用</string>
+    <string name="pref_title_debug_info">启用调试信息</string>
+    <string name="pref_summary_debug_info">在全屏界面悬浮显示分辨率、帧率和触点信息</string>
+    <string name="pref_title_hide_simple_settings">设备页隐藏简单设置项</string>
+    <string name="pref_summary_hide_simple_settings">启用后设备页仅保留更多参数、所有应用、最近任务和启动/停止按钮</string>
+    <string name="pref_title_preview_card_height">预览卡高度</string>
+    <string name="pref_summary_preview_card_height">设备页预览卡高度</string>
+    <string name="pref_title_quick_device_sort">快速设备排序</string>
+    <string name="pref_summary_quick_device_sort">手动排序设备页的快速设备</string>
+    <string name="pref_title_virtual_button_sort">虚拟按钮排序</string>
+    <string name="pref_summary_virtual_button_sort">手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外</string>
+    <string name="pref_title_password_autofill">锁屏密码自动填充</string>
+    <string name="pref_summary_password_autofill">管理用于自动填充的锁屏密码</string>
+    <string name="pref_title_clipboard_sync">实时同步剪贴板到受控机</string>
+    <string name="pref_summary_clipboard_sync">本机剪贴板更新后会自动同步到受控机\n禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容\nMIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效</string>
+
+    <!-- Settings - Fullscreen -->
+    <string name="section_fullscreen">全屏</string>
+    <string name="pref_title_ignore_rotation_lock">全屏时不跟随系统旋转锁定</string>
+    <string name="pref_summary_ignore_rotation_lock">启用后使用传感器方向，忽略系统自动旋转锁定状态</string>
+    <string name="pref_title_back_to_device">全屏时返回键发送到远程</string>
+    <string name="pref_summary_back_to_device">启用后系统返回键会发送给设备，不再退出全屏控制页\n此时退出全屏需要回到桌面通过图标重新进入应用</string>
+    <string name="pref_title_show_virtual_buttons">全屏时显示虚拟按钮</string>
+    <string name="pref_summary_show_virtual_buttons">在全屏控制页中显示返回键、主页键等虚拟按钮</string>
+    <string name="pref_title_virtual_button_direction">虚拟按钮方向</string>
+    <string name="pref_title_virtual_button_height">虚拟按钮高度</string>
+    <string name="pref_title_show_floating_button">全屏时显示悬浮球</string>
+    <string name="pref_summary_show_floating_button">在全屏控制页中显示可拖动的悬浮球，点击后弹出完整虚拟按键菜单</string>
+    <string name="pref_title_floating_button_size">悬浮球尺寸</string>
+    <string name="pref_title_floating_button_bg_opacity">悬浮球背景透明度</string>
+    <string name="pref_title_floating_button_ring_opacity">悬浮球白环透明度</string>
+    <string name="pref_title_fullscreen_compat_mode">全屏兼容模式</string>
+    <string name="pref_summary_fullscreen_compat_mode">启用后全屏控制页不再跨 Activity，会导致画中画不可用</string>
+
+    <!-- Settings - scrcpy-server -->
+    <string name="section_scrcpy_server">scrcpy-server</string>
+    <string name="pref_title_custom_binary">自定义 binary</string>
+    <string name="pref_title_custom_binary_version">自定义 binary version</string>
+    <string name="pref_title_remote_path">Remote Path</string>
+
+    <!-- Settings - ADB -->
+    <string name="section_adb">ADB</string>
+    <string name="pref_title_battery_optimization">调整后台电池策略</string>
+    <string name="pref_summary_battery_optimization">解决 Scrcpy 切换到后台时无法联网导致 ADB 断连\n应用的电池使用情况 -> 允许后台使用 -> 无限制\n国产ROM魔改的电源设置一般都可在对应的魔改应用设置中找到</string>
+    <string name="pref_title_app_info">应用信息</string>
+    <string name="pref_title_custom_adb_key">自定义 ADB 密钥名</string>
+    <string name="pref_title_adb_private_key">ADB 私钥</string>
+    <string name="pref_title_adb_public_key">ADB 公钥</string>
+    <string name="pref_adb_key_not_imported">未导入</string>
+    <string name="pref_adb_key_imported">已导入</string>
+    <string name="pref_adb_key_generated">已生成</string>
+    <string name="pref_adb_private_key_imported">私钥已导入，公钥指纹：%1$s</string>
+    <string name="pref_adb_public_key_imported_snackbar">公钥已导入，指纹：%1$s</string>
+    <string name="pref_adb_key_reset">ADB 密钥已重新生成，公钥指纹：%1$s</string>
+    <string name="pref_adb_key_removed">已移除导入的 ADB 密钥，当前公钥指纹：%1$s</string>
+    <string name="pref_adb_key_import_failed">ADB 密钥导入失败：%1$s</string>
+    <string name="pref_adb_key_remove">移除</string>
+    <string name="pref_adb_key_regenerate">重新生成</string>
+    <string name="pref_title_auto_discovery">配对时自动启用发现服务</string>
+    <string name="pref_summary_auto_discovery">打开配对弹窗后自动搜索可用配对端口</string>
+    <string name="pref_title_auto_reconnect">自动重连已配对设备</string>
+    <string name="pref_summary_auto_reconnect">自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）</string>
+    <string name="pref_title_auto_load_apps">连接后自动获取应用列表</string>
+    <string name="pref_summary_auto_load_apps">ADB 连接成功后立刻执行 --list-apps，用于补全最近任务列表应用名</string>
+    <string name="pref_warning_list_apps">--list-apps 操作可能非常耗时（特别是在息屏状态下），启用后可能导致连接设备后阻塞过久！</string>
+    <string name="pref_cannot_open_settings">无法打开设置</string>
+
+    <!-- Settings - Terminal -->
+    <string name="section_terminal">终端</string>
+    <string name="pref_title_terminal_font_size">终端字号</string>
+    <string name="pref_summary_terminal_font_size">也可以在终端上双指缩放调整</string>
+    <string name="pref_title_custom_font">自定义终端字体</string>
+    <string name="pref_hint_builtin_font">内置等宽字体</string>
+    <string name="pref_font_restored">已恢复默认终端字体</string>
+    <string name="pref_no_custom_font">当前没有可清除的自定义字体</string>
+
+    <!-- Settings - Miscellaneous -->
+    <string name="section_misc">杂项</string>
+    <string name="pref_title_clear_logs_on_exit">退出应用时清除日志</string>
+    <string name="pref_summary_clear_logs_on_exit">双击返回退出应用时清除日志</string>
+    <string name="pref_title_hide_log_box">隐藏设备页日志框</string>
+    <string name="pref_summary_hide_log_box">隐藏设备页最下方的日志框</string>
+
+    <!-- Terminal -->
+    <string name="terminal_title">终端</string>
+    <string name="terminal_menu_free_copy">自由复制</string>
+    <string name="terminal_menu_clear_screen">清屏</string>
+    <string name="terminal_copied_all">已复制所有终端输出</string>
+    <string name="terminal_copied">已复制到剪贴板</string>
+    <string name="terminal_copy_all">复制全部</string>
+    <string name="terminal_no_output">当前没有输出</string>
+    <string name="terminal_output_label">终端输出</string>
+    <string name="terminal_font_size_snackbar">终端字号 %1$dsp</string>
+    <string name="terminal_font_size_restore_default">恢复默认</string>
+
+    <!-- Virtual Button Order -->
+    <string name="vb_order_title">虚拟按钮排序</string>
+    <string name="vb_order_button_text">按钮显示文本</string>
+    <string name="vb_order_hint">超过3个建议关闭，只对预览卡下方的虚拟按钮生效</string>
+    <string name="vb_order_display_external">显示在外部</string>
+    <string name="vb_order_display_more_menu">显示在更多菜单内</string>
+
+    <!-- Virtual Button Actions -->
+    <string name="vb_more">更多</string>
+    <string name="vb_home">主页</string>
+    <string name="vb_back">返回</string>
+    <string name="vb_app_switch">多任务</string>
+    <string name="vb_menu">菜单</string>
+    <string name="vb_notifications">通知栏</string>
+    <string name="vb_volume_up">音量+</string>
+    <string name="vb_volume_down">音量-</string>
+    <string name="vb_volume_mute">静音</string>
+    <string name="vb_lock_screen">锁屏</string>
+    <string name="vb_screenshot">截图</string>
+    <string name="vb_fill_password">填充锁屏密码</string>
+    <string name="vb_all_apps">所有应用</string>
+    <string name="vb_recent_tasks">最近任务</string>
+    <string name="vb_toggle_ime">拉起输入法</string>
+    <string name="vb_paste_clipboard">粘贴本机剪贴板</string>
+
+    <!-- Dock Positions -->
+    <string name="dock_follow">跟随</string>
+    <string name="dock_fixed">固定</string>
+    <string name="dock_top">上方</string>
+    <string name="dock_bottom">下方</string>
+    <string name="dock_left">左侧</string>
+    <string name="dock_right">右侧</string>
+    <string name="dock_display_on">显示在屏幕</string>
+
+    <!-- Theme Modes -->
+    <string name="theme_follow_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+
+    <!-- Recording -->
+    <string name="record_title">录制</string>
+    <string name="record_format">录制格式</string>
+    <string name="record_filename_hint">文件名，不为空时启用</string>
+    <string name="record_preview">预览：</string>
+    <string name="record_plain_text">纯文本</string>
+    <string name="record_desc_yyyy">四位年份，例如 2026</string>
+    <string name="record_desc_yy">两位年份，例如 26</string>
+    <string name="record_desc_MM">月份，两位，例如 09</string>
+    <string name="record_desc_M">月份，一位或两位，例如 9</string>
+    <string name="record_desc_dd">日期，两位，例如 19</string>
+    <string name="record_desc_d">日期，一位或两位，例如 9</string>
+    <string name="record_desc_HH">24 小时制，两位，例如 23</string>
+    <string name="record_desc_H">24 小时制，一位或两位，例如 9</string>
+    <string name="record_desc_hh">12 小时制，两位，例如 11</string>
+    <string name="record_desc_h">12 小时制，一位或两位，例如 9</string>
+    <string name="record_desc_mm">分钟，两位，例如 09</string>
+    <string name="record_desc_m">分钟，一位或两位，例如 9</string>
+    <string name="record_desc_ss">秒，两位，例如 09</string>
+    <string name="record_desc_s">秒，一位或两位，例如 9</string>
+    <string name="record_desc_timestamp">秒级时间戳，例如 1776952809</string>
+    <string name="record_desc_device_name">设备名</string>
+    <string name="record_desc_device_ip">设备 IP</string>
+    <string name="record_desc_device_port">设备端口</string>
+    <string name="record_desc_video_codec">视频串流编码（非文件实际编码）</string>
+    <string name="record_desc_audio_codec">音频串流编码（非文件实际编码）</string>
+    <string name="record_desc_width">视频宽度</string>
+    <string name="record_desc_height">视频高度</string>
+
+    <!-- Reorder Devices -->
+    <string name="reorder_devices_title">快速设备排序</string>
+
+    <!-- Lockscreen Password -->
+    <string name="password_stop_mirroring">停止投屏</string>
+    <string name="password_authenticate_create">验证以创建新密码</string>
+    <string name="password_authenticate_subtitle">验证身份以继续</string>
+    <string name="password_auth_to_disable">验证以禁用密码保护</string>
+    <string name="password_auth_subtitle">验证身份以继续</string>
+    <string name="password_auth_fill_title">验证以填充锁屏密码</string>
+    <string name="password_fill_failed">密码填充失败</string>
+    <string name="password_no_available">无可用密码</string>
+    <string name="password_cannot_auth_here">当前页面无法拉起验证</string>
+    <string name="password_auth_failed">认证失败</string>
+    <string name="password_security_state_changed">设备安全状态已变更，请重新设置密码</string>
+    <string name="password_expired">密码已过期，请重新设置密码</string>
+    <string name="password_autofill_title">锁屏密码自动填充</string>
+    <string name="password_create_new">创建新密码</string>
+    <string name="password_no_lock_screen">当前设备未设置锁屏保护</string>
+    <string name="password_no_lock_screen_warn">继续使用将允许在无认证保护的情况下保存和填充锁屏密码</string>
+    <string name="password_agree">同意</string>
+    <string name="password_auth_lost_warn">关闭验证后密码将失去保护</string>
+    <string name="password_auth_lost_detail">关闭后每次填充密码时将不再强制认证\n同时会熔断当前经认证创建的密码</string>
+    <string name="password_continue_disable">继续关闭</string>
+    <string name="password_delete_confirm">删除密码</string>
+    <string name="password_delete_msg">将删除 %1$s</string>
+    <string name="password_default_name">密码 %1$d</string>
+    <string name="password_cannot_be_empty">密码不能为空</string>
+    <string name="password_require_auth">填充密码时需要验证</string>
+    <string name="password_require_auth_detail">关闭后将允许直接填充锁屏密码\n同时会熔断当前经认证创建的密码</string>
+    <string name="password_no_auth_capability">当前设备无认证能力</string>
+    <string name="password_or_menu_hint">或在右上角菜单中</string>
+    <string name="password_status_invalidated">已失效</string>
+    <string name="password_status_authenticated">创建时已验证</string>
+    <string name="password_status_unauthenticated">创建时未经验证</string>
+    <string name="password_status_burned">创建时已验证（熔断）</string>
+    <string name="password_rename">重命名密码</string>
+    <string name="password_lockscreen_label">锁屏密码</string>
+    <string name="password_disclaimer">免责声明\n0. 无法保证没有 bug\n1. 本功能的防护边界仅包括加密存储、按需认证和使用后内存清理，不构成绝对安全保证\n2. 在 root / posed / hook / 调试器 / 恶意输入法 等环境下，密码仍可能泄露\n3. 本功能不会绕过系统锁屏认证，仅用于你已合法授权控制的设备\n4. 关闭\"填充密码时需要验证\"会显著降低安全性，请谨慎选择</string>
+
+    <!-- File Manager -->
+    <string name="fm_cd_parent">上一层</string>
+    <string name="fm_cd_sort">排序</string>
+    <string name="fm_sort_name">文件名</string>
+    <string name="fm_sort_size">大小</string>
+    <string name="fm_sort_time">时间</string>
+    <string name="fm_sort_extension">扩展名</string>
+    <string name="fm_sort_asc">正序</string>
+    <string name="fm_sort_desc">倒序</string>
+    <string name="fm_menu_create_folder">创建文件夹</string>
+    <string name="fm_menu_upload">上传文件到该目录</string>
+    <string name="fm_loading_details">正在加载详情</string>
+    <string name="fm_no_details">暂无详情</string>
+    <string name="fm_pull_refresh">下拉刷新</string>
+    <string name="fm_release_refresh">释放刷新</string>
+    <string name="fm_refreshing">正在刷新…</string>
+    <string name="fm_refresh_done">刷新完成</string>
+    <string name="fm_load_failed">加载失败：%1$s</string>
+    <string name="fm_empty_dir">空目录</string>
+    <string name="fm_file_details">文件详情</string>
+    <string name="fm_show_raw">显示原文</string>
+    <string name="fm_show_parsed">显示解析</string>
+    <string name="fm_cd_download">下载</string>
+    <string name="fm_goto_path">跳转路径</string>
+    <string name="fm_title_create_folder">创建文件夹</string>
+    <string name="fm_label_new_folder">新建文件夹</string>
+    <string name="fm_button_create">创建</string>
+    <string name="fm_snack_link_unavailable">链接目标不可用，长按查看信息</string>
+    <string name="fm_snack_not_dir">链接目标不是文件夹，长按查看信息</string>
+    <string name="fm_snack_link_read_failed">读取链接目标失败：%1$s</string>
+    <string name="fm_snack_long_press_details">长按可查看文件详情</string>
+    <string name="fm_snack_folder_name_empty">文件夹名称不能为空</string>
+    <string name="fm_snack_folder_created">已创建文件夹</string>
+    <string name="fm_snack_create_failed">创建失败：%1$s</string>
+    <string name="fm_snack_uploaded">已上传到 %1$s</string>
+    <string name="fm_snack_upload_failed">上传失败：%1$s</string>
+    <string name="fm_snack_read_details_failed">读取详情失败：%1$s</string>
+    <string name="fm_snack_scan_failed">目录扫描失败：%1$s</string>
+    <string name="fm_snack_download_starting">开始下载</string>
+    <string name="fm_snack_dir_loading">目录信息仍在加载，请稍后重试</string>
+    <string name="fm_snack_downloaded">已下载到 Download/Scrcpy</string>
+    <string name="fm_snack_cannot_save">无法直接写入 Download/Scrcpy，请选择保存目录</string>
+    <string name="fm_snack_download_complete">下载完成</string>
+    <string name="fm_snack_download_failed">下载失败：%1$s</string>
+    <string name="terminal_snack_input_failed">终端输入失败：%1$s</string>
+    <string name="terminal_snack_session_failed">终端会话创建失败：%1$s</string>
+    <string name="terminal_snack_output_failed">终端输出失败：%1$s</string>
+    <string name="fm_exception_cannot_read_filename">无法读取文件名</string>
+    <string name="fm_exception_cannot_read_selected_file">无法读取选择的文件</string>
+    <string name="fm_exception_folder_name_empty">文件夹名称不能为空</string>
+    <string name="fm_exception_cannot_write_target">无法写入目标文件</string>
+    <string name="fm_exception_directory_not_found">目录不存在</string>
+    <string name="fm_exception_not_directory">目标不是文件夹</string>
+    <string name="fm_exception_cannot_create_dir">无法创建目录</string>
+    <string name="fm_exception_cannot_create_file">无法创建文件</string>
+    <string name="fm_exception_remote_shell_closed">远端 shell 已关闭</string>
+    <string name="fm_exception_command_failed">命令执行失败</string>
+    <string name="fm_stat_path">路径</string>
+    <string name="fm_stat_type">类型</string>
+    <string name="fm_stat_size">大小</string>
+    <string name="fm_stat_blocks">块数</string>
+    <string name="fm_stat_io_block_size">IO 块大小</string>
+    <string name="fm_stat_hard_links">硬链接</string>
+    <string name="fm_stat_permissions">权限</string>
+    <string name="fm_stat_device">设备</string>
+    <string name="fm_stat_device_type">设备类型</string>
+    <string name="fm_stat_access_time">访问时间</string>
+    <string name="fm_stat_modify_time">修改时间</string>
+    <string name="fm_stat_change_time">变更时间</string>
+    <string name="fm_stat_link_target">链接目标</string>
+    <string name="fm_stat_directories">目录数</string>
+    <string name="fm_stat_files">文件数</string>
+    <string name="fm_stat_target_info">目标信息</string>
+    <string name="fm_unknown">未知</string>
+
+    <!-- Scrcpy All Options -->
+    <string name="profile_default_name">配置</string>
+    <string name="profile_new_name">新配置</string>
+    <string name="scrcpyopt_title">所有参数</string>
+    <string name="scrcpyopt_cd_profile_manage">配置管理</string>
+    <string name="scrcpyopt_manage_profiles">管理配置</string>
+    <string name="scrcpyopt_new_profile">新建配置</string>
+    <string name="scrcpyopt_rename_profile">重命名配置</string>
+    <string name="scrcpyopt_duplicate_name_hint">配置名重复时会自动追加序号</string>
+    <string name="scrcpyopt_profile_name">配置名</string>
+    <string name="scrcpyopt_copy_from">复制配置</string>
+    <string name="scrcpyopt_current_profile">当前配置</string>
+    <string name="scrcpyopt_delete_profile">删除配置</string>
+    <string name="scrcpyopt_delete_confirm">确认删除 \"%1$s\"？</string>
+    <string name="scrcpyopt_prefer_text">优先文本</string>
+    <string name="scrcpyopt_raw_key_events">原始按键事件</string>
+    <string name="scrcpyopt_default_mixed">默认</string>
+    <string name="scrcpyopt_dont_modify">不修改</string>
+    <string name="scrcpyopt_invalid_options">无效参数：%1$s</string>
+    <string name="scrcpyopt_turn_screen_off">scrcpy 启动后熄灭设备屏幕</string>
+    <string name="scrcpyopt_turn_screen_off_note">注意：大部分设备在关闭屏幕后刷新率会降低/减半</string>
+    <string name="scrcpyopt_no_control">禁用控制</string>
+    <string name="scrcpyopt_no_video">禁用视频</string>
+    <string name="scrcpyopt_no_video_playback">仅转发不播放视频</string>
+    <string name="scrcpyopt_no_audio">禁用音频</string>
+    <string name="scrcpyopt_no_audio_playback">仅转发不播放</string>
+    <string name="scrcpyopt_screen_off_timeout">scrcpy 启动后受控机的息屏时间</string>
+    <string name="scrcpyopt_no_power_on">scrcpy 启动时不唤醒屏幕</string>
+    <string name="scrcpyopt_power_off_on_close">scrcpy 结束后息屏</string>
+    <string name="scrcpyopt_stay_awake">scrcpy 启动后保持设备唤醒状态（插入电源）</string>
+    <string name="scrcpyopt_show_touches">显示物理触控</string>
+    <string name="scrcpyopt_fullscreen">启动后进入全屏</string>
+    <string name="scrcpyopt_disable_screensaver">scrcpy 启动后保持本机屏幕常亮</string>
+    <string name="scrcpyopt_disable_screensaver_note">注意防烧屏，画中画也生效</string>
+    <string name="scrcpyopt_kill_adb_on_close">scrcpy 结束时断开 adb</string>
+    <string name="scrcpyopt_audio_codec">音频编码</string>
+    <string name="scrcpyopt_audio_bitrate">音频码率</string>
+    <string name="scrcpyopt_video_codec">视频编码</string>
+    <string name="scrcpyopt_video_bitrate">视频码率</string>
+    <string name="scrcpyopt_video_source">视频来源</string>
+    <string name="scrcpyopt_display_id">监视器 ID</string>
+    <string name="scrcpyopt_max_size">最大分辨率</string>
+    <string name="scrcpyopt_max_fps">最大帧率</string>
+    <string name="scrcpyopt_camera_id">摄像头 ID</string>
+    <string name="scrcpyopt_camera_facing">摄像头朝向</string>
+    <string name="scrcpyopt_camera_size">摄像头分辨率</string>
+    <string name="scrcpyopt_camera_fps">摄像头帧率</string>
+    <string name="scrcpyopt_camera_high_speed">高帧率模式</string>
+    <string name="scrcpyopt_audio_source">音频来源</string>
+    <string name="scrcpyopt_audio_dup">音频双路输出</string>
+    <string name="scrcpyopt_require_audio">音频转发失败时终止</string>
+    <string name="scrcpyopt_video_encoder">视频编码器</string>
+    <string name="scrcpyopt_audio_encoder">音频编码器</string>
+    <string name="scrcpyopt_ime_display_policy">输入法显示策略</string>
+    <string name="scrcpyopt_no_vd_destroy_content">关闭虚拟显示器时保留内容</string>
+    <string name="scrcpyopt_no_vd_decorations">禁用虚拟显示器系统装饰</string>
+    <string name="scrcpyopt_no_downsize_on_error">禁用 MediaCodec 出错时自动降级</string>
+    <string name="scrcpyopt_no_downsize_on_error_desc">默认情况下，在 MediaCodec 出错时，scrcpy 会自动尝试使用更低的分辨率重新开始\n此选项将禁用此行为</string>
+    <string name="scrcpyopt_legacy_paste">粘贴兼容回退（仅支持ASCII/英文字符）</string>
+    <string name="scrcpyopt_key_inject_mode">键盘注入策略</string>
+    <string name="scrcpyopt_no_key_repeat">禁用按键重复转发</string>
+    <string name="scrcpyopt_no_clipboard_autosync">禁用剪贴板双向同步</string>
+    <string name="scrcpyopt_no_mouse_hover">禁用鼠标悬停转发</string>
+    <string name="scrcpyopt_no_cleanup">禁用结束后清理</string>
+    <string name="scrcpyopt_no_cleanup_desc">默认情况下，scrcpy 会从设备中移除服务器二进制文件，并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）\n此选项将禁用此清理操作</string>
+    <string name="scrcpyopt_start_app">scrcpy 启动后打开应用</string>
+    <string name="scrcpyopt_native">本机</string>
+    <string name="scrcpyopt_log_level">日志等级</string>
+
+    <!-- DeviceTabViewModel snackbar & log messages -->
+    <string name="vm_adb_connected">ADB 已连接</string>
+    <string name="vm_scrcpy_started">scrcpy 已启动</string>
+    <string name="vm_scrcpy_started_recording">scrcpy 已启动并开始录制</string>
+    <string name="vm_scrcpy_stopped_adb_disconnected">scrcpy 已停止，ADB 已断开</string>
+    <string name="vm_scrcpy_stopped">scrcpy 已停止</string>
+    <string name="vm_adb_connection_failed">ADB 连接失败</string>
+    <string name="vm_adb_disconnected">ADB 已断开</string>
+    <string name="vm_pairing_succeeded">配对成功</string>
+    <string name="vm_pairing_failed">配对失败</string>
+    <string name="vm_auto_reconnect_succeeded">ADB 自动重连成功</string>
+    <string name="vm_auto_reconnect_failed">ADB 自动重连失败</string>
+    <string name="vm_start_scrcpy">启动 scrcpy</string>
+    <string name="vm_stop_scrcpy">停止 scrcpy</string>
+    <string name="vm_launch_app">启动应用</string>
+    <string name="vm_connect_adb">连接 ADB</string>
+    <string name="vm_disconnect_adb">断开 ADB</string>
+    <string name="vm_execute_pairing">执行配对</string>
+    <string name="vm_send_action">发送 %1$s</string>
+    <string name="vm_label_timeout">%1$s 超时</string>
+    <string name="vm_label_param_error">%1$s 参数错误：%2$s</string>
+    <string name="vm_label_failed">%1$s 失败：%2$s</string>
+    <string name="vm_app_started_on_display">已在当前显示启动应用：%1$s</string>
+    <string name="vm_start_app_fallback_adb">通过 scrcpy 控制通道启动应用失败，回退 ADB</string>
+    <string name="vm_app_started_via_adb">已通过 ADB 启动应用：%1$s</string>
+    <string name="vm_adb_connected_detail">ADB 已连接：model=%1$s</string>
+    <string name="vm_failed_app_list_msg">获取应用列表失败：%1$s</string>
+    <string name="vm_scrcpy_requested_app">已请求 scrcpy 启动应用：%1$s</string>
+    <string name="vm_scrcpy_start_app_failed">通过 scrcpy 控制通道启动应用失败：%1$s</string>
+    <string name="vm_scrcpy_started_detail">scrcpy 已启动：device=%1$s</string>
+    <string name="vm_scrcpy_stopped_adb_disconnected_log">scrcpy 已停止，ADB 已断开</string>
+    <string name="vm_failed_recent_tasks_msg">获取最近任务失败：%1$s</string>
+    <string name="vm_legacy_paste_injected">已使用 legacy paste 注入本机剪贴板文本</string>
+    <string name="vm_clipboard_synced_paste">已同步本机剪贴板到设备并触发粘贴</string>
+    <string name="vm_clipboard_paste_failed">本机剪贴板粘贴失败</string>
+    <string name="vm_ime_text_failed">输入法文本提交失败：%1$s</string>
+    <string name="vm_adb_disconnected_device">ADB 已断开：%1$s</string>
+    <string name="vm_mdns_updated">mDNS 发现新端口，已更新快速设备：%1$s:%2$s -> %1$s:%3$s</string>
+    <string name="vm_quick_probe_success">ADB 快速探测连接成功：%1$s:%2$s</string>
+    <string name="vm_device_switched_profile">当前连接设备已切换为配置：%1$s</string>
+</resources>

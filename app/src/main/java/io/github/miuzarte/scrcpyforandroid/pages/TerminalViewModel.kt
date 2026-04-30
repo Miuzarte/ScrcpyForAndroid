@@ -9,24 +9,22 @@ import androidx.lifecycle.viewModelScope
 import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TextStyle
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.BundleSyncDelegate
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.SnackbarResult
 import java.nio.charset.StandardCharsets
 import kotlin.math.roundToInt
@@ -46,12 +44,17 @@ internal class TerminalViewModel : ViewModel() {
     private val _terminalFontSizeSp = MutableStateFlow(asBundle.value.terminalFontSizeSp)
     val terminalFontSizeSp: StateFlow<Float> = _terminalFontSizeSp.asStateFlow()
 
-    fun updateTerminalFontSize(newValue: Float, onApplied: (Float) -> Unit) {
+    fun updateTerminalFontSize(newValue: Float, onApplied: (Float) -> Unit): Float {
         val clamped = newValue.coerceIn(1f, 32f)
-        if (clamped == _terminalFontSizeSp.value) return
+        if (clamped == _terminalFontSizeSp.value) return clamped
         _terminalFontSizeSp.value = clamped
         asBundleSync.update { it.copy(terminalFontSizeSp = clamped) }
         onApplied(clamped)
+        return clamped
+    }
+
+    fun adjustTerminalFontSize(delta: Float, onApplied: (Float) -> Unit): Float {
+        return updateTerminalFontSize(_terminalFontSizeSp.value + delta, onApplied)
     }
 
     fun resetFontSizeToDefault(onApplied: (Float) -> Unit) {
@@ -82,7 +85,10 @@ internal class TerminalViewModel : ViewModel() {
             }
             withContext(Dispatchers.Main) {
                 result.onFailure { error ->
-                    snackbar("终端输入失败: ${error.message ?: error.javaClass.simpleName}")
+                    AppRuntime.snackbar(
+                        R.string.terminal_snack_input_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
             }
         }
@@ -174,7 +180,10 @@ internal class TerminalViewModel : ViewModel() {
                 withContext(Dispatchers.Main) {
                     _shellConnecting.value = false
                     _shellReady.value = false
-                    snackbar("终端会话创建失败: ${error.message ?: error.javaClass.simpleName}")
+                    AppRuntime.snackbar(
+                        R.string.terminal_snack_session_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
                 return@launch
             }
@@ -197,7 +206,10 @@ internal class TerminalViewModel : ViewModel() {
                 }
             } catch (error: Throwable) {
                 withContext(Dispatchers.Main) {
-                    snackbar("终端输出失败: ${error.message ?: error.javaClass.simpleName}")
+                    AppRuntime.snackbar(
+                        R.string.terminal_snack_output_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
             } finally {
                 runCatching { stream.close() }
@@ -227,29 +239,21 @@ internal class TerminalViewModel : ViewModel() {
         _shellConnecting.value = false
     }
 
-    private val _snackbarEvents = Channel<String>(Channel.BUFFERED)
-    val snackbarEvents: Flow<String> = _snackbarEvents.receiveAsFlow()
-
-    private fun snackbar(message: String) {
-        _snackbarEvents.trySend(message)
-    }
-
     fun launchFontSizeSnackbar(
         fontSizeSp: Float,
-        hostState: SnackbarHostState,
         onReset: (Float) -> Unit,
     ) {
-        viewModelScope.launch {
-            hostState.newestSnackbarData()?.dismiss()
-            val result = hostState.showSnackbar(
-                message = "终端字号 ${fontSizeSp.roundToInt()}sp",
-                actionLabel = "恢复默认",
-                withDismissAction = true,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                resetFontSizeToDefault(onReset)
-            }
-        }
+        AppRuntime.snackbar(
+            R.string.terminal_font_size_snackbar,
+            fontSizeSp.roundToInt(),
+            actionLabelResId = R.string.terminal_font_size_restore_default,
+            withDismissAction = true,
+            onResult = { result ->
+                if (result == SnackbarResult.ActionPerformed)
+                    resetFontSizeToDefault(onReset)
+            },
+            dismissNewest = true,
+        )
     }
 
     init {

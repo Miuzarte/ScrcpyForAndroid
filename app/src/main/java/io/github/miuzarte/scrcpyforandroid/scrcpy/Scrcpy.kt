@@ -1705,25 +1705,18 @@ class Scrcpy(
                 output.writeShort(screenHeight)
             }
 
-            private fun encodeUnsignedFixedPoint16(value: Float): Int {
-                val clamped = value.coerceIn(0f, 1f)
-                return if (clamped >= 1f) {
-                    0xffff
-                } else {
-                    (clamped * 65536f).roundToInt().coerceIn(0, 0xfffe)
+            private fun encodeUnsignedFixedPoint16(value: Float) =
+                value.coerceIn(0f, 1f).let {
+                    if (it >= 1f) 0xffff
+                    else (it * 65536f).roundToInt().coerceIn(0, 0xfffe)
                 }
-            }
 
-            private fun encodeSignedFixedPoint16(value: Float): Int {
-                val clamped = value.coerceIn(-1f, 1f)
-                if (clamped >= 1f) {
-                    return 0x7fff
+            private fun encodeSignedFixedPoint16(value: Float) =
+                value.coerceIn(-1f, 1f).let {
+                    if (it >= 1f) 0x7fff
+                    else if (it <= -1f) -0x8000
+                    else (it * 32768f).roundToInt().coerceIn(-0x8000, 0x7ffe)
                 }
-                if (clamped <= -1f) {
-                    return -0x8000
-                }
-                return (clamped * 32768f).roundToInt().coerceIn(-0x8000, 0x7ffe)
-            }
         }
 
         companion object {

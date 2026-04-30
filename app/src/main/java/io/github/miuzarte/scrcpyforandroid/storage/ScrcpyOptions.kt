@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions.KeyInjectMode
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions.RecordFormat
@@ -27,7 +28,8 @@ import kotlinx.parcelize.Parcelize
 class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
     companion object {
         const val GLOBAL_PROFILE_ID = "global"
-        const val GLOBAL_PROFILE_NAME = "全局"
+        val GLOBAL_PROFILE_NAME_RES_ID = R.string.text_global
+        val NEW_PROFILE_NAME_RES_ID = R.string.profile_new_name
 
         val CROP = Pair(
             stringPreferencesKey("crop"),

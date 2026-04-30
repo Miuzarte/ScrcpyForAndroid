@@ -2,7 +2,9 @@ package io.github.miuzarte.scrcpyforandroid.widgets
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.pages.LocalRootNavigator
 import io.github.miuzarte.scrcpyforandroid.pages.RootScreen
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions.RecordFormat
@@ -24,20 +26,20 @@ fun RecordPreferences(
     val navigator = LocalRootNavigator.current
     val supportedFormats = remember { NativeRecordingSupport.supportedFormats }
 
-    val formatItems = remember {
-        supportedFormats.map {
-            if (it == RecordFormat.AUTO) "自动"
-            else it.string
-        }
+    val formatItems = supportedFormats.map {
+        if (it == RecordFormat.AUTO) stringResource(R.string.text_auto)
+        else it.string
     }
+
     val formatIndex = remember(recordFormat) {
         supportedFormats.indexOfFirst { it.string == recordFormat }
             .coerceAtLeast(0)
     }
-    val currentTemplateSummary = recordFilenameTemplate.ifBlank { "关闭" }
+    val currentTemplateSummary = recordFilenameTemplate
+        .ifBlank { stringResource(R.string.text_off) }
 
     ArrowPreference(
-        title = "录制",
+        title = stringResource(R.string.record_title),
         summary = "--record",
         enabled = enabled,
         onClick = {
@@ -55,7 +57,7 @@ fun RecordPreferences(
     )
 
     OverlayDropdownPreference(
-        title = "录制格式",
+        title = stringResource(R.string.record_format),
         summary = "--record-format",
         items = formatItems,
         selectedIndex = formatIndex,

@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.services
 
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
+import io.github.miuzarte.scrcpyforandroid.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,9 +50,10 @@ object AppUpdateChecker {
                 .onSuccess { _state.value = State.Ready(it) }
                 .onFailure { error ->
                     EventLogger.logEvent(
-                        "检查更新失败: ${error.message ?: error.javaClass.simpleName}",
-                        Log.WARN,
-                        error
+                        R.string.main_update_check_failed,
+                        error.message ?: error.javaClass.simpleName,
+                        level = Log.WARN,
+                        error = error,
                     )
                     _state.value = State.Error
                 }

@@ -13,6 +13,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ReorderableList
@@ -70,7 +72,7 @@ fun ReorderDevicesScreen(
 
     OverlayBottomSheet(
         show = show,
-        title = "快速设备排序",
+        title = stringResource(R.string.reorder_devices_title),
         defaultWindowInsetsPadding = false,
         onDismissRequest = onDismissRequest,
     ) {

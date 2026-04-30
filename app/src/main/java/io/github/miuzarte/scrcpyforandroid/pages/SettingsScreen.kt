@@ -1,7 +1,13 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FileOpen
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,13 +35,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.LockscreenPasswordActivity
-import io.github.miuzarte.scrcpyforandroid.constants.ThemeModes
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.nativecore.DirectAdbTransport
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlider
@@ -42,10 +51,10 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings.FullscreenVirtualButtonDock
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.adbClientData
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
@@ -91,6 +100,21 @@ suspend fun clearTerminalFont(context: Context) =
         target.exists() && target.delete()
     }
 
+suspend fun readTextFromUri(context: Context, uri: Uri): String =
+    withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            ?: error("Cannot open selected file")
+    }
+
+fun queryAdbKeyDisplayName(context: Context, uri: Uri): String? =
+    context.contentResolver
+        .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (columnIndex >= 0 && cursor.moveToFirst()) cursor.getString(columnIndex)
+            else null
+        }
+
 @Composable
 fun SettingsScreen(
     scrollBehavior: ScrollBehavior,
@@ -104,7 +128,7 @@ fun SettingsScreen(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
                 TopAppBar(
-                    title = "设置",
+                    title = stringResource(R.string.settings_title),
                     color =
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
@@ -141,26 +165,25 @@ fun SettingsPage(
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val scope = rememberCoroutineScope()
 
-    val snackbar = LocalSnackbarController.current
     val navigator = LocalRootNavigator.current
     val serverPicker = LocalServerPicker.current
     val terminalFontPicker = LocalTerminalFontPicker.current
     val isScrcpyStreaming = AppRuntime.scrcpy?.isStarted() == true
+
+    val acBundle by adbClientData.bundleState.collectAsState()
 
     val asBundleShared by appSettings.bundleState.collectAsState()
     val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
     var asBundle by rememberSaveable(asBundleShared) { mutableStateOf(asBundleShared) }
     val asBundleLatest by rememberUpdatedState(asBundle)
     LaunchedEffect(asBundleShared) {
-        if (asBundle != asBundleShared) {
+        if (asBundle != asBundleShared)
             asBundle = asBundleShared
-        }
     }
     LaunchedEffect(asBundle) {
         delay(Settings.BUNDLE_SAVE_DELAY)
-        if (asBundle != asBundleSharedLatest) {
+        if (asBundle != asBundleSharedLatest)
             appSettings.saveBundle(asBundle)
-        }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -170,7 +193,7 @@ fun SettingsPage(
         }
     }
 
-    val themeItems = rememberSaveable { ThemeModes.baseOptions.map { it.label } }
+    val themeItems = AppSettings.ThemeModes.baseOptions.map { stringResource(it.labelResId) }
 
     val fullscreenVirtualButtonDock = remember(asBundle.fullscreenVirtualButtonDock) {
         FullscreenVirtualButtonDock.fromStoredValue(asBundle.fullscreenVirtualButtonDock)
@@ -196,24 +219,65 @@ fun SettingsPage(
         )
     }
 
-    val updateSummary = remember(updateState) {
-        "当前版本 ${BuildConfig.VERSION_NAME}" + when (val state = updateState) {
-            AppUpdateChecker.State.Idle -> ""
-            AppUpdateChecker.State.Checking -> "，正在检查更新"
-            AppUpdateChecker.State.Error -> "，检查更新失败"
-
-            is AppUpdateChecker.State.Ready -> when {
-                state.release.hasUpdate ->
-                    "，发现新版本 ${state.release.latestVersion}"
-
-                state.release.currentVersion == state.release.latestVersion.removePrefix("v")
-                        || state.release.currentVersion == state.release.latestVersion ->
-                    "，已是最新版本"
-
-                else -> "，高于最新发布版本 ${state.release.latestVersion}"
+    val adbPrivateKeyPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val fileName = queryAdbKeyDisplayName(context, uri)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: uri.lastPathSegment.orEmpty()
+                DirectAdbTransport.importPrivateKey(readTextFromUri(context, uri), fileName)
+            }.onSuccess {
+                AppRuntime.snackbar(R.string.pref_adb_private_key_imported, it.fingerprint)
+            }.onFailure { e ->
+                AppRuntime.snackbar(
+                    R.string.pref_adb_key_import_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
             }
         }
     }
+    val adbPublicKeyPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val fileName = queryAdbKeyDisplayName(context, uri)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: uri.lastPathSegment.orEmpty()
+                DirectAdbTransport.importPublicKey(readTextFromUri(context, uri), fileName)
+            }.onSuccess {
+                AppRuntime.snackbar(R.string.pref_adb_public_key_imported_snackbar, it.fingerprint)
+            }.onFailure { e ->
+                AppRuntime.snackbar(
+                    R.string.pref_adb_key_import_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
+            }
+        }
+    }
+
+    val updateSummary = stringResource(R.string.pref_update_current, BuildConfig.VERSION_NAME) +
+            when (val state = updateState) {
+                AppUpdateChecker.State.Idle -> ""
+                AppUpdateChecker.State.Checking -> stringResource(R.string.pref_update_checking)
+                AppUpdateChecker.State.Error -> stringResource(R.string.pref_update_failed)
+
+                is AppUpdateChecker.State.Ready -> when {
+                    state.release.hasUpdate ->
+                        stringResource(R.string.pref_update_found, state.release.latestVersion)
+
+                    state.release.currentVersion == state.release.latestVersion.removePrefix("v")
+                            || state.release.currentVersion == state.release.latestVersion ->
+                        stringResource(R.string.pref_update_latest)
+
+                    else -> stringResource(R.string.pref_update_newer, state.release.latestVersion)
+                }
+            }
+
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
@@ -226,14 +290,14 @@ fun SettingsPage(
         bottomInnerPadding = bottomInnerPadding,
     ) {
         item {
-            SectionSmallTitle("主题")
+            SectionSmallTitle(stringResource(R.string.section_theme))
             Card {
                 OverlayDropdownPreference(
-                    title = "外观模式",
-                    summary = "选择应用的外观模式",
+                    title = stringResource(R.string.pref_title_appearance_mode),
+                    summary = stringResource(R.string.pref_summary_appearance_mode),
                     items = themeItems,
                     selectedIndex = asBundle.themeBaseIndex
-                        .coerceIn(0, ThemeModes.baseOptions.lastIndex),
+                        .coerceIn(0, AppSettings.ThemeModes.baseOptions.lastIndex),
                     onSelectedIndexChange = {
                         asBundle = asBundle.copy(
                             themeBaseIndex = it
@@ -241,8 +305,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "Monet 颜色",
-                    summary = "开启后使用 Monet 动态配色",
+                    title = stringResource(R.string.pref_title_monet),
+                    summary = stringResource(R.string.pref_summary_monet),
                     checked = asBundle.monet,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -253,8 +317,8 @@ fun SettingsPage(
                 AnimatedVisibility(asBundle.monet) {
                     Column {
                         OverlayDropdownPreference(
-                            title = "Monet Key Color",
-                            summary = "设置 Monet 强调色",
+                            title = stringResource(R.string.pref_title_monet_key_color),
+                            summary = stringResource(R.string.pref_summary_monet_key_color),
                             items = MonetKeyColorOptions,
                             selectedIndex = asBundle.monetSeedIndex
                                 .coerceIn(0, MonetKeyColorOptions.lastIndex),
@@ -269,8 +333,8 @@ fun SettingsPage(
                 AnimatedVisibility(asBundle.monet && asBundle.monetSeedIndex > 0) {
                     Column {
                         OverlayDropdownPreference(
-                            title = "Monet Palette Style",
-                            summary = "设置 Monet 调色板风格",
+                            title = stringResource(R.string.pref_title_monet_palette_style),
+                            summary = stringResource(R.string.pref_summary_monet_palette_style),
                             items = monetPaletteStyleOptions,
                             selectedIndex = asBundle.monetPaletteStyle
                                 .coerceIn(0, monetPaletteStyleOptions.lastIndex),
@@ -281,8 +345,8 @@ fun SettingsPage(
                             },
                         )
                         OverlayDropdownPreference(
-                            title = "Monet Color Spec",
-                            summary = "设置 Monet 色彩规格",
+                            title = stringResource(R.string.pref_title_monet_color_spec),
+                            summary = stringResource(R.string.pref_summary_monet_color_spec),
                             items = monetColorSpecOptions,
                             selectedIndex = asBundle.monetColorSpec
                                 .coerceIn(0, monetColorSpecOptions.lastIndex),
@@ -295,8 +359,8 @@ fun SettingsPage(
                     }
                 }
                 SwitchPreference(
-                    title = "模糊",
-                    summary = "启用顶栏和底栏的模糊效果",
+                    title = stringResource(R.string.pref_title_blur),
+                    summary = stringResource(R.string.pref_summary_blur),
                     checked = asBundle.blur,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -305,8 +369,8 @@ fun SettingsPage(
                     }
                 )
                 SwitchPreference(
-                    title = "悬浮底栏",
-                    summary = "使用 Apple 风格的悬浮底栏",
+                    title = stringResource(R.string.pref_title_floating_bottom_bar),
+                    summary = stringResource(R.string.pref_summary_floating_bottom_bar),
                     checked = asBundle.floatingBottomBar,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -317,8 +381,8 @@ fun SettingsPage(
                 AnimatedVisibility(asBundle.floatingBottomBar && asBundle.blur) {
                     Column {
                         SwitchPreference(
-                            title = "液态玻璃",
-                            summary = "启用悬浮底栏的液态玻璃效果",
+                            title = stringResource(R.string.pref_title_liquid_glass),
+                            summary = stringResource(R.string.pref_summary_liquid_glass),
                             checked = asBundle.floatingBottomBar && asBundle.blur
                                     && asBundle.floatingBottomBarBlur,
                             onCheckedChange = {
@@ -330,8 +394,8 @@ fun SettingsPage(
                     }
                 }
                 SwitchPreference(
-                    title = "平滑圆角",
-                    summary = "启用全局平滑圆角效果",
+                    title = stringResource(R.string.pref_title_smooth_corners),
+                    summary = stringResource(R.string.pref_summary_smooth_corners),
                     checked = asBundle.smoothCorner,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -343,16 +407,11 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("投屏")
+            SectionSmallTitle(stringResource(R.string.section_screen_mirroring))
             Card {
                 SwitchPreference(
-                    title = "低延迟音频（实验性）",
-                    summary =
-                        """
-                            启用后将尝试使用低延迟音频路径
-                            推荐配合 RAW PCM 编解码
-                            修改后建议划卡重启应用
-                        """.trimIndent(),
+                    title = stringResource(R.string.pref_title_low_latency_audio),
+                    summary = stringResource(R.string.pref_summary_low_latency_audio),
                     enabled = !isScrcpyStreaming,
                     checked = asBundle.lowLatency,
                     onCheckedChange = {
@@ -363,8 +422,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "启用调试信息",
-                    summary = "在全屏界面悬浮显示分辨率、帧率和触点信息",
+                    title = stringResource(R.string.pref_title_debug_info),
+                    summary = stringResource(R.string.pref_summary_debug_info),
                     checked = asBundle.fullscreenDebugInfo,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -373,8 +432,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "设备页隐藏简单设置项",
-                    summary = "启用后设备页仅保留更多参数、所有应用、最近任务和启动/停止按钮",
+                    title = stringResource(R.string.pref_title_hide_simple_settings),
+                    summary = stringResource(R.string.pref_summary_hide_simple_settings),
                     checked = asBundle.hideSimpleConfigItems,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -383,8 +442,8 @@ fun SettingsPage(
                     },
                 )
                 SuperSlider(
-                    title = "预览卡高度",
-                    summary = "设备页预览卡高度",
+                    title = stringResource(R.string.pref_title_preview_card_height),
+                    summary = stringResource(R.string.pref_summary_preview_card_height),
                     value = asBundle.devicePreviewCardHeightDp.toFloat(),
                     onValueChange = {
                         asBundle = asBundle.copy(
@@ -408,30 +467,25 @@ fun SettingsPage(
                     },
                 )
                 ArrowPreference(
-                    title = "快速设备排序",
-                    summary = "手动排序设备页的快速设备",
+                    title = stringResource(R.string.pref_title_quick_device_sort),
+                    summary = stringResource(R.string.pref_summary_quick_device_sort),
                     onClick = onOpenReorderDevices,
                 )
                 ArrowPreference(
-                    title = "虚拟按钮排序",
-                    summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
+                    title = stringResource(R.string.pref_title_virtual_button_sort),
+                    summary = stringResource(R.string.pref_summary_virtual_button_sort),
                     onClick = { navigator.push(RootScreen.VirtualButtonOrder) },
                 )
                 ArrowPreference(
-                    title = "锁屏密码自动填充",
-                    summary = "管理用于自动填充的锁屏密码",
+                    title = stringResource(R.string.pref_title_password_autofill),
+                    summary = stringResource(R.string.pref_summary_password_autofill),
                     onClick = {
                         context.startActivity(LockscreenPasswordActivity.createIntent(context))
                     },
                 )
                 SwitchPreference(
-                    title = "实时同步剪贴板到受控机",
-                    summary =
-                        """
-                            本机剪贴板更新后会自动同步到受控机
-                            禁用后需要使用虚拟按钮中的粘贴才能粘贴本机内容
-                            MIUI 完全不允许后台监听剪贴板，因此该选项在小米设备上可能无效
-                        """.trimIndent(),
+                    title = stringResource(R.string.pref_title_clipboard_sync),
+                    summary = stringResource(R.string.pref_summary_clipboard_sync),
                     checked = asBundle.realtimeClipboardSyncToDevice,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -443,11 +497,11 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("全屏")
+            SectionSmallTitle(stringResource(R.string.section_fullscreen))
             Card {
                 SwitchPreference(
-                    title = "全屏时不跟随系统旋转锁定",
-                    summary = "启用后使用传感器方向，忽略系统自动旋转锁定状态",
+                    title = stringResource(R.string.pref_title_ignore_rotation_lock),
+                    summary = stringResource(R.string.pref_summary_ignore_rotation_lock),
                     checked = asBundle.fullscreenControlIgnoreSystemRotationLock,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -456,12 +510,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "全屏时返回键发送到远程",
-                    summary =
-                        """
-                            启用后系统返回键会发送给设备，不再退出全屏控制页
-                            此时退出全屏需要回到桌面通过图标重新进入应用
-                        """.trimIndent(),
+                    title = stringResource(R.string.pref_title_back_to_device),
+                    summary = stringResource(R.string.pref_summary_back_to_device),
                     checked = asBundle.fullscreenControlBackToDevice,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -470,8 +520,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "全屏时显示虚拟按钮",
-                    summary = "在全屏控制页中显示返回键、主页键等虚拟按钮",
+                    title = stringResource(R.string.pref_title_show_virtual_buttons),
+                    summary = stringResource(R.string.pref_summary_show_virtual_buttons),
                     checked = asBundle.showFullscreenVirtualButtons,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -485,7 +535,7 @@ fun SettingsPage(
                             entries = listOf(
                                 DropdownEntry(
                                     items = FullscreenVirtualButtonDock
-                                        .modeItems.map { DropdownItem(it) },
+                                        .modeItemsResIds.map { DropdownItem(stringResource(it)) },
                                     selectedIndex = fullscreenVirtualButtonDock.modeIndex,
                                     onSelectedIndexChange = { modeIndex ->
                                         asBundle = asBundle.copy(
@@ -500,7 +550,7 @@ fun SettingsPage(
                                 ),
                                 DropdownEntry(
                                     items = FullscreenVirtualButtonDock
-                                        .directionItems.map { DropdownItem(it) },
+                                        .directionItemsResIds.map { DropdownItem(stringResource(it)) },
                                     selectedIndex = fullscreenVirtualButtonDock.directionIndex,
                                     onSelectedIndexChange = { directionIndex ->
                                         asBundle = asBundle.copy(
@@ -514,11 +564,16 @@ fun SettingsPage(
                                     },
                                 ),
                             ),
-                            title = "虚拟按钮方向",
-                            summary = fullscreenVirtualButtonDock.summary,
+                            title = stringResource(R.string.pref_title_virtual_button_direction),
+                            summary = stringResource(
+                                if (fullscreenVirtualButtonDock.isFixed) R.string.dock_fixed
+                                else R.string.dock_follow
+                            ) +
+                                    stringResource(R.string.dock_display_on) +
+                                    stringResource(fullscreenVirtualButtonDock.directionLabelResId),
                         )
                         SuperSlider(
-                            title = "虚拟按钮高度",
+                            title = stringResource(R.string.pref_title_virtual_button_height),
                             value = asBundle.fullscreenVirtualButtonHeightDp.toFloat(),
                             onValueChange = {
                                 asBundle = asBundle.copy(
@@ -545,8 +600,8 @@ fun SettingsPage(
                     }
                 }
                 SwitchPreference(
-                    title = "全屏时显示悬浮球",
-                    summary = "在全屏控制页中显示可拖动的悬浮球，点击后弹出完整虚拟按键菜单",
+                    title = stringResource(R.string.pref_title_show_floating_button),
+                    summary = stringResource(R.string.pref_summary_show_floating_button),
                     checked = asBundle.showFullscreenFloatingButton,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -557,7 +612,7 @@ fun SettingsPage(
                 AnimatedVisibility(asBundle.showFullscreenFloatingButton) {
                     Column {
                         SuperSlider(
-                            title = "悬浮球尺寸",
+                            title = stringResource(R.string.pref_title_floating_button_size),
                             value = asBundle.fullscreenFloatingButtonSizeDp.toFloat(),
                             onValueChange = {
                                 asBundle = asBundle.copy(
@@ -582,7 +637,7 @@ fun SettingsPage(
                             },
                         )
                         SuperSlider(
-                            title = "悬浮球背景透明度",
+                            title = stringResource(R.string.pref_title_floating_button_bg_opacity),
                             value = asBundle.fullscreenFloatingButtonBackgroundAlphaPercent.toFloat(),
                             onValueChange = {
                                 asBundle = asBundle.copy(
@@ -607,7 +662,7 @@ fun SettingsPage(
                             },
                         )
                         SuperSlider(
-                            title = "悬浮球白环透明度",
+                            title = stringResource(R.string.pref_title_floating_button_ring_opacity),
                             value = asBundle.fullscreenFloatingButtonRingAlphaPercent.toFloat(),
                             onValueChange = {
                                 asBundle = asBundle.copy(
@@ -634,8 +689,8 @@ fun SettingsPage(
                     }
                 }
                 SwitchPreference(
-                    title = "全屏兼容模式",
-                    summary = "启用后全屏控制页不再跨 Activity，会导致画中画不可用",
+                    title = stringResource(R.string.pref_title_fullscreen_compat_mode),
+                    summary = stringResource(R.string.pref_summary_fullscreen_compat_mode),
                     checked = asBundle.fullscreenCompatibilityMode,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -647,7 +702,7 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("scrcpy-server")
+            SectionSmallTitle(stringResource(R.string.section_scrcpy_server))
             Card {
                 Column(
                     modifier = Modifier.padding(vertical = UiSpacing.Large),
@@ -658,7 +713,7 @@ fun SettingsPage(
                         verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                     ) {
                         Text(
-                            text = "自定义 binary",
+                            text = stringResource(R.string.pref_title_custom_binary),
                             fontWeight = FontWeight.Medium,
                         )
                         TextField(
@@ -671,7 +726,7 @@ fun SettingsPage(
                             trailingIcon = {
                                 Row(
                                     modifier = Modifier
-                                        .padding(end = UiSpacing.Medium),
+                                        .padding(end = UiSpacing.Medium)
                                 ) {
                                     if (asBundle.customServerUri.isNotBlank())
                                         IconButton(
@@ -683,14 +738,14 @@ fun SettingsPage(
                                             },
                                         ) {
                                             Icon(
-                                                Icons.Rounded.Clear,
-                                                contentDescription = "清空",
+                                                imageVector = Icons.Rounded.Clear,
+                                                contentDescription = stringResource(R.string.cd_clear),
                                             )
                                         }
                                     IconButton(onClick = serverPicker.pick) {
                                         Icon(
-                                            Icons.Rounded.FileOpen,
-                                            contentDescription = "选择文件",
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_file),
                                         )
                                     }
                                 }
@@ -703,7 +758,7 @@ fun SettingsPage(
                             verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                         ) {
                             Text(
-                                text = "自定义 binary version",
+                                text = stringResource(R.string.pref_title_custom_binary_version),
                                 fontWeight = FontWeight.Medium,
                             )
                             SuperTextField(
@@ -754,33 +809,29 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("ADB")
+            SectionSmallTitle(stringResource(R.string.section_adb))
             Card {
+                val textTitleAppInfo = stringResource(R.string.pref_title_app_info)
                 ArrowPreference(
-                    title = "调整后台电池策略",
-                    summary =
-                        """
-                            解决 Scrcpy 切换到后台时无法联网导致 ADB 断连
-                            应用的电池使用情况 -> 允许后台使用 -> 无限制
-                            国产ROM魔改的电源设置一般都可在对应的魔改应用设置中找到
-                        """.trimIndent(),
+                    title = stringResource(R.string.pref_title_battery_optimization),
+                    summary = stringResource(R.string.pref_summary_battery_optimization),
                     onClick = {
-                        val appInfoArgs = android.os.Bundle().apply {
+                        val appInfoArgs = Bundle().apply {
                             putString("package", context.packageName)
                             putInt("uid", context.applicationInfo.uid)
                         }
                         val appDetailsIntent = Intent(Intent.ACTION_MAIN).apply {
                             setClassName(
                                 "com.android.settings",
-                                "com.android.settings.SubSettings"
+                                "com.android.settings.SubSettings",
                             )
                             putExtra(
                                 ":settings:show_fragment",
-                                "com.android.settings.applications.appinfo.AppInfoDashboardFragment"
+                                "com.android.settings.applications.appinfo.AppInfoDashboardFragment",
                             )
                             putExtra(
                                 ":settings:show_fragment_title",
-                                "应用信息"
+                                textTitleAppInfo,
                             )
                             putExtra(":settings:show_fragment_args", appInfoArgs)
                             putExtra("package", context.packageName)
@@ -797,7 +848,7 @@ fun SettingsPage(
                         runCatching { context.startActivity(appDetailsIntent) }
                             .recoverCatching { context.startActivity(requestIntent) }
                             .recoverCatching { context.startActivity(fallbackIntent) }
-                            .onFailure { snackbar.show("无法打开设置") }
+                            .onFailure { AppRuntime.snackbar(R.string.pref_cannot_open_settings) }
                     },
                 )
                 Column(
@@ -809,7 +860,7 @@ fun SettingsPage(
                         verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                     ) {
                         Text(
-                            text = "自定义 ADB 密钥名",
+                            text = stringResource(R.string.pref_title_custom_adb_key),
                             fontWeight = FontWeight.Medium,
                         )
                         SuperTextField(
@@ -829,10 +880,128 @@ fun SettingsPage(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        val hasImportedAdbKey =
+                            acBundle.importedPrivateKey.isNotBlank() ||
+                                    acBundle.importedPublicKeyX509.isNotBlank()
+                        Text(
+                            text = stringResource(R.string.pref_title_adb_private_key),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextField(
+                            value = acBundle.importedPrivateKeyFileName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = stringResource(
+                                when {
+                                    acBundle.importedPrivateKey.isBlank() &&
+                                            acBundle.rsaPrivateKey.isBlank() ->
+                                        R.string.pref_adb_key_not_imported
+
+                                    acBundle.importedPrivateKey.isNotBlank() ->
+                                        R.string.pref_adb_key_imported
+
+                                    else -> R.string.pref_adb_key_generated
+                                }
+                            ),
+                            useLabelAsPlaceholder = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                Row(modifier = Modifier.padding(end = UiSpacing.Medium)) {
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                runCatching {
+                                                    withContext(Dispatchers.IO) {
+                                                        DirectAdbTransport.resetKeys()
+                                                    }
+                                                }.onSuccess {
+                                                    AppRuntime.snackbar(
+                                                        if (it.removedImportedKey)
+                                                            R.string.pref_adb_key_removed
+                                                        else
+                                                            R.string.pref_adb_key_reset,
+                                                        it.fingerprint,
+                                                    )
+                                                }.onFailure { e ->
+                                                    AppRuntime.snackbar(
+                                                        R.string.pref_adb_key_import_failed,
+                                                        e.message ?: e.javaClass.simpleName,
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector =
+                                                if (hasImportedAdbKey) Icons.Rounded.Clear
+                                                else Icons.Rounded.Refresh,
+                                            contentDescription = stringResource(
+                                                if (hasImportedAdbKey) R.string.pref_adb_key_remove
+                                                else R.string.pref_adb_key_regenerate,
+                                            ),
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { adbPrivateKeyPicker.launch(arrayOf("*/*")) },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_file),
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        val publicKeyLabel = stringResource(
+                            when {
+                                acBundle.importedPublicKeyX509.isBlank() &&
+                                        acBundle.rsaPublicKeyX509.isBlank() ->
+                                    R.string.pref_adb_key_not_imported
+
+                                acBundle.importedPublicKeyFileName.isNotBlank() ->
+                                    R.string.pref_adb_key_imported
+
+                                else -> R.string.pref_adb_key_generated
+                            }
+                        )
+                        Text(
+                            text = stringResource(R.string.pref_title_adb_public_key),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextField(
+                            value = acBundle.importedPublicKeyFileName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = publicKeyLabel,
+                            useLabelAsPlaceholder = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                Row(modifier = Modifier.padding(end = UiSpacing.Medium)) {
+                                    IconButton(
+                                        onClick = { adbPublicKeyPicker.launch(arrayOf("*/*")) },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_file),
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
                 SwitchPreference(
-                    title = "配对时自动启用发现服务",
-                    summary = "打开配对弹窗后自动搜索可用配对端口",
+                    title = stringResource(R.string.pref_title_auto_discovery),
+                    summary = stringResource(R.string.pref_summary_auto_discovery),
                     checked = asBundle.adbPairingAutoDiscoverOnDialogOpen,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -841,8 +1010,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "自动重连已配对设备",
-                    summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
+                    title = stringResource(R.string.pref_title_auto_reconnect),
+                    summary = stringResource(R.string.pref_summary_auto_reconnect),
                     checked = asBundle.adbAutoReconnectPairedDevice,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -851,15 +1020,15 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "连接后自动获取应用列表",
-                    summary = "ADB 连接成功后立刻执行 --list-apps，用于补全最近任务列表应用名",
+                    title = stringResource(R.string.pref_title_auto_load_apps),
+                    summary = stringResource(R.string.pref_summary_auto_load_apps),
                     checked = asBundle.adbAutoLoadAppListOnConnect,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
                             adbAutoLoadAppListOnConnect = it
                         )
-                        if (it) snackbar.show(
-                            "--list-apps 操作可能非常耗时（特别是在息屏状态下），启用后可能导致连接设备后阻塞过久！"
+                        if (it) AppRuntime.snackbar(
+                            R.string.pref_warning_list_apps
                         )
                     },
                 )
@@ -867,11 +1036,11 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("终端")
+            SectionSmallTitle(stringResource(R.string.section_terminal))
             Card {
                 SuperSlider(
-                    title = "终端字号",
-                    summary = "也可以在终端上双指缩放调整",
+                    title = stringResource(R.string.pref_title_terminal_font_size),
+                    summary = stringResource(R.string.pref_summary_terminal_font_size),
                     value = asBundle.terminalFontSizeSp,
                     onValueChange = {
                         asBundle = asBundle.copy(
@@ -902,14 +1071,14 @@ fun SettingsPage(
                         verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
                     ) {
                         Text(
-                            text = "自定义终端字体",
+                            text = stringResource(R.string.pref_title_custom_font),
                             fontWeight = FontWeight.Medium,
                         )
                         TextField(
                             value = asBundle.terminalFontDisplayName,
                             onValueChange = {},
                             readOnly = true,
-                            label = "内置等宽字体",
+                            label = stringResource(R.string.pref_hint_builtin_font),
                             useLabelAsPlaceholder = true,
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
@@ -922,23 +1091,23 @@ fun SettingsPage(
                                                     asBundle = asBundle.copy(
                                                         terminalFontDisplayName = ""
                                                     )
-                                                    snackbar.show(
-                                                        if (cleared) "已恢复默认终端字体"
-                                                        else "当前没有可清除的自定义字体"
+                                                    AppRuntime.snackbar(
+                                                        if (cleared) R.string.pref_font_restored
+                                                        else R.string.pref_no_custom_font
                                                     )
                                                 }
                                             },
                                         ) {
                                             Icon(
-                                                Icons.Rounded.Clear,
-                                                contentDescription = "清空",
+                                                imageVector = Icons.Rounded.Clear,
+                                                contentDescription = stringResource(R.string.cd_clear),
                                             )
                                         }
                                     }
                                     IconButton(onClick = terminalFontPicker.pick) {
                                         Icon(
-                                            Icons.Rounded.FileOpen,
-                                            contentDescription = "选择字体",
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_font),
                                         )
                                     }
                                 }
@@ -950,11 +1119,11 @@ fun SettingsPage(
         }
 
         item {
-            SectionSmallTitle("杂项")
+            SectionSmallTitle(stringResource(R.string.section_misc))
             Card {
                 SwitchPreference(
-                    title = "退出应用时清除日志",
-                    summary = "双击返回退出应用时清除日志",
+                    title = stringResource(R.string.pref_title_clear_logs_on_exit),
+                    summary = stringResource(R.string.pref_summary_clear_logs_on_exit),
                     checked = asBundle.clearLogsOnExit,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -963,8 +1132,8 @@ fun SettingsPage(
                     },
                 )
                 SwitchPreference(
-                    title = "隐藏设备页日志框",
-                    summary = "隐藏设备页最下方的日志框",
+                    title = stringResource(R.string.pref_title_hide_log_box),
+                    summary = stringResource(R.string.pref_summary_hide_log_box),
                     checked = asBundle.hideDeviceLogs,
                     onCheckedChange = {
                         asBundle = asBundle.copy(
@@ -979,7 +1148,7 @@ fun SettingsPage(
             SectionSmallTitle("")
             Card {
                 ArrowPreference(
-                    title = "关于",
+                    title = stringResource(R.string.about_title),
                     summary = updateSummary,
                     onClick = { navigator.push(RootScreen.About) },
                 )

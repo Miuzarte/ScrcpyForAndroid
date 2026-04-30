@@ -33,8 +33,8 @@ class StreamActivity : FragmentActivity() {
     val pipStopAction: RemoteAction by lazy {
         RemoteAction(
             Icon.createWithResource(this, drawable.ic_menu_close_clear_cancel),
-            "停止投屏",
-            "停止投屏",
+            getString(R.string.password_stop_mirroring),
+            getString(R.string.password_stop_mirroring),
             PictureInPictureActionReceiver.createPendingIntent(this),
         )
     }

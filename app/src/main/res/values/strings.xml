@@ -1,3 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Scrcpy for Android</string>
+
+    <!-- Main Tab Labels -->
+    <string name="main_tab_devices">Devices</string>
+    <string name="main_tab_terminal">Terminal</string>
+    <string name="main_tab_files">Files</string>
+    <string name="main_tab_settings">Settings</string>
+    <string name="main_press_back_again">Press back again to exit</string>
+    <string name="main_font_read_error">Cannot read font file</string>
+    <string name="main_terminal_font_imported">Terminal font imported successfully</string>
+    <string name="main_terminal_font_import_failed">Terminal font import failed: %1$s</string>
+    <string name="main_update_check_failed">Update check failed: %1$s</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_project_repo">Project repo</string>
+    <string name="about_releases">Releases</string>
+    <string name="about_error">Error</string>
+
+    <!-- Common / Shared -->
+    <string name="cd_back">Back</string>
+    <string name="cd_more">More</string>
+    <string name="cd_clear">Clear</string>
+    <string name="cd_select_file">Select file</string>
+    <string name="cd_select_font">Select font</string>
+    <string name="cd_fullscreen">Fullscreen</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_save">Save</string>
+    <string name="cd_edit">Edit</string>
+    <string name="cd_drag_sort">Drag to sort</string>
+    <string name="cd_refresh">Refresh %1$s</string>
+    <string name="text_none">None</string>
+    <string name="text_default">Default</string>
+    <string name="text_global">Global</string>
+    <string name="text_loading">Loading…</string>
+    <string name="text_not_available">None available</string>
+    <string name="text_off">Off</string>
+    <string name="text_auto">Auto</string>
+    <string name="text_custom">Custom</string>
+    <string name="text_fetching">Fetching…</string>
+    <string name="text_fetch_success">Fetch successful</string>
+    <string name="text_fetch_failed">Refresh failed: %1$s</string>
+    <string name="button_cancel">Cancel</string>
+    <string name="button_delete">Delete</string>
+    <string name="button_done">Done</string>
+    <string name="button_connect">Connect</string>
+    <string name="button_disconnect">Disconnect</string>
+    <string name="button_start">Start</string>
+    <string name="button_stop">Stop</string>
+    <string name="button_fullscreen">Fullscreen</string>
+    <string name="button_pair">Pair</string>
+    <string name="button_confirm">OK</string>
+    <string name="button_add_device">Add device</string>
+    <string name="button_direct_connect">Direct connect</string>
+    <string name="button_auto_discover">Auto discover</string>
+    <string name="button_discovering">Discovering…</string>
+    <string name="button_swap">Swap</string>
+    <string name="label_ip_address">IP address</string>
+    <string name="label_port">Port</string>
+    <string name="label_device_name">Device name</string>
+    <string name="label_name">Name</string>
+    <string name="label_wlan_pairing_code">WLAN pairing code</string>
+    <string name="label_resolution">Resolution</string>
+    <string name="label_codec">Codec</string>
+    <string name="label_status">Status</string>
+    <string name="label_fps">FPS</string>
+    <string name="label_touches">Touches</string>
+
+    <!-- Device Tab -->
+    <string name="device_title">Devices</string>
+    <string name="device_cd_config_right">Config panel on right</string>
+    <string name="device_cd_config_left">Config panel on left</string>
+    <string name="device_menu_quick_sort">Quick device sort</string>
+    <string name="device_menu_virtual_button_sort">Virtual button order</string>
+    <string name="device_menu_clear_logs">Clear logs</string>
+    <string name="device_hint_long_press_edit">Long press to edit</string>
+    <string name="device_cannot_modify_connected">Cannot modify a connected device</string>
+    <string name="device_added">Device added: %1$s:%2$s</string>
+    <string name="device_section_wireless_pairing">Wireless pairing</string>
+    <string name="device_section_scrcpy">Scrcpy</string>
+    <string name="device_section_logs">Logs</string>
+    <string name="device_pairing_title">Pair device using pairing code</string>
+    <string name="device_pairing_desc">Use a six-digit pairing code to pair a new device</string>
+    <string name="device_quick_connect_title">Connect / Add device</string>
+    <string name="device_status_mirroring">Mirroring</string>
+    <string name="device_status_resolution">Resolution</string>
+    <string name="device_status_codec">Codec</string>
+    <string name="device_status_adb_connected">ADB connected</string>
+    <string name="device_status_adb_disconnected">ADB disconnected</string>
+    <string name="device_status_current">Current device</string>
+    <string name="device_status_state">Status</string>
+    <string name="device_status_idle">Idle</string>
+    <string name="device_config_audio_forwarding">Audio forwarding</string>
+    <string name="device_config_audio_forwarding_desc">Forward device audio to this device (Android 11+)</string>
+    <string name="device_config_audio_codec">Audio codec</string>
+    <string name="device_config_audio_codec_note">Note: FLAC codec introduces significant latency</string>
+    <string name="device_config_audio_bitrate">Audio bitrate</string>
+    <string name="device_config_video_codec">Video codec</string>
+    <string name="device_config_video_codec_note">Note: The vast majority of devices do not support AV1 hardware encoding</string>
+    <string name="device_config_video_bitrate">Video bitrate</string>
+    <string name="device_config_more_params">More parameters</string>
+    <string name="device_config_all_params">All parameters</string>
+    <string name="device_config_all_scrcpy_params">All scrcpy parameters</string>
+    <string name="device_config_start_immediately">Start scrcpy immediately after connecting</string>
+    <string name="device_config_direct_fullscreen">Enter fullscreen directly</string>
+    <string name="device_config_scrcpy_config">scrcpy configuration</string>
+    <string name="device_switched_profile">%1$s switched to configuration %2$s</string>
+
+    <!-- Recent Tasks / All Apps -->
+    <string name="bottomsheet_recent_tasks">Recent tasks</string>
+    <string name="bottomsheet_loading_tasks">Loading recent tasks…</string>
+    <string name="bottomsheet_no_tasks">No recent tasks available</string>
+    <string name="bottomsheet_all_apps">All apps</string>
+    <string name="bottomsheet_loading_apps">Loading app list…</string>
+    <string name="bottomsheet_no_apps">No app list available</string>
+
+    <!-- Fullscreen Control -->
+    <string name="fullscreen_failed_app_list">Failed to get app list</string>
+    <string name="fullscreen_failed_tasks">Failed to get recent tasks</string>
+    <string name="fullscreen_paste_non_ascii">Non-ASCII text paste failed</string>
+    <string name="fullscreen_text_input_failed">Text input failed</string>
+    <string name="fullscreen_clipboard_empty">Local clipboard is empty or not text</string>
+    <string name="fullscreen_legacy_paste_failed">Legacy paste failed</string>
+    <string name="fullscreen_clipboard_sync_failed">Clipboard sync paste failed, try enabling --legacy-paste</string>
+    <string name="fullscreen_start_app_failed">Start app failed: %1$s</string>
+    <string name="fullscreen_debug_resolution">Resolution: %1$sx%2$s</string>
+    <string name="fullscreen_debug_fps">FPS: %1$s</string>
+    <string name="fullscreen_debug_touches">Touches: %1$d</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+
+    <!-- Settings - Update -->
+    <string name="pref_update_current">Current version %1$s</string>
+    <string name="pref_update_checking">, checking for updates</string>
+    <string name="pref_update_failed">, update check failed</string>
+    <string name="pref_update_found">, found new version %1$s</string>
+    <string name="pref_update_latest">, already the latest version</string>
+    <string name="pref_update_newer">, newer than latest release %1$s</string>
+
+    <!-- Settings - Theme -->
+    <string name="section_theme">Theme</string>
+    <string name="pref_title_appearance_mode">Appearance mode</string>
+    <string name="pref_summary_appearance_mode">Select the app\'s appearance mode</string>
+    <string name="pref_title_monet">Monet color</string>
+    <string name="pref_summary_monet">Uses Monet dynamic color when enabled</string>
+    <string name="pref_title_monet_key_color">Monet Key Color</string>
+    <string name="pref_summary_monet_key_color">Set Monet accent color</string>
+    <string name="pref_title_monet_palette_style">Monet Palette Style</string>
+    <string name="pref_summary_monet_palette_style">Set Monet palette style</string>
+    <string name="pref_title_monet_color_spec">Monet Color Spec</string>
+    <string name="pref_summary_monet_color_spec">Set Monet color specification</string>
+    <string name="pref_title_blur">Blur</string>
+    <string name="pref_summary_blur">Enable blur effect on top bar and bottom bar</string>
+    <string name="pref_title_floating_bottom_bar">Floating bottom bar</string>
+    <string name="pref_summary_floating_bottom_bar">Use Apple-style floating bottom bar</string>
+    <string name="pref_title_liquid_glass">Liquid glass</string>
+    <string name="pref_summary_liquid_glass">Enable liquid glass effect on the floating bottom bar</string>
+    <string name="pref_title_smooth_corners">Smooth corners</string>
+    <string name="pref_summary_smooth_corners">Enable global smooth corner effect</string>
+
+    <!-- Settings - Screen Mirroring -->
+    <string name="section_screen_mirroring">Screen mirroring</string>
+    <string name="pref_title_low_latency_audio">Low latency audio (experimental)</string>
+    <string name="pref_summary_low_latency_audio">When enabled, will attempt to use low-latency audio path.\nRecommended to use with RAW PCM codec.\nAfter modification, it is recommended to swipe away and restart the app</string>
+    <string name="pref_title_debug_info">Enable debug info</string>
+    <string name="pref_summary_debug_info">Display resolution, frame rate, and touch info as overlay in fullscreen</string>
+    <string name="pref_title_hide_simple_settings">Hide simple settings on device page</string>
+    <string name="pref_summary_hide_simple_settings">When enabled, the device page only keeps More parameters, All apps, Recent tasks, and Start/Stop buttons</string>
+    <string name="pref_title_preview_card_height">Preview card height</string>
+    <string name="pref_summary_preview_card_height">Preview card height on device page</string>
+    <string name="pref_title_quick_device_sort">Quick device sort</string>
+    <string name="pref_summary_quick_device_sort">Manually sort quick devices on the device page</string>
+    <string name="pref_title_virtual_button_sort">Virtual button order</string>
+    <string name="pref_summary_virtual_button_sort">Manually sort virtual buttons in preview/fullscreen and select which are shown</string>
+    <string name="pref_title_password_autofill">Lockscreen password auto-fill</string>
+    <string name="pref_summary_password_autofill">Manage lockscreen passwords used for auto-fill</string>
+    <string name="pref_title_clipboard_sync">Realtime clipboard sync to device</string>
+    <string name="pref_summary_clipboard_sync">When local clipboard is updated, it is automatically synced to the controlled device.\nAfter disabling, use the Paste virtual button to paste local content.\nMIUI does not allow background clipboard monitoring at all, so this option may not work on Xiaomi devices</string>
+
+    <!-- Settings - Fullscreen -->
+    <string name="section_fullscreen">Fullscreen</string>
+    <string name="pref_title_ignore_rotation_lock">Don\'t follow system rotation lock in fullscreen</string>
+    <string name="pref_summary_ignore_rotation_lock">When enabled, uses sensor orientation, ignoring system auto-rotation lock</string>
+    <string name="pref_title_back_to_device">Send BACK to device in fullscreen</string>
+    <string name="pref_summary_back_to_device">When enabled, the system back key is sent to the device and no longer exits the fullscreen control page.\nTo exit fullscreen, return to the desktop and re-enter via the app icon</string>
+    <string name="pref_title_show_virtual_buttons">Show virtual buttons in fullscreen</string>
+    <string name="pref_summary_show_virtual_buttons">Show Back, Home and other virtual buttons on the fullscreen control page</string>
+    <string name="pref_title_virtual_button_direction">Virtual button direction</string>
+    <string name="pref_title_virtual_button_height">Virtual button height</string>
+    <string name="pref_title_show_floating_button">Show floating button in fullscreen</string>
+    <string name="pref_summary_show_floating_button">Show a draggable floating button on the fullscreen control page; tap to open the full virtual button menu</string>
+    <string name="pref_title_floating_button_size">Floating button size</string>
+    <string name="pref_title_floating_button_bg_opacity">Floating button background opacity</string>
+    <string name="pref_title_floating_button_ring_opacity">Floating button ring opacity</string>
+    <string name="pref_title_fullscreen_compat_mode">Fullscreen compatibility mode</string>
+    <string name="pref_summary_fullscreen_compat_mode">When enabled, the fullscreen control page no longer spans Activities; Picture-in-Picture will be unavailable</string>
+
+    <!-- Settings - scrcpy-server -->
+    <string name="section_scrcpy_server">scrcpy-server</string>
+    <string name="pref_title_custom_binary">Custom binary</string>
+    <string name="pref_title_custom_binary_version">Custom binary version</string>
+    <string name="pref_title_remote_path">Remote Path</string>
+
+    <!-- Settings - ADB -->
+    <string name="section_adb">ADB</string>
+    <string name="pref_title_battery_optimization">Adjust background battery optimization</string>
+    <string name="pref_summary_battery_optimization">Fix ADB disconnection when Scrcpy switches to background and cannot reach the network.\nApp battery usage -> Allow background usage -> Unrestricted.\nModified power settings in domestic ROMs can generally be found in the corresponding modified app settings</string>
+    <string name="pref_title_app_info">App info</string>
+    <string name="pref_title_custom_adb_key">Custom ADB key name</string>
+    <string name="pref_title_adb_private_key">ADB private key</string>
+    <string name="pref_title_adb_public_key">ADB public key</string>
+    <string name="pref_adb_key_not_imported">Not imported</string>
+    <string name="pref_adb_key_imported">Imported</string>
+    <string name="pref_adb_key_generated">Generated</string>
+    <string name="pref_adb_private_key_imported">Private key imported, public key fingerprint: %1$s</string>
+    <string name="pref_adb_public_key_imported_snackbar">Public key imported, fingerprint: %1$s</string>
+    <string name="pref_adb_key_reset">ADB key regenerated, public key fingerprint: %1$s</string>
+    <string name="pref_adb_key_removed">Imported ADB key removed, active public key fingerprint: %1$s</string>
+    <string name="pref_adb_key_import_failed">ADB key import failed: %1$s</string>
+    <string name="pref_adb_key_remove">Remove</string>
+    <string name="pref_adb_key_regenerate">Regenerate</string>
+    <string name="pref_title_auto_discovery">Auto enable discovery service when pairing</string>
+    <string name="pref_summary_auto_discovery">Automatically search for available pairing ports after opening the pairing dialog</string>
+    <string name="pref_title_auto_reconnect">Auto reconnect paired devices</string>
+    <string name="pref_summary_auto_reconnect">Automatically discover devices with wireless debugging enabled, update quick device random ports, and attempt connection (results may vary)</string>
+    <string name="pref_title_auto_load_apps">Auto fetch app list after connection</string>
+    <string name="pref_summary_auto_load_apps">Execute --list-apps immediately after successful ADB connection to populate app names in recent tasks list</string>
+    <string name="pref_warning_list_apps">--list-apps may be very time-consuming (especially when screen is off); enabling may cause excessive blocking after connecting to the device!</string>
+    <string name="pref_cannot_open_settings">Cannot open settings</string>
+
+    <!-- Settings - Terminal -->
+    <string name="section_terminal">Terminal</string>
+    <string name="pref_title_terminal_font_size">Terminal font size</string>
+    <string name="pref_summary_terminal_font_size">Can also be adjusted with pinch-to-zoom on the terminal</string>
+    <string name="pref_title_custom_font">Custom terminal font</string>
+    <string name="pref_hint_builtin_font">Built-in monospace font</string>
+    <string name="pref_font_restored">Restored default terminal font</string>
+    <string name="pref_no_custom_font">No custom font to clear currently</string>
+
+    <!-- Settings - Miscellaneous -->
+    <string name="section_misc">Miscellaneous</string>
+    <string name="pref_title_clear_logs_on_exit">Clear logs when exiting app</string>
+    <string name="pref_summary_clear_logs_on_exit">Clear logs when double-pressing back to exit the app</string>
+    <string name="pref_title_hide_log_box">Hide device page log box</string>
+    <string name="pref_summary_hide_log_box">Hide the log box at the bottom of the device page</string>
+
+    <!-- Terminal -->
+    <string name="terminal_title">Terminal</string>
+    <string name="terminal_menu_free_copy">Free copy</string>
+    <string name="terminal_menu_clear_screen">Clear screen</string>
+    <string name="terminal_copied_all">Copied all terminal output</string>
+    <string name="terminal_copied">Copied to clipboard</string>
+    <string name="terminal_copy_all">Copy all</string>
+    <string name="terminal_no_output">No output currently</string>
+    <string name="terminal_output_label">Terminal output</string>
+    <string name="terminal_font_size_snackbar">Terminal font size %1$dsp</string>
+    <string name="terminal_font_size_restore_default">Restore default</string>
+
+    <!-- Virtual Button Order -->
+    <string name="vb_order_title">Virtual button order</string>
+    <string name="vb_order_button_text">Button display text</string>
+    <string name="vb_order_hint">Exceed 3, recommend hiding, only effective for virtual buttons below the preview card</string>
+    <string name="vb_order_display_external">Display on external</string>
+    <string name="vb_order_display_more_menu">Display in more menu</string>
+
+    <!-- Virtual Button Actions -->
+    <string name="vb_more">More</string>
+    <string name="vb_home">Home</string>
+    <string name="vb_back">Back</string>
+    <string name="vb_app_switch">App switch</string>
+    <string name="vb_menu">Menu</string>
+    <string name="vb_notifications">Notifications</string>
+    <string name="vb_volume_up">Volume up</string>
+    <string name="vb_volume_down">Volume down</string>
+    <string name="vb_volume_mute">Mute</string>
+    <string name="vb_lock_screen">Lock screen</string>
+    <string name="vb_screenshot">Screenshot</string>
+    <string name="vb_fill_password">Fill lockscreen password</string>
+    <string name="vb_all_apps">All apps</string>
+    <string name="vb_recent_tasks">Recent tasks</string>
+    <string name="vb_toggle_ime">Toggle IME</string>
+    <string name="vb_paste_clipboard">Paste local clipboard</string>
+
+    <!-- Dock Positions -->
+    <string name="dock_follow">Follow</string>
+    <string name="dock_fixed">Fixed</string>
+    <string name="dock_top">Top</string>
+    <string name="dock_bottom">Bottom</string>
+    <string name="dock_left">Left</string>
+    <string name="dock_right">Right</string>
+    <string name="dock_display_on"> show at screen </string>
+
+    <!-- Theme Modes -->
+    <string name="theme_follow_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <!-- Recording -->
+    <string name="record_title">Recording</string>
+    <string name="record_format">Recording format</string>
+    <string name="record_filename_hint">Filename, enabled when not empty</string>
+    <string name="record_preview">Preview:</string>
+    <string name="record_plain_text">Plain text</string>
+    <string name="record_desc_yyyy">Four-digit year, e.g. 2026</string>
+    <string name="record_desc_yy">Two-digit year, e.g. 26</string>
+    <string name="record_desc_MM">Month, two digits, e.g. 09</string>
+    <string name="record_desc_M">Month, one or two digits, e.g. 9</string>
+    <string name="record_desc_dd">Day, two digits, e.g. 19</string>
+    <string name="record_desc_d">Day, one or two digits, e.g. 9</string>
+    <string name="record_desc_HH">24-hour, two digits, e.g. 23</string>
+    <string name="record_desc_H">24-hour, one or two digits, e.g. 9</string>
+    <string name="record_desc_hh">12-hour, two digits, e.g. 11</string>
+    <string name="record_desc_h">12-hour, one or two digits, e.g. 9</string>
+    <string name="record_desc_mm">Minutes, two digits, e.g. 09</string>
+    <string name="record_desc_m">Minutes, one or two digits, e.g. 9</string>
+    <string name="record_desc_ss">Seconds, two digits, e.g. 09</string>
+    <string name="record_desc_s">Seconds, one or two digits, e.g. 9</string>
+    <string name="record_desc_timestamp">Unix timestamp in seconds, e.g. 1776952809</string>
+    <string name="record_desc_device_name">Device name</string>
+    <string name="record_desc_device_ip">Device IP</string>
+    <string name="record_desc_device_port">Device port</string>
+    <string name="record_desc_video_codec">Video stream codec (not actual file encoding)</string>
+    <string name="record_desc_audio_codec">Audio stream codec (not actual file encoding)</string>
+    <string name="record_desc_width">Video width</string>
+    <string name="record_desc_height">Video height</string>
+
+    <!-- Reorder Devices -->
+    <string name="reorder_devices_title">Quick device sort</string>
+
+    <!-- Lockscreen Password -->
+    <string name="password_stop_mirroring">Stop screen mirroring</string>
+    <string name="password_authenticate_create">Authenticate to create a new password</string>
+    <string name="password_authenticate_subtitle">Verify your identity to continue</string>
+    <string name="password_auth_to_disable">Authenticate to disable password protection</string>
+    <string name="password_auth_subtitle">Verify your identity to continue</string>
+    <string name="password_auth_fill_title">Authenticate to fill lockscreen password</string>
+    <string name="password_fill_failed">Password fill failed</string>
+    <string name="password_no_available">No available passwords</string>
+    <string name="password_cannot_auth_here">Cannot authenticate on this page</string>
+    <string name="password_auth_failed">Authentication failed</string>
+    <string name="password_security_state_changed">Device security state has changed, please reset password</string>
+    <string name="password_expired">Password has expired, please reset</string>
+    <string name="password_autofill_title">Lockscreen Password Auto-fill</string>
+    <string name="password_create_new">Create new password</string>
+    <string name="password_no_lock_screen">Current device does not have lock screen protection set</string>
+    <string name="password_no_lock_screen_warn">Continuing will allow saving and filling lockscreen passwords without authentication protection</string>
+    <string name="password_agree">Agree</string>
+    <string name="password_auth_lost_warn">Passwords will lose protection after disabling authentication</string>
+    <string name="password_auth_lost_detail">After disabling, filling passwords will no longer require authentication.\nAlso, passwords previously created with authentication will be burned.</string>
+    <string name="password_continue_disable">Continue to disable</string>
+    <string name="password_delete_confirm">Delete password</string>
+    <string name="password_delete_msg">Will delete %1$s</string>
+    <string name="password_default_name">Password %1$d</string>
+    <string name="password_cannot_be_empty">Password cannot be empty</string>
+    <string name="password_require_auth">Require authentication when filling passwords</string>
+    <string name="password_require_auth_detail">After disabling, lockscreen passwords can be filled directly.\nAlso, passwords previously created with authentication will be burned.</string>
+    <string name="password_no_auth_capability">Current device has no authentication capability</string>
+    <string name="password_or_menu_hint">Or in the top-right menu</string>
+    <string name="password_status_invalidated">Invalidated</string>
+    <string name="password_status_authenticated">Authenticated when created</string>
+    <string name="password_status_unauthenticated">Unauthenticated when created</string>
+    <string name="password_status_burned">Authenticated when created (burned)</string>
+    <string name="password_rename">Rename password</string>
+    <string name="password_lockscreen_label">Lockscreen password</string>
+    <string name="password_disclaimer">Disclaimer\n0. Cannot guarantee there are no bugs.\n1. The protection boundary of this feature only includes encrypted storage, on-demand authentication, and memory cleanup after use; it does not constitute an absolute security guarantee.\n2. Under root / posed / hook / debugger / malicious input method environments, passwords may still leak.\n3. This feature does not bypass system lock screen authentication; it is only for devices you have legally authorized control over.\n4. Disabling \"Require authentication when filling passwords\" will significantly reduce security; please choose carefully.</string>
+
+    <!-- File Manager -->
+    <string name="fm_cd_parent">Parent directory</string>
+    <string name="fm_cd_sort">Sort</string>
+    <string name="fm_sort_name">Name</string>
+    <string name="fm_sort_size">Size</string>
+    <string name="fm_sort_time">Time</string>
+    <string name="fm_sort_extension">Extension</string>
+    <string name="fm_sort_asc">Ascending</string>
+    <string name="fm_sort_desc">Descending</string>
+    <string name="fm_menu_create_folder">Create folder</string>
+    <string name="fm_menu_upload">Upload file to this directory</string>
+    <string name="fm_loading_details">Loading details…</string>
+    <string name="fm_no_details">No details</string>
+    <string name="fm_pull_refresh">Pull to refresh</string>
+    <string name="fm_release_refresh">Release to refresh</string>
+    <string name="fm_refreshing">Refreshing…</string>
+    <string name="fm_refresh_done">Refresh done</string>
+    <string name="fm_load_failed">Load failed: %1$s</string>
+    <string name="fm_empty_dir">Empty directory</string>
+    <string name="fm_file_details">File Details</string>
+    <string name="fm_show_raw">Show raw</string>
+    <string name="fm_show_parsed">Show parsed</string>
+    <string name="fm_cd_download">Download</string>
+    <string name="fm_goto_path">Go to path</string>
+    <string name="fm_title_create_folder">Create folder</string>
+    <string name="fm_label_new_folder">New folder</string>
+    <string name="fm_button_create">Create</string>
+    <string name="fm_snack_link_unavailable">Link target unavailable, long press for details</string>
+    <string name="fm_snack_not_dir">Link target is not a directory, long press for details</string>
+    <string name="fm_snack_link_read_failed">Failed to read link target: %1$s</string>
+    <string name="fm_snack_long_press_details">Long press to view file details</string>
+    <string name="fm_snack_folder_name_empty">Folder name cannot be empty</string>
+    <string name="fm_snack_folder_created">Folder created</string>
+    <string name="fm_snack_create_failed">Create failed: %1$s</string>
+    <string name="fm_snack_uploaded">Uploaded to %1$s</string>
+    <string name="fm_snack_upload_failed">Upload failed: %1$s</string>
+    <string name="fm_snack_read_details_failed">Failed to read details: %1$s</string>
+    <string name="fm_snack_scan_failed">Directory scan failed: %1$s</string>
+    <string name="fm_snack_download_starting">Starting download</string>
+    <string name="fm_snack_dir_loading">Directory info still loading, please try again later</string>
+    <string name="fm_snack_downloaded">Downloaded to Download/Scrcpy</string>
+    <string name="fm_snack_cannot_save">Cannot write directly to Download/Scrcpy, please select a save directory</string>
+    <string name="fm_snack_download_complete">Download complete</string>
+    <string name="fm_snack_download_failed">Download failed: %1$s</string>
+    <string name="terminal_snack_input_failed">Terminal input failed: %1$s</string>
+    <string name="terminal_snack_session_failed">Terminal session creation failed: %1$s</string>
+    <string name="terminal_snack_output_failed">Terminal output failed: %1$s</string>
+    <string name="fm_exception_cannot_read_filename">Cannot read file name</string>
+    <string name="fm_exception_cannot_read_selected_file">Cannot read selected file</string>
+    <string name="fm_exception_folder_name_empty">Folder name cannot be empty</string>
+    <string name="fm_exception_cannot_write_target">Cannot write target file</string>
+    <string name="fm_exception_directory_not_found">Directory not found</string>
+    <string name="fm_exception_not_directory">Target is not a directory</string>
+    <string name="fm_exception_cannot_create_dir">Cannot create directory</string>
+    <string name="fm_exception_cannot_create_file">Cannot create file</string>
+    <string name="fm_exception_remote_shell_closed">Remote shell closed</string>
+    <string name="fm_exception_command_failed">Command failed</string>
+    <string name="fm_stat_path">Path</string>
+    <string name="fm_stat_type">Type</string>
+    <string name="fm_stat_size">Size</string>
+    <string name="fm_stat_blocks">Blocks</string>
+    <string name="fm_stat_io_block_size">IO block size</string>
+    <string name="fm_stat_hard_links">Hard links</string>
+    <string name="fm_stat_permissions">Permissions</string>
+    <string name="fm_stat_device">Device</string>
+    <string name="fm_stat_device_type">Device type</string>
+    <string name="fm_stat_access_time">Access time</string>
+    <string name="fm_stat_modify_time">Modify time</string>
+    <string name="fm_stat_change_time">Change time</string>
+    <string name="fm_stat_link_target">Link target</string>
+    <string name="fm_stat_directories">Directories</string>
+    <string name="fm_stat_files">Files</string>
+    <string name="fm_stat_target_info">Target info</string>
+    <string name="fm_unknown">Unknown</string>
+
+    <!-- Scrcpy All Options -->
+    <string name="profile_default_name">Profile</string>
+    <string name="profile_new_name">New Profile</string>
+    <string name="scrcpyopt_title">All Parameters</string>
+    <string name="scrcpyopt_cd_profile_manage">Profile Management</string>
+    <string name="scrcpyopt_manage_profiles">Manage Profiles</string>
+    <string name="scrcpyopt_new_profile">New Profile</string>
+    <string name="scrcpyopt_rename_profile">Rename Profile</string>
+    <string name="scrcpyopt_duplicate_name_hint">Duplicate profile names will have a number appended automatically</string>
+    <string name="scrcpyopt_profile_name">Profile Name</string>
+    <string name="scrcpyopt_copy_from">Copy From Profile</string>
+    <string name="scrcpyopt_current_profile">Current Profile</string>
+    <string name="scrcpyopt_delete_profile">Delete Profile</string>
+    <string name="scrcpyopt_delete_confirm">Confirm deletion of \"%1$s\"?</string>
+    <string name="scrcpyopt_prefer_text">Prefer Text</string>
+    <string name="scrcpyopt_raw_key_events">Raw Key Events</string>
+    <string name="scrcpyopt_default_mixed">Default</string>
+    <string name="scrcpyopt_dont_modify">Don\'t Modify</string>
+    <string name="scrcpyopt_invalid_options">Invalid options: %1$s</string>
+    <string name="scrcpyopt_turn_screen_off">Turn device screen off after scrcpy starts</string>
+    <string name="scrcpyopt_turn_screen_off_note">Note: On most devices, the refresh rate decreases/is halved when the screen is turned off</string>
+    <string name="scrcpyopt_no_control">Disable device control (mirror the device in read-only)</string>
+    <string name="scrcpyopt_no_video">Disable video forwarding</string>
+    <string name="scrcpyopt_no_video_playback">Disable video playback on the computer</string>
+    <string name="scrcpyopt_no_audio">Disable audio forwarding</string>
+    <string name="scrcpyopt_no_audio_playback">Disable audio playback on the computer</string>
+    <string name="scrcpyopt_screen_off_timeout">Controlled device\'s screen-off timeout after scrcpy starts</string>
+    <string name="scrcpyopt_no_power_on">Do not power on the device on start</string>
+    <string name="scrcpyopt_power_off_on_close">Turn the device screen off when closing scrcpy</string>
+    <string name="scrcpyopt_stay_awake">Keep the device on while scrcpy is running, when the device is plugged in</string>
+    <string name="scrcpyopt_show_touches">Enable \"show touches\" on start, restore the initial value on exit</string>
+    <string name="scrcpyopt_fullscreen">Start in fullscreen</string>
+    <string name="scrcpyopt_disable_screensaver">Disable screensaver while scrcpy is running</string>
+    <string name="scrcpyopt_disable_screensaver_note">Be aware of burn-in; this also affects picture-in-picture</string>
+    <string name="scrcpyopt_kill_adb_on_close">Kill adb when scrcpy terminates</string>
+    <string name="scrcpyopt_audio_codec">Audio codec</string>
+    <string name="scrcpyopt_audio_bitrate">Audio bitrate</string>
+    <string name="scrcpyopt_video_codec">Video codec</string>
+    <string name="scrcpyopt_video_bitrate">Video bitrate</string>
+    <string name="scrcpyopt_video_source">Video source</string>
+    <string name="scrcpyopt_display_id">Display ID</string>
+    <string name="scrcpyopt_max_size">Max resolution</string>
+    <string name="scrcpyopt_max_fps">Max framerate</string>
+    <string name="scrcpyopt_camera_id">Camera ID</string>
+    <string name="scrcpyopt_camera_facing">Camera facing</string>
+    <string name="scrcpyopt_camera_size">Camera resolution</string>
+    <string name="scrcpyopt_camera_fps">Camera framerate</string>
+    <string name="scrcpyopt_camera_high_speed">High framerate mode</string>
+    <string name="scrcpyopt_audio_source">Audio source</string>
+    <string name="scrcpyopt_audio_dup">Duplicate audio (capture and keep playing on the device)</string>
+    <string name="scrcpyopt_require_audio">Terminate when audio forwarding fails</string>
+    <string name="scrcpyopt_video_encoder">Video encoder</string>
+    <string name="scrcpyopt_audio_encoder">Audio encoder</string>
+    <string name="scrcpyopt_ime_display_policy">IME display policy</string>
+    <string name="scrcpyopt_no_vd_destroy_content">Retain content when closing virtual display</string>
+    <string name="scrcpyopt_no_vd_decorations">Disable virtual display system decorations</string>
+    <string name="scrcpyopt_no_downsize_on_error">Disable auto-downscale on MediaCodec error</string>
+    <string name="scrcpyopt_no_downsize_on_error_desc">By default, when a MediaCodec error occurs, scrcpy automatically tries again with a lower resolution.\nThis option disables this behavior.</string>
+    <string name="scrcpyopt_legacy_paste">Legacy paste (ASCII/English characters only)</string>
+    <string name="scrcpyopt_key_inject_mode">Keyboard injection mode</string>
+    <string name="scrcpyopt_no_key_repeat">Do not forward repeated key events when a key is held down</string>
+    <string name="scrcpyopt_no_clipboard_autosync">Disable automatic clipboard synchronization</string>
+    <string name="scrcpyopt_no_mouse_hover">Do not forward mouse hover events</string>
+    <string name="scrcpyopt_no_cleanup">Disable cleanup on exit</string>
+    <string name="scrcpyopt_no_cleanup_desc">By default, scrcpy removes the server binary from the device and restores device state on exit (show touches, stay awake, and power mode).\nThis option disables this cleanup operation.</string>
+    <string name="scrcpyopt_start_app">Open app after scrcpy starts</string>
+    <string name="scrcpyopt_native">Native</string>
+    <string name="scrcpyopt_log_level">Log level</string>
+
+    <!-- DeviceTabViewModel snackbar & log messages -->
+    <string name="vm_adb_connected">ADB connected</string>
+    <string name="vm_scrcpy_started">scrcpy started</string>
+    <string name="vm_scrcpy_started_recording">scrcpy started and recording</string>
+    <string name="vm_scrcpy_stopped_adb_disconnected">scrcpy stopped, ADB disconnected</string>
+    <string name="vm_scrcpy_stopped">scrcpy stopped</string>
+    <string name="vm_adb_connection_failed">ADB connection failed</string>
+    <string name="vm_adb_disconnected">ADB disconnected</string>
+    <string name="vm_pairing_succeeded">Pairing succeeded</string>
+    <string name="vm_pairing_failed">Pairing failed</string>
+    <string name="vm_auto_reconnect_succeeded">ADB auto-reconnect succeeded</string>
+    <string name="vm_auto_reconnect_failed">ADB auto-reconnect failed</string>
+    <string name="vm_start_scrcpy">Start scrcpy</string>
+    <string name="vm_stop_scrcpy">Stop scrcpy</string>
+    <string name="vm_launch_app">Launch app</string>
+    <string name="vm_connect_adb">Connect ADB</string>
+    <string name="vm_disconnect_adb">Disconnect ADB</string>
+    <string name="vm_execute_pairing">Execute pairing</string>
+    <string name="vm_send_action">Send %1$s</string>
+    <string name="vm_label_timeout">%1$s timed out</string>
+    <string name="vm_label_param_error">%1$s parameter error: %2$s</string>
+    <string name="vm_label_failed">%1$s failed: %2$s</string>
+    <string name="vm_app_started_on_display">App started on current display: %1$s</string>
+    <string name="vm_start_app_fallback_adb">Failed to start app via scrcpy control channel, falling back to ADB</string>
+    <string name="vm_app_started_via_adb">App started via ADB: %1$s</string>
+    <string name="vm_adb_connected_detail">ADB connected: model=%1$s</string>
+    <string name="vm_failed_app_list_msg">Failed to get app list: %1$s</string>
+    <string name="vm_scrcpy_requested_app">Scrcpy requested to start app: %1$s</string>
+    <string name="vm_scrcpy_start_app_failed">Failed to start app via scrcpy control channel: %1$s</string>
+    <string name="vm_scrcpy_started_detail">scrcpy started: device=%1$s</string>
+    <string name="vm_scrcpy_stopped_adb_disconnected_log">scrcpy stopped, ADB disconnected</string>
+    <string name="vm_failed_recent_tasks_msg">Failed to get recent tasks: %1$s</string>
+    <string name="vm_legacy_paste_injected">Used legacy paste to inject local clipboard text</string>
+    <string name="vm_clipboard_synced_paste">Synced local clipboard to device and triggered paste</string>
+    <string name="vm_clipboard_paste_failed">Local clipboard paste failed</string>
+    <string name="vm_ime_text_failed">IME text submission failed: %1$s</string>
+    <string name="vm_adb_disconnected_device">ADB disconnected: %1$s</string>
+    <string name="vm_mdns_updated">mDNS discovered new port, updated quick device: %1$s:%2$s -> %1$s:%3$s</string>
+    <string name="vm_quick_probe_success">ADB quick probe connection succeeded: %1$s:%2$s</string>
+    <string name="vm_device_switched_profile">Current connected device switched to profile: %1$s</string>
 </resources>

@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -47,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.pages.effect.BgEffectBackground
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
@@ -102,7 +105,7 @@ internal fun AboutScreen() {
     Scaffold(
         topBar = {
             SmallTopAppBar(
-                title = "关于",
+                title = stringResource(R.string.about_title),
                 scrollBehavior = topAppBarScrollBehavior,
                 modifier =
                     if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop)
@@ -116,7 +119,7 @@ internal fun AboutScreen() {
                     IconButton(onClick = navigator.pop) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.cd_back),
                         )
                     }
                 },
@@ -160,12 +163,13 @@ private fun AboutContent(
     var versionCodeProgress by remember { mutableFloatStateOf(0f) }
     var initialLogoAreaY by remember { mutableFloatStateOf(0f) }
 
-    val (releaseStatusText, releasesUrl) = remember(updateState) {
+    val textAboutError = stringResource(R.string.about_error)
+    val (releaseStatusText, releasesUrl) = remember(textAboutError, updateState) {
         when (val state = updateState) {
             AppUpdateChecker.State.Idle -> null to AppUpdateChecker.RELEASES_URL
             AppUpdateChecker.State.Checking -> "..." to AppUpdateChecker.RELEASES_URL
             is AppUpdateChecker.State.Ready -> state.release.latestVersion to state.release.htmlUrl
-            is AppUpdateChecker.State.Error -> "错误" to AppUpdateChecker.RELEASES_URL
+            is AppUpdateChecker.State.Error -> textAboutError to AppUpdateChecker.RELEASES_URL
         }
     }
 
@@ -374,7 +378,7 @@ private fun AboutContent(
                 ) {
                     AboutCard {
                         ArrowPreference(
-                            title = "项目仓库",
+                            title = stringResource(R.string.about_project_repo),
                             endActions = {
                                 Text(
                                     text = "GitHub",
@@ -389,7 +393,7 @@ private fun AboutContent(
                             },
                         )
                         ArrowPreference(
-                            title = "版本发布",
+                            title = stringResource(R.string.about_releases),
                             endActions = {
                                 releaseStatusText?.let {
                                     Text(

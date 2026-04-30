@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -51,13 +52,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
-import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
+import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
+import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
@@ -88,11 +91,11 @@ fun FullscreenControlScreen(
 ) {
     val activity = LocalActivity.current
     val context = LocalContext.current
+    val snackbarController = LocalSnackbarController.current
     val fragmentActivity = remember(activity) { activity as? FragmentActivity }
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
-    val snackbar = LocalSnackbarController.current
     val currentSession by scrcpy.currentSessionState.collectAsState()
     val listingsRefreshBusy by scrcpy.listings.refreshBusyState.collectAsState()
     val listingsRefreshVersion by scrcpy.listings.refreshVersionState.collectAsState()
@@ -291,7 +294,7 @@ fun FullscreenControlScreen(
                 scrcpy.listings.getApps(forceRefresh = true)
             }
         }.onFailure { error ->
-            snackbar.show("获取应用列表失败")
+            AppRuntime.snackbar(R.string.fullscreen_failed_app_list)
             Log.w("FullscreenControlPage", "refreshApps failed", error)
         }
     }
@@ -302,7 +305,7 @@ fun FullscreenControlScreen(
                 scrcpy.listings.getRecentTasks(forceRefresh = true)
             }
         }.onFailure { error ->
-            snackbar.show("获取最近任务失败")
+            AppRuntime.snackbar(R.string.fullscreen_failed_tasks)
             Log.w("FullscreenControlPage", "refreshRecentTasks failed", error)
         }
     }
@@ -314,9 +317,9 @@ fun FullscreenControlScreen(
             keyInjectMode = currentSession?.keyInjectMode ?: ClientOptions.KeyInjectMode.MIXED,
         ) { error, useClipboardPaste ->
             Log.w("FullscreenControlPage", "commitImeText failed", error)
-            snackbar.show(
-                if (useClipboardPaste) "非 ASCII 文本粘贴失败"
-                else "文本输入失败"
+            AppRuntime.snackbar(
+                if (useClipboardPaste) R.string.fullscreen_paste_non_ascii
+                else R.string.fullscreen_text_input_failed
             )
         }
     }
@@ -350,7 +353,7 @@ fun FullscreenControlScreen(
                     val text = LocalInputService.getClipboardText(activity ?: return@launch)
                         ?.takeIf { it.isNotBlank() }
                     if (text == null) {
-                        snackbar.show("本机剪贴板为空或不是文本")
+                        AppRuntime.snackbar(R.string.fullscreen_clipboard_empty)
                         return@launch
                     }
                     val useLegacyPaste = session.legacyPaste
@@ -361,7 +364,10 @@ fun FullscreenControlScreen(
                         }
                     }.onFailure { error ->
                         Log.w("FullscreenControl", "pasteLocalClipboard failed", error)
-                        snackbar.show(if (useLegacyPaste) "legacy 粘贴失败" else "剪贴板同步粘贴失败，可尝试开启 --legacy-paste")
+                        AppRuntime.snackbar(
+                            if (useLegacyPaste) R.string.fullscreen_legacy_paste_failed
+                            else R.string.fullscreen_clipboard_sync_failed
+                        )
                     }
                 }
 
@@ -390,12 +396,15 @@ fun FullscreenControlScreen(
                 scrcpy.startApp(packageName)
             }
         }.onFailure { error ->
-            snackbar.show("启动应用失败: ${error.message ?: error.javaClass.simpleName}")
+            AppRuntime.snackbar(
+                R.string.fullscreen_start_app_failed,
+                error.message ?: error.javaClass.simpleName,
+            )
         }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbar.hostState) },
+        snackbarHost = { SnackbarHost(snackbarController.hostState) },
     ) { contentPadding ->
         Box(
             modifier = Modifier
@@ -467,9 +476,9 @@ fun FullscreenControlScreen(
 
             AppListBottomSheet(
                 show = showRecentTasksSheet,
-                title = "最近任务",
-                loadingText = "最近任务加载中",
-                emptyText = "没有可用的最近任务",
+                title = stringResource(R.string.bottomsheet_recent_tasks),
+                loadingText = stringResource(R.string.bottomsheet_loading_tasks),
+                emptyText = stringResource(R.string.bottomsheet_no_tasks),
                 entries = recentTasks.map { task ->
                     val app = scrcpy.listings.findCachedApp(task.packageName)
                     AppListEntry(
@@ -495,9 +504,9 @@ fun FullscreenControlScreen(
 
             AppListBottomSheet(
                 show = showAllAppsSheet,
-                title = "所有应用",
-                loadingText = "应用列表加载中",
-                emptyText = "没有可用的应用列表",
+                title = stringResource(R.string.bottomsheet_all_apps),
+                loadingText = stringResource(R.string.bottomsheet_loading_apps),
+                emptyText = stringResource(R.string.bottomsheet_no_apps),
                 entries = apps.map { app ->
                     AppListEntry(
                         key = app.packageName,
@@ -745,23 +754,32 @@ fun FullscreenControlPage(
                 .align(Alignment.TopStart)
                 .padding(start = UiSpacing.ContentVertical, top = UiSpacing.ContentVertical)
                 .background(Color.Black.copy(alpha = 0.5f))
-                .padding(horizontal = UiSpacing.ContentVertical, vertical = UiSpacing.Medium),
+                .padding(horizontal = UiSpacing.ContentVertical, vertical = UiSpacing.Medium)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.Tiny)) {
                 Text(
-                    text = "分辨率: ${session.width}x${session.height}",
+                    text = stringResource(
+                        R.string.fullscreen_debug_resolution,
+                        session.width,
+                        session.height,
+                    ),
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                @SuppressLint("DefaultLocale")
                 Text(
-                    text = "FPS: ${String.format("%.1f", currentFps.coerceAtLeast(0f))}",
+                    text = stringResource(
+                        R.string.fullscreen_debug_fps,
+                        currentFps.coerceAtLeast(0f),
+                    ),
                     color = Color.White,
                     fontSize = 13.sp,
                 )
                 Text(
-                    text = "触点: $activeTouchCount",
+                    text = stringResource(
+                        R.string.fullscreen_debug_touches,
+                        activeTouchCount,
+                    ),
                     color = Color.White,
                     fontSize = 13.sp,
                 )

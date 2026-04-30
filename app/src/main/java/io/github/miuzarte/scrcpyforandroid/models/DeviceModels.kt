@@ -260,29 +260,38 @@ data class ConnectionTarget(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
 ) : Parcelable {
-    override fun toString(): String = "$host:$port"
+    override fun toString(): String =
+        if (':' in host) "[$host]:$port"
+        else "$host:$port"
 
     companion object {
         fun unmarshalFrom(s: String): ConnectionTarget? {
-            val parts = s.split(":", limit = 2)
-            return when (parts.size) {
-                2 -> ConnectionTarget(
-                    host = parts[0].trim(),
-                    port = parts[1].trim().toIntOrNull() ?: Defaults.ADB_PORT,
-                )
-
-                1 -> ConnectionTarget(
-                    host = parts[0].trim(),
-                    port = Defaults.ADB_PORT,
-                )
-
-                0 -> ConnectionTarget(
-                    host = s.trim(),
-                    port = Defaults.ADB_PORT,
-                )
-
-                else -> null
+            val host: String
+            val port: Int
+            if (s.startsWith('[')) {
+                val closeBracket = s.indexOf(']')
+                if (closeBracket < 1) return null
+                host = s.substring(1, closeBracket)
+                port = if (s.length > closeBracket + 1 && s[closeBracket + 1] == ':')
+                    s.substring(closeBracket + 2).toIntOrNull() ?: Defaults.ADB_PORT
+                else
+                    Defaults.ADB_PORT
+            } else {
+                val input = s.trim()
+                val colonCount = input.count { it == ':' }
+                if (colonCount > 1) {
+                    host = input
+                    port = Defaults.ADB_PORT
+                } else {
+                    val parts = input.split(":", limit = 2)
+                    host = parts[0].trim()
+                    port = if (parts.size >= 2)
+                        parts[1].trim().toIntOrNull() ?: Defaults.ADB_PORT
+                    else
+                        Defaults.ADB_PORT
+                }
             }
+            return ConnectionTarget(host = host, port = port)
         }
     }
 }

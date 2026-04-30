@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import io.github.miuzarte.scrcpyforandroid.R
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
@@ -147,13 +149,13 @@ private fun SliderInputDialog(
 
         Row(horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(
-                text = "取消",
+                text = stringResource(R.string.button_cancel),
                 onClick = onDismissRequest,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(20.dp))
             TextButton(
-                text = "确定",
+                text = stringResource(R.string.button_confirm),
                 onClick = {
                     val inputValue = text.toFloatOrNull() ?: 0f
                     if (inputValue >= inputValueRange.start && inputValue <= inputValueRange.endInclusive) {
