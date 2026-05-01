@@ -9,9 +9,3 @@
 - ~~orientation locking~~
 
 ## FEATURES
-
-### LOWER PRIORITY
-
-顺序无关
-
-- I18N
