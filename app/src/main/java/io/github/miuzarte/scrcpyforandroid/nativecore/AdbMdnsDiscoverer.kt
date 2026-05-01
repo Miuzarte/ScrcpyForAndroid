@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
@@ -85,7 +86,7 @@ internal object AdbMdnsDiscoverer {
 
                     override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                         if (discoveryFinished.get()) return
-                        val hostAddress = serviceInfo.hostAddresses[0].hostAddress ?: return
+                        val hostAddress = resolvedHostAddress(serviceInfo) ?: return
                         if (hostAddress.isBlank()) return
 
                         if (!includeLanDevices) {
@@ -127,6 +128,14 @@ internal object AdbMdnsDiscoverer {
         val host = resultHost.get()
         return if (port > 0 && !host.isNullOrBlank()) host to port else null
     }
+
+    @Suppress("DEPRECATION")
+    @SuppressLint("NewApi")
+    private fun resolvedHostAddress(serviceInfo: NsdServiceInfo): String? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            serviceInfo.hostAddresses.firstOrNull()?.hostAddress
+        else
+            serviceInfo.host?.hostAddress
 
     private fun isPortOpened(port: Int): Boolean = try {
         ServerSocket().use {
