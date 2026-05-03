@@ -17,6 +17,10 @@
 > [!NOTE]
 > 本项目基于 scrcpy，但并非其官方版本，与原作者及维护团队不存在任何隶属或合作关系
 
+## 下载
+
+\> [releases](https://github.com/Miuzarte/ScrcpyForAndroid/releases)
+
 ## 截图
 
 <p align="center">

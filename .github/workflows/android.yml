@@ -168,10 +168,11 @@ jobs:
 
           notes_file="dist/RELEASE_NOTES.md"
           download_base_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          proxy_base_url="https://github.miuzarte.top/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
 
           {
-            echo "| 架构 | 构建类型 | 文件 | SHA256 | 大小 |"
-            echo "| --- | --- | --- | --- | --- |"
+            echo "| 架构 | 文件 | 大小<br>SHA256 |"
+            echo "| ---- | ---- | -------------- |"
 
             shopt -s nullglob
             for apk in dist/*.apk; do
@@ -190,14 +191,13 @@ jobs:
                 arch="arm_all"
               fi
 
-              build_type="release"
-
               file_url="${download_base_url}/${file_name}"
+              proxy_url="${proxy_base_url}/${file_name}"
               sha256_value="$(sha256sum "$apk" | awk '{print $1}')"
               size_bytes="$(stat -c%s "$apk")"
               size_mb="$(awk -v bytes="$size_bytes" 'BEGIN { printf "%.1f MB", bytes / 1048576 }')"
 
-              echo "| ${arch} | ${build_type} | [${file_name}](${file_url}) | ${sha256_value} | ${size_mb} |"
+              echo "| ${arch} | [${file_name}](${file_url})<br>[你的反代跨越了半个地球🐌<br>但是你套的Cloudflare☁️又弥补了这一部分🚀](${proxy_url}) | ${size_mb}<br>\`${sha256_value}\` |"
             done
           } > "$notes_file"
 
