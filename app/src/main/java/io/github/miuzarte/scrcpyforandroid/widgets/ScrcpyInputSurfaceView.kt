@@ -36,6 +36,7 @@ class ScrcpyInputSurfaceView @JvmOverloads constructor(
     }
 
     override fun onKeyPreIme(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) return super.onKeyPreIme(keyCode, event)
         if (inputCallbacks?.handleKeyEvent(event) == true) return true
         return super.onKeyPreIme(keyCode, event)
     }
@@ -58,6 +59,7 @@ class ScrcpyInputSurfaceView @JvmOverloads constructor(
             }
 
             override fun sendKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK) return super.sendKeyEvent(event)
                 if (inputCallbacks?.handleKeyEvent(event) == true) return true
                 return super.sendKeyEvent(event)
             }

@@ -85,6 +85,7 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
+import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
@@ -1006,7 +1007,7 @@ fun ScrcpyVideoSurface(
         if (imeRequestToken == 0) return@LaunchedEffect
         val surfaceView = currentSurfaceView ?: return@LaunchedEffect
         surfaceView.setCommitTextEnabled(true)
-        io.github.miuzarte.scrcpyforandroid.services.LocalInputService.showSoftKeyboard(surfaceView)
+        LocalInputService.showSoftKeyboard(surfaceView)
     }
 
     DisposableEffect(lifecycleOwner, session, currentSurface) {
