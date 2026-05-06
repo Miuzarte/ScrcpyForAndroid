@@ -197,7 +197,7 @@ jobs:
               size_bytes="$(stat -c%s "$apk")"
               size_mb="$(awk -v bytes="$size_bytes" 'BEGIN { printf "%.1f MB", bytes / 1048576 }')"
 
-              echo "| ${arch} | [${file_name}](${file_url})<br>[你的反代跨越了半个地球🐌<br>但是你套的Cloudflare☁️又弥补了这一部分🚀](${proxy_url}) | ${size_mb}<br>\`${sha256_value}\` |"
+              echo "| ${arch} | [${file_name}](${file_url})<br><br>[你的反代跨越了半个地球🐌<br>但是你套的Cloudflare☁️又弥补了这一部分🚀](${proxy_url}) | ${size_mb}<br>\`${sha256_value}\` |"
             done
           } > "$notes_file"
 
