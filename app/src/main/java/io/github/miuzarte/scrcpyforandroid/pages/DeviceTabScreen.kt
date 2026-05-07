@@ -58,7 +58,6 @@ import io.github.miuzarte.scrcpyforandroid.services.ConnectionStateStore
 import io.github.miuzarte.scrcpyforandroid.services.DeviceAdbAutoReconnectManager
 import io.github.miuzarte.scrcpyforandroid.services.DeviceAdbConnectionCoordinator
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
@@ -77,12 +76,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
@@ -91,7 +88,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 private const val PREVIEW_CARD_ITEM_KEY = "preview_card"
@@ -117,7 +114,6 @@ internal fun DeviceTabScreen(
     val viewModel: DeviceTabViewModel = viewModel(factory = viewModelFactory)
 
     val navigator = LocalRootNavigator.current
-    var showThreePointMenu by rememberSaveable { mutableStateOf(false) }
     var useCompactTopAppBar by remember { mutableStateOf(false) }
     var showTwoPaneSideAction by remember { mutableStateOf(false) }
     var configPanelOnLeft by remember { mutableStateOf(true) }
@@ -145,56 +141,35 @@ internal fun DeviceTabScreen(
                             )
                         }
                     }
-                    Box {
-                        IconButton(
-                            onClick = { showThreePointMenu = true },
-                            holdDownState = showThreePointMenu,
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.More,
-                                contentDescription = stringResource(R.string.cd_more),
-                            )
-                        }
-                        OverlayListPopup(
-                            show = showThreePointMenu,
-                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                            alignment = PopupPositionProvider.Align.TopEnd,
-                            onDismissRequest = { showThreePointMenu = false },
-                        ) {
-                            ListPopupColumn {
-                                DropdownImpl(
+                    OverlayIconDropdownMenu(
+                        entry = DropdownEntry(
+                            items = listOf(
+                                DropdownItem(
                                     text = stringResource(R.string.device_menu_quick_sort),
-                                    optionSize = 3,
-                                    isSelected = false,
-                                    index = 0,
-                                    onSelectedIndexChange = {
+                                    onClick = {
                                         onOpenReorderDevices()
-                                        showThreePointMenu = false
                                     },
-                                )
-                                DropdownImpl(
+                                ),
+                                DropdownItem(
                                     text = stringResource(R.string.device_menu_virtual_button_sort),
-                                    optionSize = 3,
-                                    isSelected = false,
-                                    index = 1,
-                                    onSelectedIndexChange = {
+                                    onClick = {
                                         navigator.push(RootScreen.VirtualButtonOrder)
-                                        showThreePointMenu = false
                                     },
-                                )
-                                DropdownImpl(
+                                ),
+                                DropdownItem(
                                     text = stringResource(R.string.device_menu_clear_logs),
-                                    optionSize = 3,
-                                    isSelected = false,
-                                    index = 2,
                                     enabled = EventLogger.hasLogs(),
-                                    onSelectedIndexChange = {
+                                    onClick = {
                                         EventLogger.clearLogs()
-                                        showThreePointMenu = false
                                     },
                                 )
-                            }
-                        }
+                            )
+                        )
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.More,
+                            contentDescription = stringResource(R.string.cd_more),
+                        )
                     }
                 }
                 if (useCompactTopAppBar) SmallTopAppBar(

@@ -71,12 +71,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.DropdownDefaults
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -690,7 +690,7 @@ class VirtualButtonBar(
         val haptic = LocalHapticFeedback.current
         val spinnerItems = actions.map { action ->
             val title = stringResource(action.titleResId)
-            SpinnerEntry(
+            DropdownItem(
                 icon = {
                     Icon(
                         imageVector = action.icon,
@@ -719,7 +719,7 @@ class VirtualButtonBar(
                             entryCount = spinnerItems.size,
                             isSelected = false,
                             index = index,
-                            spinnerColors = SpinnerDefaults.spinnerColors(),
+                            spinnerColors = DropdownDefaults.dropdownColors(),
                             dialogMode = false,
                             onSelectedIndexChange = { selectedIdx ->
                                 haptic.confirm()

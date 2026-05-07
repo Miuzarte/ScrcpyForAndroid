@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.basic.SpinnerColors
+import top.yukonga.miuix.kmp.basic.DropdownColors
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -32,7 +32,7 @@ fun SpinnerItemImpl(
     entryCount: Int,
     isSelected: Boolean,
     index: Int,
-    spinnerColors: SpinnerColors,
+    spinnerColors: DropdownColors,
     dialogMode: Boolean = false,
     enabled: Boolean = true,
     onSelectedIndexChange: (Int) -> Unit,

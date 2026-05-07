@@ -53,7 +53,6 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.DirectoryDownloadSnapshot
 import io.github.miuzarte.scrcpyforandroid.services.FileManagerService
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.RemoteFileEntry
 import io.github.miuzarte.scrcpyforandroid.services.RemoteFileKind
 import io.github.miuzarte.scrcpyforandroid.services.RemoteFileStat
@@ -61,12 +60,10 @@ import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.DropdownImpl
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.PullToRefreshState
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -79,9 +76,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Tune
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 private const val INITIAL_REMOTE_PATH = "/storage/emulated/0"
@@ -216,43 +213,33 @@ fun FileManagerScreen(
                         )
                     },
                     actions = {
-                        Box {
-                            IconButton(
-                                onClick = { showSortMenu = true },
-                                holdDownState = showSortMenu
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.Tune,
-                                    contentDescription = stringResource(R.string.fm_cd_sort),
-                                )
-                            }
-                            OverlayListPopup(
-                                show = showSortMenu,
-                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                onDismissRequest = { showSortMenu = false },
-                            ) {
-                                ListPopupColumn {
-                                    val sortOptions = listOf(
-                                        stringResource(R.string.fm_sort_name),
-                                        stringResource(R.string.fm_sort_size),
-                                        stringResource(R.string.fm_sort_time),
-                                        stringResource(R.string.fm_sort_extension),
-                                    )
-                                    val sortFieldIdx = when (sortField) {
-                                        FileManagerSortField.NAME -> 0
-                                        FileManagerSortField.SIZE -> 1
-                                        FileManagerSortField.TIME -> 2
-                                        FileManagerSortField.EXTENSION -> 3
-                                    }
-                                    sortOptions.forEachIndexed { i, option ->
-                                        DropdownImpl(
+                        val sortOptions = listOf(
+                            stringResource(R.string.fm_sort_name),
+                            stringResource(R.string.fm_sort_size),
+                            stringResource(R.string.fm_sort_time),
+                            stringResource(R.string.fm_sort_extension),
+                        )
+                        val sortFieldIdx = when (sortField) {
+                            FileManagerSortField.NAME -> 0
+                            FileManagerSortField.SIZE -> 1
+                            FileManagerSortField.TIME -> 2
+                            FileManagerSortField.EXTENSION -> 3
+                        }
+                        val dirOptions = listOf(
+                            stringResource(R.string.fm_sort_asc),
+                            stringResource(R.string.fm_sort_desc),
+                        )
+                        val dirIdx = if (sortDescending) 1 else 0
+                        OverlayIconDropdownMenu(
+                            entries = listOf(
+                                DropdownEntry(
+                                    items = sortOptions.mapIndexed { i, option ->
+                                        DropdownItem(
                                             text = option,
-                                            optionSize = sortOptions.size,
-                                            isSelected = i == sortFieldIdx,
-                                            index = i,
-                                            onSelectedIndexChange = { index ->
+                                            selected = i == sortFieldIdx,
+                                            onClick = {
                                                 viewModel.updateSort(
-                                                    sortBy = when (index) {
+                                                    sortBy = when (i) {
                                                         1 -> FileManagerSortField.SIZE
                                                         2 -> FileManagerSortField.TIME
                                                         3 -> FileManagerSortField.EXTENSION
@@ -262,67 +249,51 @@ fun FileManagerScreen(
                                             },
                                         )
                                     }
-                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                                    val dirOptions = listOf(
-                                        stringResource(R.string.fm_sort_asc),
-                                        stringResource(R.string.fm_sort_desc),
-                                    )
-                                    val dirIdx = if (sortDescending) 1 else 0
-                                    dirOptions.forEachIndexed { i, option ->
-                                        DropdownImpl(
+                                ),
+                                DropdownEntry(
+                                    items = dirOptions.mapIndexed { i, option ->
+                                        DropdownItem(
                                             text = option,
-                                            optionSize = dirOptions.size,
-                                            isSelected = i == dirIdx,
-                                            index = i,
-                                            onSelectedIndexChange = { index ->
+                                            selected = i == dirIdx,
+                                            onClick = {
                                                 viewModel.updateSort(
-                                                    descending = index == 1
+                                                    descending = i == 1
                                                 )
                                             },
                                         )
                                     }
-                                }
-                            }
+                                ),
+                            )
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.Tune,
+                                contentDescription = stringResource(R.string.fm_cd_sort),
+                            )
                         }
-                        Box {
-                            IconButton(
-                                onClick = { showMenu = true },
-                                holdDownState = showMenu,
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.More,
-                                    contentDescription = stringResource(R.string.cd_more),
-                                )
-                            }
-                            OverlayListPopup(
-                                show = showMenu,
-                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                onDismissRequest = { showMenu = false },
-                            ) {
-                                ListPopupColumn {
-                                    DropdownImpl(
+
+                        OverlayIconDropdownMenu(
+                            entry = DropdownEntry(
+                                items = listOf(
+                                    DropdownItem(
                                         text = stringResource(R.string.fm_menu_create_folder),
-                                        optionSize = 2,
-                                        isSelected = false,
-                                        index = 0,
-                                        onSelectedIndexChange = {
-                                            showMenu = false
+                                        onClick = {
                                             newFolderName = ""
                                             showCreateFolderDialog = true
                                         },
-                                    )
-                                    DropdownImpl(
+                                    ),
+                                    DropdownItem(
                                         text = stringResource(R.string.fm_menu_upload),
-                                        optionSize = 2,
-                                        isSelected = false,
-                                        index = 1,
-                                        onSelectedIndexChange = {
-                                            showMenu = false
+                                        onClick = {
                                             uploadLauncher.launch(arrayOf("*/*"))
                                         },
                                     )
-                                }
-                            }
+                                )
+                            )
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = stringResource(R.string.cd_more),
+                            )
                         }
                     },
                 )

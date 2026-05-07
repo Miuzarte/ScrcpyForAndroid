@@ -1,21 +1,19 @@
 package io.github.miuzarte.scrcpyforandroid.scaffolds
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.miuix.OverlaySpinnerPreference
 import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
+import top.yukonga.miuix.kmp.basic.DropdownColors
+import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
-import top.yukonga.miuix.kmp.basic.SpinnerColors
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
 
 /**
  * [OverlaySpinnerPreference] wrapper with fallback value display and loading state.
@@ -34,7 +32,7 @@ fun OverlaySpinnerWithFallback(
     titleColor: BasicComponentColors = BasicComponentDefaults.titleColor(),
     summary: String? = null,
     summaryColor: BasicComponentColors = BasicComponentDefaults.summaryColor(),
-    spinnerColors: SpinnerColors = SpinnerDefaults.spinnerColors(),
+    spinnerColors: DropdownColors = DropdownDefaults.dropdownColors(),
     startAction: @Composable (() -> Unit)? = null,
     bottomAction: (@Composable () -> Unit)? = null,
     insideMargin: PaddingValues = BasicComponentDefaults.InsideMargin,

@@ -725,7 +725,6 @@ fun MainScreen() {
 
     MiuixTheme(
         controller = themeController,
-        smoothRounding = asBundle.smoothCorner,
     ) {
         CompositionLocalProvider(
             LocalEnableBlur provides asBundle.blur,

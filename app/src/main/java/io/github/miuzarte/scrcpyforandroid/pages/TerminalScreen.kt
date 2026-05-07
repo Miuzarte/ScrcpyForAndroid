@@ -38,8 +38,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,16 +52,14 @@ import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
@@ -69,8 +67,8 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import java.io.File
 import kotlin.math.abs
@@ -98,7 +96,6 @@ fun TerminalScreen(
     val context = LocalContext.current
     val blurBackdrop = rememberBlurBackdrop(LocalEnableBlur.current)
     val blurActive = blurBackdrop != null
-    var showMenu by rememberSaveable { mutableStateOf(false) }
     var showOutputSheet by rememberSaveable { mutableStateOf(false) }
     var output by rememberSaveable { mutableStateOf("") }
 
@@ -111,45 +108,29 @@ fun TerminalScreen(
                         if (blurActive) Color.Transparent
                         else colorScheme.surface,
                     actions = {
-                        Box {
-                            IconButton(
-                                onClick = { showMenu = true },
-                                holdDownState = showMenu,
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.More,
-                                    contentDescription = stringResource(R.string.cd_more),
-                                )
-                            }
-                            OverlayListPopup(
-                                show = showMenu,
-                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                onDismissRequest = { showMenu = false },
-                            ) {
-                                ListPopupColumn {
-                                    DropdownImpl(
+                        OverlayIconDropdownMenu(
+                            entry = DropdownEntry(
+                                items = listOf(
+                                    DropdownItem(
                                         text = stringResource(R.string.terminal_menu_free_copy),
-                                        optionSize = 2,
-                                        isSelected = false,
-                                        index = 0,
                                         enabled = output.isNotBlank(),
-                                        onSelectedIndexChange = {
-                                            showMenu = false
+                                        onClick = {
                                             showOutputSheet = true
                                         },
-                                    )
-                                    DropdownImpl(
+                                    ),
+                                    DropdownItem(
                                         text = stringResource(R.string.terminal_menu_clear_screen),
-                                        optionSize = 2,
-                                        isSelected = false,
-                                        index = 1,
-                                        onSelectedIndexChange = {
-                                            showMenu = false
+                                        onClick = {
                                             output = ""
                                         },
                                     )
-                                }
-                            }
+                                )
+                            )
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = stringResource(R.string.cd_more),
+                            )
                         }
                     },
                 )
@@ -175,7 +156,6 @@ fun TerminalScreen(
                 output = output,
                 onDismissRequest = { showOutputSheet = false },
                 onCopyAll = {
-                    showMenu = false
                     LocalInputService.setClipboardText(context, output)
                     AppRuntime.snackbar(R.string.terminal_copied_all)
                 },

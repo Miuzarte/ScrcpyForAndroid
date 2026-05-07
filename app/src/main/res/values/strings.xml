@@ -246,6 +246,8 @@
     <string name="pref_summary_clear_logs_on_exit">Clear logs when double-pressing back to exit the app</string>
     <string name="pref_title_hide_log_box">Hide device page log box</string>
     <string name="pref_summary_hide_log_box">Hide the log box at the bottom of the device page</string>
+    <string name="pref_title_language">Language</string>
+    <string name="pref_summary_language">App display language</string>
 
     <!-- Terminal -->
     <string name="terminal_title">Terminal</string>
@@ -551,4 +553,9 @@
     <string name="vm_mdns_updated">mDNS discovered new port, updated quick device: %1$s:%2$s -> %1$s:%3$s</string>
     <string name="vm_quick_probe_success">ADB quick probe connection succeeded: %1$s:%2$s</string>
     <string name="vm_device_switched_profile">Current connected device switched to profile: %1$s</string>
+
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_english">English</string>
+    <string name="language_chinese">Chinese</string>
+
 </resources>

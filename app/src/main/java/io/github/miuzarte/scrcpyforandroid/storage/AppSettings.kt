@@ -88,6 +88,10 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     }
 
     companion object {
+        val LANGUAGE_TAG = Pair(
+            stringPreferencesKey("language_tag"),
+            "",
+        )
         // Theme
         val THEME_BASE_INDEX = Pair(
             intPreferencesKey("theme_base_index"),
@@ -119,10 +123,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         )
         val FLOATING_BOTTOM_BAR_BLUR = Pair(
             booleanPreferencesKey("floating_bottom_bar_blur"),
-            false,
-        )
-        val SMOOTH_CORNER = Pair(
-            booleanPreferencesKey("smooth_corner"),
             false,
         )
 
@@ -302,6 +302,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
     @Parcelize
     data class Bundle(
         // Theme
+        val languageTag: String,
         val themeBaseIndex: Int,
         val monet: Boolean,
         val monetSeedIndex: Int,
@@ -310,7 +311,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val blur: Boolean,
         val floatingBottomBar: Boolean,
         val floatingBottomBarBlur: Boolean,
-        val smoothCorner: Boolean,
 
         // Scrcpy
         val lowLatency: Boolean,
@@ -365,6 +365,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
 
     private val bundleFields = arrayOf<BundleField<Bundle>>(
         // Theme
+        bundleField(LANGUAGE_TAG) { it.languageTag },
         bundleField(THEME_BASE_INDEX) { it.themeBaseIndex },
         bundleField(MONET) { it.monet },
         bundleField(MONET_SEED_INDEX) { it.monetSeedIndex },
@@ -373,7 +374,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         bundleField(BLUR) { it.blur },
         bundleField(FLOATING_BOTTOM_BAR) { it.floatingBottomBar },
         bundleField(FLOATING_BOTTOM_BAR_BLUR) { it.floatingBottomBarBlur },
-        bundleField(SMOOTH_CORNER) { it.smoothCorner },
 
         // Scrcpy
         bundleField(LOW_LATENCY) { it.lowLatency },
@@ -429,6 +429,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
 
     private fun bundleFromPreferences(preferences: Preferences) = Bundle(
         // Theme
+        languageTag = preferences.read(LANGUAGE_TAG),
         themeBaseIndex = preferences.read(THEME_BASE_INDEX),
         monet = preferences.read(MONET),
         monetSeedIndex = preferences.read(MONET_SEED_INDEX),
@@ -437,7 +438,6 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         blur = preferences.read(BLUR),
         floatingBottomBar = preferences.read(FLOATING_BOTTOM_BAR),
         floatingBottomBarBlur = preferences.read(FLOATING_BOTTOM_BAR_BLUR),
-        smoothCorner = preferences.read(SMOOTH_CORNER),
 
         // Scrcpy
         lowLatency = preferences.read(LOW_LATENCY),

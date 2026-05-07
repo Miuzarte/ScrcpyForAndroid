@@ -84,12 +84,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -102,9 +100,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Store
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
@@ -230,35 +228,23 @@ internal fun ScrcpyAllOptionsScreen(
                         }
                     },
                     actions = {
-                        Box {
-                            IconButton(
-                                onClick = { showProfileMenu = true },
-                                holdDownState = showProfileMenu,
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.More,
-                                    contentDescription = stringResource(R.string.scrcpyopt_cd_profile_manage),
-                                )
-                            }
-                            OverlayListPopup(
-                                show = showProfileMenu,
-                                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                                alignment = PopupPositionProvider.Align.TopEnd,
-                                onDismissRequest = { showProfileMenu = false },
-                            ) {
-                                ListPopupColumn {
-                                    DropdownImpl(
+                        OverlayIconDropdownMenu(
+                            entry = DropdownEntry(
+                                items = listOf(
+                                    DropdownItem(
                                         text = stringResource(R.string.scrcpyopt_manage_profiles),
-                                        optionSize = 1,
-                                        isSelected = false,
-                                        index = 0,
-                                        onSelectedIndexChange = {
+                                        onClick = {
                                             showManageProfilesSheet = true
                                             showProfileMenu = false
                                         },
                                     )
-                                }
-                            }
+                                )
+                            )
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.More,
+                                contentDescription = stringResource(R.string.scrcpyopt_cd_profile_manage),
+                            )
                         }
                     },
                     scrollBehavior = scrollBehavior,

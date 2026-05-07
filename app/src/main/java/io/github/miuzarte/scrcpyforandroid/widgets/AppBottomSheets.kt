@@ -17,15 +17,15 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import top.yukonga.miuix.kmp.basic.DropdownColors
+import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SpinnerColors
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Store
@@ -51,7 +51,6 @@ fun AppListBottomSheet(
     onDismissRequest: () -> Unit,
     onRefresh: () -> Unit,
 ) {
-    val spinnerColors = SpinnerDefaults.spinnerColors()
     OverlayBottomSheet(
         show = show,
         title = title,
@@ -98,7 +97,7 @@ fun AppListBottomSheet(
                     items(items = entries, key = { it.key }) { entry ->
                         AppListBottomSheetItem(
                             entry = entry,
-                            spinnerColors = spinnerColors,
+                            spinnerColors = DropdownDefaults.dropdownColors(),
                         )
                     }
                 }
@@ -110,7 +109,7 @@ fun AppListBottomSheet(
 @Composable
 private fun AppListBottomSheetItem(
     entry: AppListEntry,
-    spinnerColors: SpinnerColors,
+    spinnerColors: DropdownColors,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,

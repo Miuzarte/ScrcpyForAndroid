@@ -246,6 +246,8 @@
     <string name="pref_summary_clear_logs_on_exit">双击返回退出应用时清除日志</string>
     <string name="pref_title_hide_log_box">隐藏设备页日志框</string>
     <string name="pref_summary_hide_log_box">隐藏设备页最下方的日志框</string>
+    <string name="pref_title_language">语言</string>
+    <string name="pref_summary_language">应用显示语言</string>
 
     <!-- Terminal -->
     <string name="terminal_title">终端</string>
@@ -551,4 +553,9 @@
     <string name="vm_mdns_updated">mDNS 发现新端口，已更新快速设备：%1$s:%2$s -> %1$s:%3$s</string>
     <string name="vm_quick_probe_success">ADB 快速探测连接成功：%1$s:%2$s</string>
     <string name="vm_device_switched_profile">当前连接设备已切换为配置：%1$s</string>
+
+    <string name="language_follow_system">跟随系统</string>
+    <string name="language_english">英语</string>
+    <string name="language_chinese">中文</string>
+
 </resources>

@@ -1,11 +1,11 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.LockscreenPasswordActivity
+import io.github.miuzarte.scrcpyforandroid.MainActivity
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.nativecore.DirectAdbTransport
@@ -87,6 +88,11 @@ import java.io.File
 import kotlin.math.roundToInt
 import android.provider.Settings as AndroidSettings
 
+private val languages = listOf(
+    R.string.language_follow_system to "",
+    R.string.language_english to "en",
+    R.string.language_chinese to "zh",
+)
 private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 private val monetPaletteStyleOptions = ThemePaletteStyle.entries.map { it.name }
 private val monetColorSpecOptions = ThemeColorSpec.entries.map { it.name }
@@ -159,6 +165,7 @@ fun SettingsPage(
     bottomInnerPadding: Dp,
     onOpenReorderDevices: () -> Unit,
 ) {
+    val activity = LocalActivity.current
     val context = LocalContext.current
     val updateState by AppUpdateChecker.state.collectAsState()
 
@@ -293,6 +300,27 @@ fun SettingsPage(
             SectionSmallTitle(stringResource(R.string.section_theme))
             Card {
                 OverlayDropdownPreference(
+                    title = stringResource(R.string.pref_title_language),
+                    summary = stringResource(R.string.pref_summary_language),
+                    entries = listOf(
+                        DropdownEntry(
+                            items = languages.map { lang ->
+                                DropdownItem(
+                                    text = stringResource(lang.first),
+                                    selected = lang.second == asBundle.languageTag,
+                                    onClick = {
+                                        asBundle = asBundle.copy(
+                                            languageTag = lang.second
+                                        )
+                                        MainActivity.setAppLanguageTag(context, lang.second)
+                                        activity?.recreate()
+                                    },
+                                )
+                            },
+                        ),
+                    ),
+                )
+                OverlayDropdownPreference(
                     title = stringResource(R.string.pref_title_appearance_mode),
                     summary = stringResource(R.string.pref_summary_appearance_mode),
                     items = themeItems,
@@ -393,16 +421,6 @@ fun SettingsPage(
                         )
                     }
                 }
-                SwitchPreference(
-                    title = stringResource(R.string.pref_title_smooth_corners),
-                    summary = stringResource(R.string.pref_summary_smooth_corners),
-                    checked = asBundle.smoothCorner,
-                    onCheckedChange = {
-                        asBundle = asBundle.copy(
-                            smoothCorner = it
-                        )
-                    }
-                )
             }
         }
 
@@ -535,33 +553,41 @@ fun SettingsPage(
                             entries = listOf(
                                 DropdownEntry(
                                     items = FullscreenVirtualButtonDock
-                                        .modeItemsResIds.map { DropdownItem(stringResource(it)) },
-                                    selectedIndex = fullscreenVirtualButtonDock.modeIndex,
-                                    onSelectedIndexChange = { modeIndex ->
-                                        asBundle = asBundle.copy(
-                                            fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
-                                                .fromModeAndDirection(
-                                                    modeIndex = modeIndex,
-                                                    directionIndex = fullscreenVirtualButtonDock.directionIndex,
-                                                )
-                                                .toStoredValue()
-                                        )
-                                    },
+                                        .modeItemsResIds.mapIndexed { index, id ->
+                                            DropdownItem(
+                                                text = stringResource(id),
+                                                selected = index == fullscreenVirtualButtonDock.modeIndex,
+                                                onClick = {
+                                                    asBundle = asBundle.copy(
+                                                        fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
+                                                            .fromModeAndDirection(
+                                                                modeIndex = index,
+                                                                directionIndex = fullscreenVirtualButtonDock.directionIndex,
+                                                            )
+                                                            .toStoredValue()
+                                                    )
+                                                },
+                                            )
+                                        },
                                 ),
                                 DropdownEntry(
                                     items = FullscreenVirtualButtonDock
-                                        .directionItemsResIds.map { DropdownItem(stringResource(it)) },
-                                    selectedIndex = fullscreenVirtualButtonDock.directionIndex,
-                                    onSelectedIndexChange = { directionIndex ->
-                                        asBundle = asBundle.copy(
-                                            fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
-                                                .fromModeAndDirection(
-                                                    modeIndex = fullscreenVirtualButtonDock.modeIndex,
-                                                    directionIndex = directionIndex,
-                                                )
-                                                .toStoredValue()
-                                        )
-                                    },
+                                        .directionItemsResIds.mapIndexed { index, id ->
+                                            DropdownItem(
+                                                text = stringResource(id),
+                                                selected = index == fullscreenVirtualButtonDock.directionIndex,
+                                                onClick = {
+                                                    asBundle = asBundle.copy(
+                                                        fullscreenVirtualButtonDock = FullscreenVirtualButtonDock
+                                                            .fromModeAndDirection(
+                                                                modeIndex = fullscreenVirtualButtonDock.modeIndex,
+                                                                directionIndex = index,
+                                                            )
+                                                            .toStoredValue()
+                                                    )
+                                                },
+                                            )
+                                        },
                                 ),
                             ),
                             title = stringResource(R.string.pref_title_virtual_button_direction),

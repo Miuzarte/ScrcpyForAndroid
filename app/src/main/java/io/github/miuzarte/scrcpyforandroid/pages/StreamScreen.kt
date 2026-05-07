@@ -101,7 +101,6 @@ fun StreamScreen(activity: StreamActivity) {
 
     MiuixTheme(
         controller = themeController,
-        smoothRounding = asBundle.smoothCorner,
     ) {
         CompositionLocalProvider(
             LocalSnackbarController provides snackbarController,

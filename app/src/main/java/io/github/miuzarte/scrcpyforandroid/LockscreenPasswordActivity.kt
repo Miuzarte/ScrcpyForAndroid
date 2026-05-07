@@ -7,7 +7,6 @@ import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -37,13 +36,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.BiometricGate
 import io.github.miuzarte.scrcpyforandroid.password.PasswordCreatedState
@@ -66,19 +66,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
-import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -88,9 +84,9 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -124,7 +120,6 @@ class LockscreenPasswordActivity : FragmentActivity() {
             }
             MiuixTheme(
                 controller = themeController,
-                smoothRounding = asBundle.smoothCorner,
             ) {
                 CompositionLocalProvider(
                     LocalSnackbarController provides snackbarController,
@@ -181,7 +176,6 @@ private fun LockscreenPasswordScreen(
     }
 
     val entries by PasswordRepository.entriesState.collectAsState()
-    var showMenu by rememberSaveable { mutableStateOf(false) }
     var pendingCreate by rememberSaveable { mutableStateOf(false) }
     var showRiskDialog by rememberSaveable { mutableStateOf(!BiometricGate.isDeviceSecure()) }
     var showDisableDialog by rememberSaveable { mutableStateOf(false) }
@@ -191,10 +185,10 @@ private fun LockscreenPasswordScreen(
     var editorInitialName by rememberSaveable { mutableStateOf("") }
 
     DisposableEffect(Unit) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+        val observer = LifecycleEventObserver { _, event ->
             if (
-                event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE ||
-                event == androidx.lifecycle.Lifecycle.Event.ON_STOP
+                event == Lifecycle.Event.ON_PAUSE ||
+                event == Lifecycle.Event.ON_STOP
             ) {
                 editorInitialName = ""
             }
@@ -205,8 +199,8 @@ private fun LockscreenPasswordScreen(
 
     val textCreate = stringResource(R.string.password_authenticate_create)
     val textSubtitle = stringResource(R.string.password_authenticate_subtitle)
-    LaunchedEffect(pendingCreate, showMenu) {
-        if (!pendingCreate || showMenu) return@LaunchedEffect
+    LaunchedEffect(pendingCreate) {
+        if (!pendingCreate) return@LaunchedEffect
         if (asBundle.passwordRequireAuth) {
             val ok = BiometricGate.authenticate(
                 activity = activity,
@@ -246,37 +240,23 @@ private fun LockscreenPasswordScreen(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(
-                            onClick = { showMenu = true },
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.More,
-                                contentDescription = stringResource(R.string.cd_more),
-                            )
-                        }
-                        val textCreateNew = stringResource(R.string.password_create_new)
-                        OverlayListPopup(
-                            show = showMenu,
-                            popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                            alignment = PopupPositionProvider.Align.TopEnd,
-                            onDismissRequest = { showMenu = false },
-                        ) {
-                            ListPopupColumn {
-                                SpinnerItemImpl(
-                                    entry = SpinnerEntry(title = textCreateNew),
-                                    entryCount = 1,
-                                    isSelected = false,
-                                    index = 0,
-                                    spinnerColors = SpinnerDefaults.spinnerColors(),
-                                    dialogMode = false,
-                                    onSelectedIndexChange = {
-                                        showMenu = false
+                    val textCreateNew = stringResource(R.string.password_create_new)
+                    OverlayIconDropdownMenu(
+                        entry = DropdownEntry(
+                            items = listOf(
+                                DropdownItem(
+                                    text = textCreateNew,
+                                    onClick = {
                                         pendingCreate = true
-                                    },
+                                    }
                                 )
-                            }
-                        }
+                            )
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.More,
+                            contentDescription = stringResource(R.string.cd_more),
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,

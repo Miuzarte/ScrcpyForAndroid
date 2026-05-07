@@ -22,10 +22,10 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.DropdownArrowEndAction
+import top.yukonga.miuix.kmp.basic.DropdownColors
+import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.SpinnerColors
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -44,7 +44,7 @@ fun OverlaySpinnerPreference(
     titleColor: BasicComponentColors = BasicComponentDefaults.titleColor(),
     summary: String? = null,
     summaryColor: BasicComponentColors = BasicComponentDefaults.summaryColor(),
-    spinnerColors: SpinnerColors = SpinnerDefaults.spinnerColors(),
+    spinnerColors: DropdownColors = DropdownDefaults.dropdownColors(),
     startAction: @Composable (() -> Unit)? = null,
     bottomAction: (@Composable () -> Unit)? = null,
     insideMargin: PaddingValues = BasicComponentDefaults.InsideMargin,
@@ -145,7 +145,7 @@ private fun OverlaySpinnerPopup(
     onDismissFinished: () -> Unit,
     maxHeight: Dp?,
     hapticFeedback: HapticFeedback,
-    spinnerColors: SpinnerColors,
+    spinnerColors: DropdownColors,
     renderInRootScaffold: Boolean,
     onSelectedIndexChange: ((Int) -> Unit)?,
 ) {

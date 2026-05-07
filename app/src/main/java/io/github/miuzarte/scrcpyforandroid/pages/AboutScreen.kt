@@ -1,6 +1,5 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
@@ -72,7 +72,6 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.shapes.SmoothRoundedCornerShape
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 import java.util.Locale.getDefault
@@ -208,7 +207,7 @@ private fun AboutContent(
         Card(
             modifier = modifier.textureBlur(
                 backdrop = backdrop,
-                shape = SmoothRoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(16.dp),
                 blurRadius = 60f,
                 noiseCoefficient = BlurDefaults.NoiseCoefficient,
                 colors = BlurColors(blendColors = cardBlendColors),
@@ -285,7 +284,7 @@ private fun AboutContent(
                         }
                         .textureBlur(
                             backdrop = backdrop,
-                            shape = SmoothRoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(16.dp),
                             blurRadius = 150f,
                             noiseCoefficient = BlurDefaults.NoiseCoefficient,
                             colors = BlurColors(blendColors = heroBlendColors),
