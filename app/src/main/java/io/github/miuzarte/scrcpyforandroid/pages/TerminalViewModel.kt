@@ -17,13 +17,13 @@ import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.BundleSyncDelegate
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.SnackbarResult
 import java.nio.charset.StandardCharsets
@@ -67,31 +67,41 @@ internal class TerminalViewModel : ViewModel() {
     private val _shellConnecting = MutableStateFlow(false)
     val shellConnecting: StateFlow<Boolean> = _shellConnecting.asStateFlow()
 
-    private val shellWriteMutex = Mutex()
     private var shellStream: AdbSocketStream? = null
+    private var shellWriterJob: Job? = null
+    private var shellWriteChannel = Channel<ByteArray>(Channel.UNLIMITED)
 
     val sessionHolder = arrayOfNulls<TerminalSession>(1)
 
-    fun writeBytesToShell(data: ByteArray, offset: Int, count: Int) {
-        val stream = shellStream
-        if (stream == null || !_shellReady.value || stream.closed) return
-        val payload = data.copyOfRange(offset, offset + count)
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = runCatching {
-                shellWriteMutex.withLock {
+    private fun startShellWriter() {
+        shellWriteChannel = Channel(Channel.UNLIMITED)
+        shellWriterJob = viewModelScope.launch(Dispatchers.IO) {
+            for (payload in shellWriteChannel) {
+                val stream = shellStream ?: break
+                if (stream.closed) break
+                val result = runCatching {
                     stream.outputStream.write(payload)
                     stream.outputStream.flush()
                 }
-            }
-            withContext(Dispatchers.Main) {
-                result.onFailure { error ->
-                    AppRuntime.snackbar(
-                        R.string.terminal_snack_input_failed,
-                        error.message ?: error.javaClass.simpleName,
-                    )
+                if (result.isFailure) {
+                    withContext(Dispatchers.Main) {
+                        result.exceptionOrNull()?.let { error ->
+                            AppRuntime.snackbar(
+                                R.string.terminal_snack_input_failed,
+                                error.message ?: error.javaClass.simpleName,
+                            )
+                        }
+                    }
+                    break
                 }
             }
         }
+    }
+
+    fun writeBytesToShell(data: ByteArray, offset: Int, count: Int) {
+        if (!_shellReady.value) return
+        val payload = data.copyOfRange(offset, offset + count)
+        shellWriteChannel.trySend(payload)
     }
 
     fun writeClipboardToShell(context: Context) {
@@ -192,6 +202,7 @@ internal class TerminalViewModel : ViewModel() {
                 shellStream = stream
                 _shellReady.value = true
                 _shellConnecting.value = false
+                startShellWriter()
                 if (showKeyboardAfterConnect) requestFocus()
             }
 
@@ -214,6 +225,8 @@ internal class TerminalViewModel : ViewModel() {
             } finally {
                 runCatching { stream.close() }
                 withContext(Dispatchers.Main) {
+                    shellWriterJob?.cancel()
+                    shellWriterJob = null
                     if (shellStream === stream) shellStream = null
                     _shellReady.value = false
                     _shellConnecting.value = false
@@ -233,6 +246,8 @@ internal class TerminalViewModel : ViewModel() {
     }
 
     fun closeShell() {
+        shellWriterJob?.cancel()
+        shellWriterJob = null
         runCatching { shellStream?.close() }
         shellStream = null
         _shellReady.value = false
