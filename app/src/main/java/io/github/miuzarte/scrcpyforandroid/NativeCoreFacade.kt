@@ -8,7 +8,6 @@ import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
 import io.github.miuzarte.scrcpyforandroid.nativecore.PersistentVideoRenderer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
@@ -196,13 +195,10 @@ object NativeCoreFacade {
             if (currentDecoder == null) {
                 val info = scrcpy.currentSessionState.value
                 if (info != null && info.width > 0 && info.height > 0) {
-                    // Acquire session lifecycle mutex to create decoder safely
-                    runBlocking {
-                        sessionLifecycleMutex.withLock {
-                            if (decoder == null) {
-                                currentSessionInfo = info
-                                createOrReplaceDecoder(info)
-                            }
+                    synchronized(this@NativeCoreFacade) {
+                        if (decoder == null) {
+                            currentSessionInfo = info
+                            createOrReplaceDecoder(info)
                         }
                     }
                 }
@@ -210,12 +206,10 @@ object NativeCoreFacade {
                 // v4.0 flex display: rebuild decoder when session size changes
                 val info = scrcpy.currentSessionState.value
                 if (info != null && (info.width != currentSessionInfo?.width || info.height != currentSessionInfo?.height)) {
-                    runBlocking {
-                        sessionLifecycleMutex.withLock {
-                            if (decoder != null) {
-                                currentSessionInfo = info
-                                createOrReplaceDecoder(info)
-                            }
+                    synchronized(this@NativeCoreFacade) {
+                        if (decoder != null) {
+                            currentSessionInfo = info
+                            createOrReplaceDecoder(info)
                         }
                     }
                 }

@@ -705,11 +705,13 @@ fun FullscreenControlPage(
             )
             .onSizeChanged { size ->
                 touchAreaSize = size
-                val sessionKnown = scrcpy.currentSessionState.value
-                    ?.let { it.width > 0 && it.height > 0 }
-                    ?: false
-                if (sessionKnown) {
-                    resizeDebouncer.invoke(size.width, size.height)
+                if (scrcpy.flexDisplay) {
+                    val sessionKnown = scrcpy.currentSessionState.value?.let {
+                        it.width > 0 && it.height > 0
+                    } ?: false
+                    if (sessionKnown) {
+                        resizeDebouncer.invoke(size.width, size.height)
+                    }
                 }
             },
     ) {

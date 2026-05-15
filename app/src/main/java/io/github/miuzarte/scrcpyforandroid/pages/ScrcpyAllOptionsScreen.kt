@@ -1489,7 +1489,7 @@ internal fun ScrcpyAllOptionsPage(
                             onValueChange = { cameraZoomInput = it },
                             onFocusLost = {
                                 soBundle = soBundle.copy(
-                                    cameraAr = cameraZoomInput
+                                    cameraZoom = cameraZoomInput
                                 )
                             },
                             label = "--camera-zoom",

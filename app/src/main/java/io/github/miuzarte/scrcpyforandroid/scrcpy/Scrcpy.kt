@@ -105,6 +105,10 @@ class Scrcpy(
     private var isRunning: Boolean = false
 
     @Volatile
+    @JvmField
+    var flexDisplay: Boolean = false
+
+    @Volatile
     private var audioPlayer: ScrcpyAudioPlayer? = null
 
     @Volatile
@@ -202,6 +206,7 @@ class Scrcpy(
                 forwardKeyRepeat = options.forwardKeyRepeat,
             )
             isRunning = true
+            flexDisplay = options.flexDisplay
             startClipboardSync()
 
             // Setup video consumer (notify NativeCoreFacade to setup decoders)
@@ -313,33 +318,19 @@ class Scrcpy(
             runCatching { aacRecorder?.release() }
             aacRecorder = null
             isRunning = false
+            flexDisplay = false
             _currentSessionState.value = null
             throw e
         }
     }
 
     suspend fun stop(): Boolean = withContext(Dispatchers.IO) {
-        if (!isRunning) {
-            Log.w(TAG, "stop(): No active session to stop")
-            return@withContext false
-        }
-
-        Log.i(TAG, "stop(): Stopping scrcpy session")
-
-        return@withContext try {
-            session.clearVideoConsumer()
-            session.clearAudioConsumer()
-            mp4Recorder?.release()
-            mp4Recorder = null
-            wavRecorder?.release()
-            wavRecorder = null
-            aacRecorder?.release()
-            aacRecorder = null
-            NativeCoreFacade.onScrcpySessionStopped()
-            session.stop()
+        try {
+            stopClipboardSync()
             audioPlayer?.release()
             audioPlayer = null
             isRunning = false
+            flexDisplay = false
             _currentSessionState.value = null
             stopClipboardSync()
             Log.i(TAG, "stop(): Session stopped successfully")
