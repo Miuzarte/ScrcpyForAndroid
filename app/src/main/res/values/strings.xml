@@ -513,7 +513,7 @@
     <string name="scrcpyopt_no_mouse_hover">Do not forward mouse hover events</string>
     <string name="scrcpyopt_no_cleanup">Disable cleanup on exit</string>
     <string name="scrcpyopt_no_cleanup_desc">By default, scrcpy removes the server binary from the device and restores device state on exit (show touches, stay awake, and power mode).\nThis option disables this cleanup operation.</string>
-    <string name="scrcpyopt_flex_display">Continuously resize the virtual display to match the screen</string>
+    <string name="scrcpyopt_flex_display">Automatically resize to match the screen</string>
     <string name="scrcpyopt_start_app">Open app after scrcpy starts</string>
     <string name="scrcpyopt_native">Native</string>
     <string name="scrcpyopt_log_level">Log level</string>

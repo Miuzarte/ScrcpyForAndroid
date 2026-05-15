@@ -206,6 +206,19 @@ object NativeCoreFacade {
                         }
                     }
                 }
+            } else {
+                // v4.0 flex display: rebuild decoder when session size changes
+                val info = scrcpy.currentSessionState.value
+                if (info != null && (info.width != currentSessionInfo?.width || info.height != currentSessionInfo?.height)) {
+                    runBlocking {
+                        sessionLifecycleMutex.withLock {
+                            if (decoder != null) {
+                                currentSessionInfo = info
+                                createOrReplaceDecoder(info)
+                            }
+                        }
+                    }
+                }
             }
 
             val dec = decoder ?: return@attachVideoConsumer

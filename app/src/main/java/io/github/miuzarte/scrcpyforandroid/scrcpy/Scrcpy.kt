@@ -356,6 +356,10 @@ class Scrcpy(
         session.startApp(name)
     }
 
+    suspend fun resizeDisplay(width: Int, height: Int) = withContext(Dispatchers.IO) {
+        session.resizeDisplay(width, height)
+    }
+
     suspend fun injectKeycode(
         action: Int,
         keycode: Int,
@@ -1276,7 +1280,14 @@ class Scrcpy(
                 requireControlWriter().startApp(name)
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "startApp(): control channel not available", e)
-                throw e
+            }
+        }
+
+        suspend fun resizeDisplay(width: Int, height: Int) = mutex.withLock {
+            try {
+                requireControlWriter().resizeDisplay(width, height)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "resizeDisplay(): control channel not available", e)
             }
         }
 

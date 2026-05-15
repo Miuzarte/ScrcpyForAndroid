@@ -1813,14 +1813,16 @@ internal fun ScrcpyAllOptionsPage(
                 )
                 SwitchPreference(
                     title = stringResource(R.string.scrcpyopt_flex_display),
-                    summary = "--flex-display (WIP)",
+                    summary = "--flex-display",
                     checked = soBundle.flexDisplay,
                     onCheckedChange = {
                         soBundle = soBundle.copy(
                             flexDisplay = it
                         )
+                        if (it) AppRuntime.snackbar(
+                            "untested"
+                        )
                     },
-                    enabled = false,
                 )
             }
         }
