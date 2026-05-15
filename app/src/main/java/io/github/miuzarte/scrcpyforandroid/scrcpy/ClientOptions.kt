@@ -40,6 +40,8 @@ data class ClientOptions(
     var cameraSize: String = "", // to server
     // --camera-ar
     var cameraAr: String = "", // to server
+    // --camera-zoom
+    var cameraZoom: String = "", // to server
     // --camera-fps
     var cameraFps: UShort = 0u, // to server
 
@@ -73,6 +75,9 @@ data class ClientOptions(
 
     // OR of enum sc_shortcut_mod values
     // var shortcutMods: ShortcutMod,
+
+    // --min-size-alignment
+    var minSizeAlignment: UByte = 1u, // to server
 
     // --max-size
     var maxSize: UShort = 0u, // to server
@@ -207,6 +212,15 @@ data class ClientOptions(
     var vdDestroyContent: Boolean = true, // to server
     // --no-vd-system-decorations
     var vdSystemDecorations: Boolean = true, // to server
+
+    // --camera-torch
+    var cameraTorch: Boolean = false, // to server
+
+    // --keep-active
+    var keepActive: Boolean = false, // to server
+
+    // --flex-display
+    var flexDisplay: Boolean = false, // to server
 ) {
     enum class KeyInjectMode(val string: String) {
         MIXED("mixed"),
@@ -370,6 +384,27 @@ data class ClientOptions(
             throw IllegalArgumentException(
                 "Cannot specify both --display-id and --new-display"
             )
+        }
+
+        if (flexDisplay) {
+            if (videoSource != VideoSource.DISPLAY || newDisplay.isBlank()) {
+                throw IllegalArgumentException(
+                    "-x/--flex-display can only be applied to displays created " +
+                            "with --new-display"
+                )
+            }
+
+            if (!control) {
+                throw IllegalArgumentException(
+                    "-n/--no-control is not compatible with -x/--flex-display"
+                )
+            }
+
+            if (crop.isNotBlank()) {
+                throw IllegalArgumentException(
+                    "--crop is not compatible with -x/--flex-display"
+                )
+            }
         }
 
         if (displayImePolicy != DisplayImePolicy.UNDEFINED
@@ -542,6 +577,11 @@ data class ClientOptions(
                     "Cannot start an Android app if control is disabled"
                 )
             }
+            if (keepActive) {
+                throw IllegalArgumentException(
+                    "Cannot keep device active if control is disabled"
+                )
+            }
         }
 
         return this
@@ -560,6 +600,7 @@ data class ClientOptions(
             crop = crop,
 
             maxSize = maxSize,
+            minSizeAlignment = minSizeAlignment,
             videoBitRate = videoBitRate,
             audioBitRate = audioBitRate,
             maxFps = maxFps,
@@ -583,6 +624,7 @@ data class ClientOptions(
             cameraId = cameraId,
             cameraSize = cameraSize,
             cameraAr = cameraAr,
+            cameraZoom = cameraZoom,
             cameraFps = cameraFps,
 
             powerOffOnClose = powerOffOnClose,
@@ -595,8 +637,11 @@ data class ClientOptions(
             powerOn = powerOn,
 
             cameraHighSpeed = cameraHighSpeed,
+            cameraTorch = cameraTorch,
             vdDestroyContent = vdDestroyContent,
             vdSystemDecorations = vdSystemDecorations,
+            keepActive = keepActive,
+            flexDisplay = flexDisplay,
             list = list,
         )
     }

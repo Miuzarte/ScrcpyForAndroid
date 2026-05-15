@@ -474,6 +474,7 @@
     <string name="scrcpyopt_no_power_on">Do not power on the device on start</string>
     <string name="scrcpyopt_power_off_on_close">Turn the device screen off when closing scrcpy</string>
     <string name="scrcpyopt_stay_awake">Keep the device on while scrcpy is running, when the device is plugged in</string>
+    <string name="scrcpyopt_keep_active">Simulate user activity to keep the screen on</string>
     <string name="scrcpyopt_show_touches">Enable \"show touches\" on start, restore the initial value on exit</string>
     <string name="scrcpyopt_fullscreen">Start in fullscreen</string>
     <string name="scrcpyopt_disable_screensaver">Disable screensaver while scrcpy is running</string>
@@ -485,6 +486,8 @@
     <string name="scrcpyopt_video_bitrate">Video bitrate</string>
     <string name="scrcpyopt_video_source">Video source</string>
     <string name="scrcpyopt_display_id">Display ID</string>
+    <string name="scrcpyopt_min_size_alignment">Min size alignment</string>
+    <string name="scrcpyopt_min_size_alignment_invalid">Alignment must be a power of 2 (1, 2, 4, 8, or 16)</string>
     <string name="scrcpyopt_max_size">Max resolution</string>
     <string name="scrcpyopt_max_fps">Max framerate</string>
     <string name="scrcpyopt_camera_id">Camera ID</string>
@@ -492,6 +495,7 @@
     <string name="scrcpyopt_camera_size">Camera resolution</string>
     <string name="scrcpyopt_camera_fps">Camera framerate</string>
     <string name="scrcpyopt_camera_high_speed">High framerate mode</string>
+    <string name="scrcpyopt_camera_torch">Camera torch</string>
     <string name="scrcpyopt_audio_source">Audio source</string>
     <string name="scrcpyopt_audio_dup">Duplicate audio (capture and keep playing on the device)</string>
     <string name="scrcpyopt_require_audio">Terminate when audio forwarding fails</string>
@@ -509,6 +513,7 @@
     <string name="scrcpyopt_no_mouse_hover">Do not forward mouse hover events</string>
     <string name="scrcpyopt_no_cleanup">Disable cleanup on exit</string>
     <string name="scrcpyopt_no_cleanup_desc">By default, scrcpy removes the server binary from the device and restores device state on exit (show touches, stay awake, and power mode).\nThis option disables this cleanup operation.</string>
+    <string name="scrcpyopt_flex_display">Continuously resize the virtual display to match the screen</string>
     <string name="scrcpyopt_start_app">Open app after scrcpy starts</string>
     <string name="scrcpyopt_native">Native</string>
     <string name="scrcpyopt_log_level">Log level</string>

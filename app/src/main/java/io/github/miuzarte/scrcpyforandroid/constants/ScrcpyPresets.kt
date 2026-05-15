@@ -35,28 +35,8 @@ class Preset<T : Comparable<T>>(val values: List<T>) {
     }
 }
 
-/**
- * Extension function for Int presets to find index from Int value.
- */
-fun Preset<Int>.indexOfOrNearest(raw: Int): Int {
-    val exact = values.indexOf(raw)
-    if (exact >= 0) return exact
-    val nearest = values.withIndex().minByOrNull { (_, preset) ->
-        kotlin.math.abs(preset - raw)
-    }
-    return nearest?.index ?: 0
-}
-
-/**
- * Extension function for Int presets to find index from String value.
- */
-fun Preset<Int>.indexOfOrNearest(raw: String): Int {
-    if (raw.isBlank()) return 0
-    val value = raw.toIntOrNull() ?: return 0
-    return indexOfOrNearest(value)
-}
-
 object ScrcpyPresets {
+    val MinSizeAlignment = Preset(listOf(1, 2, 4, 8, 16)) // power-of-2
     val MaxSize = Preset(listOf(0, 720, 1080, 1280, 1600, 1920, 2160, 2560, 3200, 3840)) // px
     val MaxFPS = Preset(listOf(0, 24, 30, 45, 60, 90, 120)) // fps
     val ScreenOffTimeout = Preset(listOf(0, 15, 30, 60, 120, 300, 600)) // sec

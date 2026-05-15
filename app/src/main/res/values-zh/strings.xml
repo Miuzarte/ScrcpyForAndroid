@@ -474,6 +474,7 @@
     <string name="scrcpyopt_no_power_on">scrcpy 启动时不唤醒屏幕</string>
     <string name="scrcpyopt_power_off_on_close">scrcpy 结束后息屏</string>
     <string name="scrcpyopt_stay_awake">scrcpy 启动后保持设备唤醒状态（插入电源）</string>
+    <string name="scrcpyopt_keep_active">模拟用户活动防止息屏</string>
     <string name="scrcpyopt_show_touches">显示物理触控</string>
     <string name="scrcpyopt_fullscreen">启动后进入全屏</string>
     <string name="scrcpyopt_disable_screensaver">scrcpy 启动后保持本机屏幕常亮</string>
@@ -485,6 +486,8 @@
     <string name="scrcpyopt_video_bitrate">视频码率</string>
     <string name="scrcpyopt_video_source">视频来源</string>
     <string name="scrcpyopt_display_id">监视器 ID</string>
+    <string name="scrcpyopt_min_size_alignment">最小尺寸对齐</string>
+    <string name="scrcpyopt_min_size_alignment_invalid">对齐值必须是 2 的次方 (1, 2, 4, 8, 16)</string>
     <string name="scrcpyopt_max_size">最大分辨率</string>
     <string name="scrcpyopt_max_fps">最大帧率</string>
     <string name="scrcpyopt_camera_id">摄像头 ID</string>
@@ -492,6 +495,7 @@
     <string name="scrcpyopt_camera_size">摄像头分辨率</string>
     <string name="scrcpyopt_camera_fps">摄像头帧率</string>
     <string name="scrcpyopt_camera_high_speed">高帧率模式</string>
+    <string name="scrcpyopt_camera_torch">相机手电筒</string>
     <string name="scrcpyopt_audio_source">音频来源</string>
     <string name="scrcpyopt_audio_dup">音频双路输出</string>
     <string name="scrcpyopt_require_audio">音频转发失败时终止</string>
@@ -509,6 +513,7 @@
     <string name="scrcpyopt_no_mouse_hover">禁用鼠标悬停转发</string>
     <string name="scrcpyopt_no_cleanup">禁用结束后清理</string>
     <string name="scrcpyopt_no_cleanup_desc">默认情况下，scrcpy 会从设备中移除服务器二进制文件，并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）\n此选项将禁用此清理操作</string>
+    <string name="scrcpyopt_flex_display">连续调整虚拟显示器尺寸以匹配界面</string>
     <string name="scrcpyopt_start_app">scrcpy 启动后打开应用</string>
     <string name="scrcpyopt_native">本机</string>
     <string name="scrcpyopt_log_level">日志等级</string>
