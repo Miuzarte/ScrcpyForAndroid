@@ -8,6 +8,7 @@ import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
 import io.github.miuzarte.scrcpyforandroid.nativecore.PersistentVideoRenderer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
@@ -77,6 +78,10 @@ object NativeCoreFacade {
                 if (switched) {
                     return
                 }
+            }
+            if (session.width <= 0 || session.height <= 0) {
+                Log.i(TAG, "attachVideoSurface(): defer decoder, session size not yet known (${session.width}x${session.height})")
+                return
             }
             createOrReplaceDecoder(session)
         }
@@ -157,7 +162,8 @@ object NativeCoreFacade {
      */
     suspend fun onScrcpySessionStarted(
         session: Scrcpy.Session.SessionInfo,
-        sessionMgr: Scrcpy.Session
+        sessionMgr: Scrcpy.Session,
+        scrcpy: Scrcpy,
     ) = sessionLifecycleMutex.withLock {
         currentSessionInfo = session
         releaseAllDecoders()
@@ -166,8 +172,13 @@ object NativeCoreFacade {
             latestConfigPacket = null
         }
         if (activeSurfaceId != null || recordingSurfaceAttached) {
-            Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
-            createOrReplaceDecoder(session)
+            // v4.0: width/height come from first video session packet, not from initial metadata
+            if (session.width > 0 && session.height > 0) {
+                Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
+                createOrReplaceDecoder(session)
+            } else {
+                Log.i(TAG, "onScrcpySessionStarted(): defer decoder until first video session packet (v4.0)")
+            }
         }
         packetCount = 0
         sessionMgr.attachVideoConsumer { packet ->
@@ -179,9 +190,27 @@ object NativeCoreFacade {
                     "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
                 )
             }
-            val currentDecoder = decoder ?: return@attachVideoConsumer
+
+            // v4.0: deferred decoder creation — wait for session packet with valid dimensions
+            val currentDecoder = decoder
+            if (currentDecoder == null) {
+                val info = scrcpy.currentSessionState.value
+                if (info != null && info.width > 0 && info.height > 0) {
+                    // Acquire session lifecycle mutex to create decoder safely
+                    runBlocking {
+                        sessionLifecycleMutex.withLock {
+                            if (decoder == null) {
+                                currentSessionInfo = info
+                                createOrReplaceDecoder(info)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val dec = decoder ?: return@attachVideoConsumer
             runCatching {
-                currentDecoder.feedAnnexB(
+                dec.feedAnnexB(
                     packet.data,
                     packet.ptsUs,
                     packet.isKeyFrame,
