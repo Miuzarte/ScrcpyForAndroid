@@ -692,6 +692,12 @@ fun FullscreenControlPage(
         }
     }
 
+    DisposableEffect(resizeDebouncer) {
+        onDispose {
+            resizeDebouncer.cancel()
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

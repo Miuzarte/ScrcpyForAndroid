@@ -426,6 +426,7 @@ class Scrcpy(
         val current = _currentSessionState.value ?: return
         if (current.width == width && current.height == height) return
         _currentSessionState.value = current.copy(width = width, height = height)
+        NativeCoreFacade.onVideoSizeChanged(width, height)
     }
 
     private fun startClipboardSync() {
@@ -1753,6 +1754,9 @@ class Scrcpy(
 
             @Synchronized
             fun resizeDisplay(width: Int, height: Int) {
+                require(width in 1..0xFFFF && height in 1..0xFFFF) {
+                    "resizeDisplay dimensions must be in 1..65535, got ${width}x${height}"
+                }
                 output.writeByte(TYPE_RESIZE_DISPLAY)
                 output.writeShort(width)
                 output.writeShort(height)
