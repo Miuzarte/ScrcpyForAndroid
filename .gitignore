@@ -44,3 +44,6 @@ scrcpy.help*
 *.mp4
 
 abandoned_assets/
+
+# scrcpy-server binary (downloaded by Gradle during build)
+app/src/main/assets/bin/scrcpy-server-v*

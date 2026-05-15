@@ -59,11 +59,12 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
+import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.util.Debouncer
 import io.github.miuzarte.scrcpyforandroid.widgets.AppListBottomSheet
 import io.github.miuzarte.scrcpyforandroid.widgets.AppListEntry
 import io.github.miuzarte.scrcpyforandroid.widgets.ScrcpyVideoSurface
@@ -683,6 +684,20 @@ fun FullscreenControlPage(
         )
     }
 
+    val resizeDebouncer = remember {
+        Debouncer(300L) { w, h ->
+            coroutineScope.launch(Dispatchers.IO) {
+                scrcpy.resizeDisplay(w, h)
+            }
+        }
+    }
+
+    DisposableEffect(resizeDebouncer) {
+        onDispose {
+            resizeDebouncer.cancel()
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -694,7 +709,17 @@ fun FullscreenControlPage(
                     }
                 else Modifier
             )
-            .onSizeChanged { touchAreaSize = it },
+            .onSizeChanged { size ->
+                touchAreaSize = size
+                if (scrcpy.flexDisplay) {
+                    val sessionKnown = scrcpy.currentSessionState.value?.let {
+                        it.width > 0 && it.height > 0
+                    } ?: false
+                    if (sessionKnown) {
+                        resizeDebouncer.invoke(size.width, size.height)
+                    }
+                }
+            },
     ) {
         val sessionAspect =
             if (session.height == 0) 16f / 9f

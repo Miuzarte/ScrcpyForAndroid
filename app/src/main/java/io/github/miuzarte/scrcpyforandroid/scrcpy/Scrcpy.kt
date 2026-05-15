@@ -42,6 +42,8 @@ import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.File
 import java.io.InputStreamReader
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.ArrayDeque
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -74,7 +76,10 @@ class Scrcpy(
     private val lowLatency: Boolean = false,
 ) {
 
-    private val session = Session(::handleRemoteClipboardText)
+    private val session = Session(
+        ::handleRemoteClipboardText,
+        ::updateCurrentSessionSize,
+    )
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val clipboardSyncLock = Any()
     private val clipboardManager by lazy {
@@ -100,6 +105,10 @@ class Scrcpy(
     private var isRunning: Boolean = false
 
     @Volatile
+    @JvmField
+    var flexDisplay: Boolean = false
+
+    @Volatile
     private var audioPlayer: ScrcpyAudioPlayer? = null
 
     @Volatile
@@ -116,9 +125,9 @@ class Scrcpy(
     companion object {
         private const val TAG = "Scrcpy"
 
-        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v3.3.4"
-        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v3.3.4"
-        const val DEFAULT_SERVER_VERSION = "3.3.4"
+        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v4.0"
+        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v4.0"
+        const val DEFAULT_SERVER_VERSION = "4.0"
         const val DEFAULT_REMOTE_PATH = "/data/local/tmp/scrcpy-server.jar"
 
         // Regex patterns for parsing server output
@@ -197,11 +206,12 @@ class Scrcpy(
                 forwardKeyRepeat = options.forwardKeyRepeat,
             )
             isRunning = true
+            flexDisplay = options.flexDisplay
             startClipboardSync()
 
             // Setup video consumer (notify NativeCoreFacade to setup decoders)
             if (options.video) {
-                NativeCoreFacade.onScrcpySessionStarted(info, session)
+                NativeCoreFacade.onScrcpySessionStarted(info, session, this@Scrcpy)
             }
 
             // Setup audio player
@@ -287,7 +297,10 @@ class Scrcpy(
 
             Log.i(
                 TAG, "start(): Session started successfully - device=${info.deviceName}, " +
-                        "video=${if (options.video) "${info.codec?.string ?: "null"} ${info.width}x${info.height}" else "off"}, " +
+                        "video=${if (options.video) buildString {
+                            append(info.codec?.string ?: "null")
+                            if (info.width > 0 && info.height > 0) append(" ${info.width}x${info.height}")
+                        } else "off"}, " +
                         "audio=${if (options.audio) options.audioCodec.string else "off"}, " +
                         "control=${options.control}"
             )
@@ -305,6 +318,7 @@ class Scrcpy(
             runCatching { aacRecorder?.release() }
             aacRecorder = null
             isRunning = false
+            flexDisplay = false
             _currentSessionState.value = null
             throw e
         }
@@ -332,6 +346,7 @@ class Scrcpy(
             audioPlayer?.release()
             audioPlayer = null
             isRunning = false
+            flexDisplay = false
             _currentSessionState.value = null
             stopClipboardSync()
             Log.i(TAG, "stop(): Session stopped successfully")
@@ -346,6 +361,10 @@ class Scrcpy(
 
     suspend fun startApp(name: String) = withContext(Dispatchers.IO) {
         session.startApp(name)
+    }
+
+    suspend fun resizeDisplay(width: Int, height: Int) = withContext(Dispatchers.IO) {
+        session.resizeDisplay(width, height)
     }
 
     suspend fun injectKeycode(
@@ -423,6 +442,7 @@ class Scrcpy(
         val current = _currentSessionState.value ?: return
         if (current.width == width && current.height == height) return
         _currentSessionState.value = current.copy(width = width, height = height)
+        NativeCoreFacade.onVideoSizeChanged(width, height)
     }
 
     private fun startClipboardSync() {
@@ -970,6 +990,7 @@ class Scrcpy(
      */
     class Session(
         private val onRemoteClipboardText: (String) -> Unit,
+        private val onVideoSessionSize: (Int, Int) -> Unit,
     ) {
         private val mutex = Mutex()
 
@@ -1085,19 +1106,16 @@ class Scrcpy(
                 } else {
                     0
                 }
-                val videoCodecId: Int
-                val width: Int
-                val height: Int
-                if (options.video) {
-                    val vInput = checkNotNull(videoInput)
-                    videoCodecId = vInput.readInt()
-                    width = vInput.readInt()
-                    height = vInput.readInt()
+                val videoCodecId = if (options.video) {
+                    checkNotNull(videoInput).readInt()
                 } else {
-                    videoCodecId = 0
-                    width = 0
-                    height = 0
+                    0
                 }
+
+                // Video dimensions now come from the first session packet in the stream,
+                // not from stream metadata (v4.0 protocol change).
+                val width = 0
+                val height = 0
 
                 val sessionInfo = SessionInfo(
                     deviceName = deviceName,
@@ -1154,11 +1172,37 @@ class Scrcpy(
 
             videoReaderThread = thread(start = true, name = "scrcpy-video-reader") {
                 try {
+                    val sessionFlagByte = (PACKET_FLAG_SESSION ushr 56).toInt()
+                    val headerBuf = ByteArray(12)
                     while (activeSession === session && !vStream.closed) {
                         try {
-                            val ptsAndFlags = vInput.readLong()
-                            val packetSize = vInput.readInt()
-                            if (packetSize <= 0) {
+                            vInput.readFully(headerBuf)
+
+                            if ((headerBuf[0].toInt() and sessionFlagByte) != 0) {
+                                // Session packet: parse width/height, update state, no payload
+                                val clientResized = (headerBuf[3].toInt() and 1) != 0
+                                val sw = ((headerBuf[4].toInt() and 0xFF) shl 24) or
+                                        ((headerBuf[5].toInt() and 0xFF) shl 16) or
+                                        ((headerBuf[6].toInt() and 0xFF) shl 8) or
+                                        (headerBuf[7].toInt() and 0xFF)
+                                val sh = ((headerBuf[8].toInt() and 0xFF) shl 24) or
+                                        ((headerBuf[9].toInt() and 0xFF) shl 16) or
+                                        ((headerBuf[10].toInt() and 0xFF) shl 8) or
+                                        (headerBuf[11].toInt() and 0xFF)
+                                Log.i(
+                                    TAG,
+                                    "video session packet: ${sw}x${sh} clientResized=$clientResized"
+                                )
+                                onVideoSessionSize(sw, sh)
+                                continue
+                            }
+
+                            // Media packet: parse ptsAndFlags + packetSize from header
+                            val bb = ByteBuffer.wrap(headerBuf)
+                                .order(ByteOrder.BIG_ENDIAN)
+                            val ptsAndFlags = bb.long
+                            val packetSize = bb.int
+                            if (packetSize !in 1..10_000_000) {
                                 continue
                             }
 
@@ -1244,7 +1288,14 @@ class Scrcpy(
                 requireControlWriter().startApp(name)
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "startApp(): control channel not available", e)
-                throw e
+            }
+        }
+
+        suspend fun resizeDisplay(width: Int, height: Int) = mutex.withLock {
+            try {
+                requireControlWriter().resizeDisplay(width, height)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "resizeDisplay(): control channel not available", e)
             }
         }
 
@@ -1625,7 +1676,7 @@ class Scrcpy(
             fun setClipboard(text: String, paste: Boolean) {
                 val bytes = text.toByteArray(Charsets.UTF_8)
                 output.writeByte(TYPE_SET_CLIPBOARD)
-                output.writeLong(CLIPBOARD_SEQUENCE_INVALID)
+                output.writeLong(SEQUENCE_INVALID)
                 output.writeByte(if (paste) 1 else 0)
                 output.writeInt(bytes.size)
                 output.write(bytes)
@@ -1698,6 +1749,36 @@ class Scrcpy(
                 output.flush()
             }
 
+            @Synchronized
+            fun setCameraTorch(on: Boolean) {
+                output.writeByte(TYPE_CAMERA_SET_TORCH)
+                output.writeBoolean(on)
+                output.flush()
+            }
+
+            @Synchronized
+            fun cameraZoomIn() {
+                output.writeByte(TYPE_CAMERA_ZOOM_IN)
+                output.flush()
+            }
+
+            @Synchronized
+            fun cameraZoomOut() {
+                output.writeByte(TYPE_CAMERA_ZOOM_OUT)
+                output.flush()
+            }
+
+            @Synchronized
+            fun resizeDisplay(width: Int, height: Int) {
+                require(width in 1..0xFFFF && height in 1..0xFFFF) {
+                    "resizeDisplay dimensions must be in 1..65535, got ${width}x${height}"
+                }
+                output.writeByte(TYPE_RESIZE_DISPLAY)
+                output.writeShort(width)
+                output.writeShort(height)
+                output.flush()
+            }
+
             private fun writePosition(x: Int, y: Int, screenWidth: Int, screenHeight: Int) {
                 output.writeInt(x)
                 output.writeInt(y)
@@ -1725,9 +1806,10 @@ class Scrcpy(
             private const val CONNECT_RETRY_COUNT = 100
             private const val CONNECT_RETRY_DELAY_MS = 100L
             private const val DEVICE_NAME_FIELD_LENGTH = 64
-            private const val PACKET_FLAG_CONFIG = 1L shl 63
-            private const val PACKET_FLAG_KEY_FRAME = 1L shl 62
-            private const val PACKET_PTS_MASK = (1L shl 62) - 1
+            private const val PACKET_FLAG_SESSION = 1L shl 63
+            private const val PACKET_FLAG_CONFIG = 1L shl 62
+            private const val PACKET_FLAG_KEY_FRAME = 1L shl 61
+            private const val PACKET_PTS_MASK = (1L shl 61) - 1
 
             private const val AUDIO_DISABLED = 0
             private const val AUDIO_ERROR = 1
@@ -1741,10 +1823,29 @@ class Scrcpy(
             private const val TYPE_INJECT_TOUCH_EVENT = 2
             private const val TYPE_INJECT_SCROLL_EVENT = 3
             private const val TYPE_BACK_OR_SCREEN_ON = 4
+            private const val TYPE_EXPAND_NOTIFICATION_PANEL = 5
+            private const val TYPE_EXPAND_SETTINGS_PANEL = 6
+            private const val TYPE_COLLAPSE_PANELS = 7
+            private const val TYPE_GET_CLIPBOARD = 8
             private const val TYPE_SET_CLIPBOARD = 9
             private const val TYPE_SET_DISPLAY_POWER = 10
+            private const val TYPE_ROTATE_DEVICE = 11
+            private const val TYPE_UHID_CREATE = 12
+            private const val TYPE_UHID_INPUT = 13
+            private const val TYPE_UHID_DESTROY = 14
+            private const val TYPE_OPEN_HARD_KEYBOARD_SETTINGS = 15
             private const val TYPE_START_APP = 16
-            private const val CLIPBOARD_SEQUENCE_INVALID = 0L
+            private const val TYPE_RESET_VIDEO = 17
+            private const val TYPE_CAMERA_SET_TORCH = 18
+            private const val TYPE_CAMERA_ZOOM_IN = 19
+            private const val TYPE_CAMERA_ZOOM_OUT = 20
+            private const val TYPE_RESIZE_DISPLAY = 21
+
+            private const val SEQUENCE_INVALID = 0L
+
+            private const val COPY_KEY_NONE = 0
+            private const val COPY_KEY_COPY = 1
+            private const val COPY_KEY_CUT = 2
 
             private fun socketNameFor(scid: Int): String {
                 return "scrcpy_%08x".format(scid)

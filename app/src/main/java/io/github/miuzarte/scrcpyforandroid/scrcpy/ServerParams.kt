@@ -14,84 +14,89 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 // 启动 scrcpy 前直接继承自 [ClientOptions],
 // 不需要默认值
 data class ServerParams(
-    var scid: UInt, // (random uint32) & 0x7FFFFFFF
+    val scid: UInt, // (random uint32) & 0x7FFFFFFF
 
-    // var reqSerial: String,
+    // val reqSerial: String,
 
-    var logLevel: LogLevel,
+    val logLevel: LogLevel,
 
-    var videoCodec: Codec,
-    var audioCodec: Codec,
-    var videoSource: VideoSource,
-    var audioSource: AudioSource,
+    val videoCodec: Codec,
+    val audioCodec: Codec,
+    val videoSource: VideoSource,
+    val audioSource: AudioSource,
 
-    var cameraFacing: CameraFacing,
+    val cameraFacing: CameraFacing,
 
-    var crop: String,
+    val crop: String,
 
-    var videoCodecOptions: String,
-    var audioCodecOptions: String,
-    var videoEncoder: String,
-    var audioEncoder: String,
+    val videoCodecOptions: String,
+    val audioCodecOptions: String,
+    val videoEncoder: String,
+    val audioEncoder: String,
 
-    var cameraId: String,
-    var cameraSize: String,
-    var cameraAr: String, // aspect ratio
-    var cameraFps: UShort,
+    val cameraId: String,
+    val cameraSize: String,
+    val cameraAr: String, // aspect ratio
+    val cameraZoom: String,
+    val cameraFps: UShort,
 
-    // var portRange: PortRange, // sc_port_range(first, last)
-    // var tunnelHost: UInt,
-    // var tunnelPort: UShort,
+    // val portRange: PortRange, // sc_port_range(first, last)
+    // val tunnelHost: UInt,
+    // val tunnelPort: UShort,
 
-    var maxSize: UShort,
+    val maxSize: UShort,
+    val minSizeAlignment: UByte,
 
-    var videoBitRate: Int,
-    var audioBitRate: Int,
+    val videoBitRate: Int,
+    val audioBitRate: Int,
 
-    var maxFps: String, // float to be parsed by the server
-    var angle: String, // float to be parsed by the server
+    val maxFps: String, // float to be parsed by the server
+    val angle: String, // float to be parsed by the server
 
-    var screenOffTimeout: Tick,
+    val screenOffTimeout: Tick,
 
-    var captureOrientation: Orientation,
-    var captureOrientationLock: OrientationLock,
+    val captureOrientation: Orientation,
+    val captureOrientationLock: OrientationLock,
 
-    var control: Boolean,
+    val control: Boolean,
 
-    var displayId: Int,
-    var newDisplay: String,
+    val displayId: Int,
+    val newDisplay: String,
 
-    var displayImePolicy: DisplayImePolicy,
+    val displayImePolicy: DisplayImePolicy,
 
-    var video: Boolean,
-    var audio: Boolean,
-    var audioDup: Boolean,
-    var showTouches: Boolean,
-    var stayAwake: Boolean,
+    val video: Boolean,
+    val audio: Boolean,
+    val audioDup: Boolean,
+    val showTouches: Boolean,
+    val stayAwake: Boolean,
 
-    // var forceAdbForward: Boolean,
+    // val forceAdbForward: Boolean,
 
-    var powerOffOnClose: Boolean,
-    var legacyPaste: Boolean,
-    var clipboardAutosync: Boolean,
+    val powerOffOnClose: Boolean,
+    val legacyPaste: Boolean,
+    val clipboardAutosync: Boolean,
 
-    var downsizeOnError: Boolean,
-    // var tcpip: Boolean,
-    // var tcpipDst: String,
-    // var selectUsb: Boolean,
-    // var selectTcpip: Boolean,
+    val downsizeOnError: Boolean,
+    // val tcpip: Boolean,
+    // val tcpipDst: String,
+    // val selectUsb: Boolean,
+    // val selectTcpip: Boolean,
 
-    var cleanUp: Boolean,
-    var powerOn: Boolean,
+    val cleanUp: Boolean,
+    val powerOn: Boolean,
 
-    // var killAdbOnClose: Boolean,
+    // val killAdbOnClose: Boolean,
 
-    var cameraHighSpeed: Boolean,
+    val cameraHighSpeed: Boolean,
+    val cameraTorch: Boolean,
 
-    var vdDestroyContent: Boolean,
-    var vdSystemDecorations: Boolean,
+    val vdDestroyContent: Boolean,
+    val vdSystemDecorations: Boolean,
+    val keepActive: Boolean,
+    val flexDisplay: Boolean,
 
-    var list: ListOptions,
+    val list: ListOptions,
 ) {
     companion object {
         const val SEPARATOR: String = " "
@@ -155,6 +160,9 @@ data class ServerParams(
             validate(maxFps)
             cmd.add("max_fps=${maxFps.trim()}")
         }
+        if (minSizeAlignment != 1.toUByte()) {
+            cmd.add("min_size_alignment=${minSizeAlignment}")
+        }
         if (angle.isNotBlank()) {
             validate(angle)
             cmd.add("angle=${angle.trim()}")
@@ -206,6 +214,13 @@ data class ServerParams(
         }
         if (cameraHighSpeed) {
             cmd.add("camera_high_speed=true")
+        }
+        if (cameraTorch) {
+            cmd.add("camera_torch=true")
+        }
+        if (cameraZoom.isNotBlank()) {
+            validate(cameraZoom)
+            cmd.add("camera_zoom=${cameraZoom.trim()}")
         }
         if (showTouches) {
             cmd.add("show_touches=true")
@@ -259,6 +274,9 @@ data class ServerParams(
             validate(newDisplay)
             cmd.add("new_display=${newDisplay.trim()}")
         }
+        if (flexDisplay) {
+            cmd.add("flex_display=true")
+        }
         if (displayImePolicy != DisplayImePolicy.UNDEFINED) {
             cmd.add("display_ime_policy=${displayImePolicy.string}")
         }
@@ -267,6 +285,9 @@ data class ServerParams(
         }
         if (!vdSystemDecorations) {
             cmd.add("vd_system_decorations=false")
+        }
+        if (keepActive) {
+            cmd.add("keep_active=true")
         }
         if (list has ListOptions.ENCODERS) {
             cmd.add("list_encoders=true")

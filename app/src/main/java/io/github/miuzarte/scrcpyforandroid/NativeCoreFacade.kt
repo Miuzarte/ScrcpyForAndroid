@@ -8,6 +8,11 @@ import io.github.miuzarte.scrcpyforandroid.nativecore.AnnexBDecoder
 import io.github.miuzarte.scrcpyforandroid.nativecore.PersistentVideoRenderer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.ArrayDeque
@@ -22,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  */
 object NativeCoreFacade {
     private val sessionLifecycleMutex = Mutex()
+    private val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val renderer = PersistentVideoRenderer()
     private var activeSurfaceId: Int? = null
     private var decoder: AnnexBDecoder? = null
@@ -40,6 +46,10 @@ object NativeCoreFacade {
 
     @Volatile
     private var currentSessionInfo: Scrcpy.Session.SessionInfo? = null
+
+    // Reference to Scrcpy for reading currentSessionState (set by onScrcpySessionStarted)
+    @Volatile
+    private var scrcpyRef: Scrcpy? = null
 
     suspend fun close() {
         sessionLifecycleMutex.withLock {
@@ -77,6 +87,10 @@ object NativeCoreFacade {
                 if (switched) {
                     return
                 }
+            }
+            if (session.width <= 0 || session.height <= 0) {
+                Log.i(TAG, "attachVideoSurface(): defer decoder, session size not yet known (${session.width}x${session.height})")
+                return
             }
             createOrReplaceDecoder(session)
         }
@@ -157,8 +171,10 @@ object NativeCoreFacade {
      */
     suspend fun onScrcpySessionStarted(
         session: Scrcpy.Session.SessionInfo,
-        sessionMgr: Scrcpy.Session
+        sessionMgr: Scrcpy.Session,
+        scrcpy: Scrcpy,
     ) = sessionLifecycleMutex.withLock {
+        scrcpyRef = scrcpy
         currentSessionInfo = session
         releaseAllDecoders()
         synchronized(bootstrapLock) {
@@ -166,8 +182,13 @@ object NativeCoreFacade {
             latestConfigPacket = null
         }
         if (activeSurfaceId != null || recordingSurfaceAttached) {
-            Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
-            createOrReplaceDecoder(session)
+            // v4.0: width/height come from first video session packet, not from initial metadata
+            if (session.width > 0 && session.height > 0) {
+                Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
+                createOrReplaceDecoder(session)
+            } else {
+                Log.i(TAG, "onScrcpySessionStarted(): defer decoder until first video session packet (v4.0)")
+            }
         }
         packetCount = 0
         sessionMgr.attachVideoConsumer { packet ->
@@ -179,14 +200,43 @@ object NativeCoreFacade {
                     "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
                 )
             }
-            val currentDecoder = decoder ?: return@attachVideoConsumer
+
+            val dec = decoder ?: return@attachVideoConsumer
             runCatching {
-                currentDecoder.feedAnnexB(
+                dec.feedAnnexB(
                     packet.data,
                     packet.ptsUs,
                     packet.isKeyFrame,
                     packet.isConfig
                 )
+            }
+        }
+    }
+
+    /**
+     * Called by Scrcpy when a video session packet arrives with new dimensions.
+     * Launches a coroutine to create or rebuild the decoder under the lifecycle mutex.
+     */
+    fun onVideoSizeChanged(width: Int, height: Int) {
+        lifecycleScope.launch {
+            sessionLifecycleMutex.withLock {
+                val scrcpy = scrcpyRef ?: return@withLock
+                val info = scrcpy.currentSessionState.value ?: return@withLock
+                if (info.width <= 0 || info.height <= 0) return@withLock
+
+                if (decoder == null) {
+                    // Initial creation (v4.0: deferred until first session packet)
+                    Log.i(TAG, "onVideoSizeChanged(): create decoder ${info.width}x${info.height}")
+                    currentSessionInfo = info
+                    createOrReplaceDecoder(info)
+                } else if (currentSessionInfo != null &&
+                    (info.width != currentSessionInfo!!.width || info.height != currentSessionInfo!!.height)
+                ) {
+                    // Flex display: rebuild decoder on size change
+                    Log.i(TAG, "onVideoSizeChanged(): rebuild decoder ${currentSessionInfo!!.width}x${currentSessionInfo!!.height} → ${info.width}x${info.height}")
+                    currentSessionInfo = info
+                    createOrReplaceDecoder(info)
+                }
             }
         }
     }
@@ -201,6 +251,7 @@ object NativeCoreFacade {
             bootstrapPackets.clear()
             latestConfigPacket = null
         }
+        scrcpyRef = null
         currentSessionInfo = null
         recordingSurfaceAttached = false
     }

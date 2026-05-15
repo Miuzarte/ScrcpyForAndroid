@@ -605,9 +605,13 @@ internal class DeviceTabViewModel(
 
         val videoDetail =
             if (!resolvedOptions.video) "off"
-            else if (activeBundle.videoBitRate <= 0) "${session.codec?.string ?: "null"} ${session.width}x${session.height} @default"
-            else "${session.codec?.string ?: "null"} ${session.width}x${session.height} " +
-                    "@%.1fMbps".format(activeBundle.videoBitRate / 1_000_000f)
+            else {
+                val codec = session.codec?.string ?: "null"
+                val sizeHint = if (session.width > 0 && session.height > 0) " ${session.width}x${session.height}" else ""
+                val bitrateSuffix = if (activeBundle.videoBitRate <= 0) " @default"
+                else " @%.1fMbps".format(activeBundle.videoBitRate / 1_000_000f)
+                "$codec$sizeHint$bitrateSuffix"
+            }
 
         val audioDetail =
             if (!activeBundle.audio) "off"

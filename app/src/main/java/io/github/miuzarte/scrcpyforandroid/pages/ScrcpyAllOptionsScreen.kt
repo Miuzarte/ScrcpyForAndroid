@@ -331,6 +331,7 @@ internal fun ScrcpyAllOptionsScreen(
                             bundle = copySourceBundle,
                         )
                         selectedProfileId = created.id
+                        bindCurrentConnectedDevice(created.id)
                     }
 
                     ProfileDialogMode.Rename -> {
@@ -597,6 +598,9 @@ internal fun ScrcpyAllOptionsPage(
     var cameraArInput by rememberSaveable(soBundle.cameraAr) {
         mutableStateOf(soBundle.cameraAr)
     }
+    var cameraZoomInput by rememberSaveable(soBundle.cameraZoom) {
+        mutableStateOf(soBundle.cameraZoom)
+    }
 
     val cameraFpsPresetIndex = rememberSaveable(soBundle.cameraFps) {
         ScrcpyPresets.CameraFps.indexOfOrNearest(soBundle.cameraFps)
@@ -637,6 +641,10 @@ internal fun ScrcpyAllOptionsPage(
             ClientOptions.KeyInjectMode.RAW.string -> 2
             else -> 0
         }
+    }
+
+    val minSizeAlignmentPresetIndex = rememberSaveable(soBundle.minSizeAlignment) {
+        ScrcpyPresets.MinSizeAlignment.indexOfOrNearest(soBundle.minSizeAlignment)
     }
 
     val maxSizePresetIndex = rememberSaveable(soBundle.maxSize) {
@@ -1018,6 +1026,16 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
+                    title = stringResource(R.string.scrcpyopt_keep_active),
+                    summary = "--keep-active",
+                    checked = soBundle.keepActive,
+                    onCheckedChange = {
+                        soBundle = soBundle.copy(
+                            keepActive = it
+                        )
+                    },
+                )
+                SwitchPreference(
                     title = stringResource(R.string.scrcpyopt_show_touches),
                     summary = "--show-touches",
                     checked = soBundle.showTouches,
@@ -1221,6 +1239,39 @@ internal fun ScrcpyAllOptionsPage(
                                     displayId =
                                         if (it == 0) -1
                                         else displays[it - 1].id
+                                )
+                            },
+                        )
+                        SuperSlider(
+                            title = stringResource(R.string.scrcpyopt_min_size_alignment),
+                            summary = "--min-size-alignment",
+                            value = minSizeAlignmentPresetIndex.toFloat(),
+                            onValueChange = {
+                                val idx = it.roundToInt()
+                                    .coerceIn(0, ScrcpyPresets.MinSizeAlignment.lastIndex)
+                                soBundle = soBundle.copy(
+                                    minSizeAlignment = ScrcpyPresets.MinSizeAlignment[idx]
+                                )
+                            },
+                            valueRange = 0f..ScrcpyPresets.MinSizeAlignment.lastIndex.toFloat(),
+                            steps = (ScrcpyPresets.MinSizeAlignment.size - 2).coerceAtLeast(0),
+                            showKeyPoints = true,
+                            keyPoints = ScrcpyPresets.MinSizeAlignment.indices.map { it.toFloat() },
+                            displayText = soBundle.minSizeAlignment.toString(),
+                            inputInitialValue = soBundle.minSizeAlignment
+                                .takeIf { it != 1 }
+                                ?.toString()
+                                ?: "",
+                            inputFilter = { it.filter(Char::isDigit) },
+                            inputValueRange = 1f..16f,
+                            onInputConfirm = { raw ->
+                                val parsed = raw.toIntOrNull() ?: return@SuperSlider
+                                if (parsed and (parsed - 1) != 0) {
+                                    AppRuntime.snackbar(R.string.scrcpyopt_min_size_alignment_invalid)
+                                    return@SuperSlider
+                                }
+                                soBundle = soBundle.copy(
+                                    minSizeAlignment = parsed
                                 )
                             },
                         )
@@ -1433,6 +1484,20 @@ internal fun ScrcpyAllOptionsPage(
                                 .fillMaxWidth()
                                 .padding(all = UiSpacing.Large),
                         )
+                        SuperTextField(
+                            value = cameraZoomInput,
+                            onValueChange = { cameraZoomInput = it },
+                            onFocusLost = {
+                                soBundle = soBundle.copy(
+                                    cameraZoom = cameraZoomInput
+                                )
+                            },
+                            label = "--camera-zoom",
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(all = UiSpacing.Large),
+                        )
                         SuperSlider(
                             title = stringResource(R.string.scrcpyopt_camera_fps),
                             summary = "--camera-fps",
@@ -1469,6 +1534,16 @@ internal fun ScrcpyAllOptionsPage(
                             onCheckedChange = {
                                 soBundle = soBundle.copy(
                                     cameraHighSpeed = it
+                                )
+                            },
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.scrcpyopt_camera_torch),
+                            summary = "--camera-torch",
+                            checked = soBundle.cameraTorch,
+                            onCheckedChange = {
+                                soBundle = soBundle.copy(
+                                    cameraTorch = it
                                 )
                             },
                         )
@@ -1733,6 +1808,19 @@ internal fun ScrcpyAllOptionsPage(
                         )
                         if (it) AppRuntime.snackbar(
                             R.string.scrcpyopt_no_cleanup_desc
+                        )
+                    },
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.scrcpyopt_flex_display),
+                    summary = "--flex-display",
+                    checked = soBundle.flexDisplay,
+                    onCheckedChange = {
+                        soBundle = soBundle.copy(
+                            flexDisplay = it
+                        )
+                        if (it) AppRuntime.snackbar(
+                            "untested"
                         )
                     },
                 )
