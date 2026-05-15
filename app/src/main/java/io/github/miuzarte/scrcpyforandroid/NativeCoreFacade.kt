@@ -52,7 +52,6 @@ object NativeCoreFacade {
     private var scrcpyRef: Scrcpy? = null
 
     suspend fun close() {
-        lifecycleScope.cancel()
         sessionLifecycleMutex.withLock {
             releaseAllDecoders()
             renderer.release()

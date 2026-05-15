@@ -325,8 +325,24 @@ class Scrcpy(
     }
 
     suspend fun stop(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            stopClipboardSync()
+        if (!isRunning) {
+            Log.w(TAG, "stop(): No active session to stop")
+            return@withContext false
+        }
+
+        Log.i(TAG, "stop(): Stopping scrcpy session")
+
+        return@withContext try {
+            session.clearVideoConsumer()
+            session.clearAudioConsumer()
+            mp4Recorder?.release()
+            mp4Recorder = null
+            wavRecorder?.release()
+            wavRecorder = null
+            aacRecorder?.release()
+            aacRecorder = null
+            NativeCoreFacade.onScrcpySessionStopped()
+            session.stop()
             audioPlayer?.release()
             audioPlayer = null
             isRunning = false
