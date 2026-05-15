@@ -331,6 +331,7 @@ internal fun ScrcpyAllOptionsScreen(
                             bundle = copySourceBundle,
                         )
                         selectedProfileId = created.id
+                        bindCurrentConnectedDevice(created.id)
                     }
 
                     ProfileDialogMode.Rename -> {
