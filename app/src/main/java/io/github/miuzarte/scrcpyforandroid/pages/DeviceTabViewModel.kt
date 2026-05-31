@@ -481,8 +481,8 @@ internal class DeviceTabViewModel(
     }
 
     suspend fun disconnectCurrentTargetBeforeConnecting(newHost: String, newPort: Int) {
-        val disconnected =
-            connectionController.disconnectCurrentTargetBeforeConnecting(newHost, newPort) ?: return
+        val disconnected = connectionController.disconnectCurrentTargetBeforeConnecting(newHost, newPort)
+            ?: return
         sessionReconnectBlacklistHosts += disconnected.host
         if (disconnected.host.isNotBlank())
             _savedShortcuts.update { it.update(host = disconnected.host, port = disconnected.port) }
@@ -497,11 +497,9 @@ internal class DeviceTabViewModel(
     }
 
     suspend fun disconnectCurrentTargetBeforeConnectingAny(addresses: List<String>) {
-        val disconnected =
-            connectionController.disconnectCurrentTargetBeforeConnectingAny(addresses) ?: return
+        val disconnected = connectionController.disconnectCurrentTargetBeforeConnectingAny(addresses)
+            ?: return
         sessionReconnectBlacklistHosts += disconnected.host
-        if (disconnected.host.isNotBlank())
-            _savedShortcuts.update { it.update(host = disconnected.host, port = disconnected.port) }
     }
 
     fun applyConnectedDeviceCapabilities(sdkInt: Int) {

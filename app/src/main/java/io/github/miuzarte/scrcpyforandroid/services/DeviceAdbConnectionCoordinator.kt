@@ -42,28 +42,34 @@ internal class DeviceAdbConnectionCoordinator(
         probeTimeoutMs: Int,
     ): ConnectionTarget {
         var lastError: Throwable? = null
-        var result: ConnectionTarget? = null
-        withContext(Dispatchers.IO) {
-            for (addr in addresses) {
-                val target = ConnectionTarget.unmarshalFrom(addr) ?: continue
+        return withContext(Dispatchers.IO) {
+            val candidates = addresses.mapNotNull { addr ->
+                val target = ConnectionTarget.unmarshalFrom(addr) ?: return@mapNotNull null
                 val resolved = resolveHost(target.host)
-                val probeOk = runCatching {
-                    InetAddress.getByName(resolved).isReachable(probeTimeoutMs)
-                }.getOrDefault(false)
-                if (!probeOk) continue
-
+                val latencyNs = runCatching {
+                    val startNs = System.nanoTime()
+                    Socket().use { socket ->
+                        socket.connect(InetSocketAddress(resolved, target.port), probeTimeoutMs)
+                    }
+                    System.nanoTime() - startNs
+                }.getOrElse { e ->
+                    lastError = e
+                    return@mapNotNull null
+                }
+                Triple(latencyNs, target, resolved)
+            }.sortedBy { it.first }
+            for ((_, target, resolved) in candidates) {
                 try {
                     withTimeout(timeoutMs) {
                         adbService.connect(resolved, target.port)
                     }
-                    result = target
-                    return@withContext
+                    return@withContext target
                 } catch (e: Exception) {
                     lastError = e
                 }
             }
+            throw (lastError ?: IllegalStateException("All addresses unreachable: $addresses"))
         }
-        return result ?: throw (lastError ?: IllegalStateException("All addresses unreachable: $addresses"))
     }
 
     suspend fun disconnect() {

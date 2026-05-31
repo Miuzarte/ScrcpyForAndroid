@@ -609,8 +609,8 @@ internal fun DeviceTabPage(
 
             if (adbConnected) {
                 if (includeInlinePreviewControls && canShowPreviewControls && asBundle.previewCardOnTop) {
-                    item {
-                        SectionSmallTitle("Scrcpy")
+                    item(key = PREVIEW_CARD_ITEM_KEY) {
+                        SectionSmallTitle(stringResource(R.string.device_section_scrcpy))
                         PreviewSection()
                     }
                     item { VirtualButtonsSection() }
@@ -620,7 +620,7 @@ internal fun DeviceTabPage(
                     }
                 } else {
                     item {
-                        SectionSmallTitle("Scrcpy")
+                        SectionSmallTitle(stringResource(R.string.device_section_scrcpy))
                         if (useTwoPaneConfigPanel) ScrcpyConfigSectionForTwoPane()
                         else ScrcpyConfigSection()
                     }
