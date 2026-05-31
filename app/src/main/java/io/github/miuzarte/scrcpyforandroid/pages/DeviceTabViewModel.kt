@@ -492,6 +492,18 @@ internal class DeviceTabViewModel(
         connectionController.connectWithTimeout(host, port, ADB_CONNECT_TIMEOUT_MS)
     }
 
+    suspend fun connectAddresses(addresses: List<String>): ConnectionTarget {
+        return connectionController.connectAddresses(addresses, ADB_CONNECT_TIMEOUT_MS, ADB_TCP_PROBE_TIMEOUT_MS)
+    }
+
+    suspend fun disconnectCurrentTargetBeforeConnectingAny(addresses: List<String>) {
+        val disconnected =
+            connectionController.disconnectCurrentTargetBeforeConnectingAny(addresses) ?: return
+        sessionReconnectBlacklistHosts += disconnected.host
+        if (disconnected.host.isNotBlank())
+            _savedShortcuts.update { it.update(host = disconnected.host, port = disconnected.port) }
+    }
+
     fun applyConnectedDeviceCapabilities(sdkInt: Int) {
         connectionController.applyConnectedDeviceCapabilities(sdkInt)
     }
@@ -710,8 +722,7 @@ internal class DeviceTabViewModel(
 
     fun onDeviceAction(device: DeviceShortcut) {
         val connected = adbConnected.value
-                && currentTarget.value?.host == device.host
-                && currentTarget.value?.port == device.port
+                && currentTarget.value?.let { device.matchesAddress(it) } == true
 
         if (!connected) {
             runAdbConnect(
@@ -719,12 +730,12 @@ internal class DeviceTabViewModel(
                 onStarted = { _activeDeviceActionId.value = device.id },
                 onFinished = { _activeDeviceActionId.value = null },
             ) {
-                disconnectCurrentTargetBeforeConnecting(device.host, device.port)
+                disconnectCurrentTargetBeforeConnectingAny(device.addresses)
                 try {
-                    connectWithTimeout(device.host, device.port)
+                    val matched = connectAddresses(device.addresses)
                     handleAdbConnected(
-                        host = device.host,
-                        port = device.port,
+                        host = matched.host,
+                        port = matched.port,
                         autoStartScrcpy = device.startScrcpyOnConnect,
                         autoEnterFullScreen = device.startScrcpyOnConnect && device.openFullscreenOnStart,
                         scrcpyProfileId = device.scrcpyProfileId,

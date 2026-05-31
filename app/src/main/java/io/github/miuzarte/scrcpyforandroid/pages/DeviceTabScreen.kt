@@ -317,10 +317,10 @@ internal fun DeviceTabPage(
     fun DeviceListSection() {
         DeviceTileList(
             devices = savedShortcuts,
+            currentTarget = currentTarget,
             isConnected = { device ->
                 adbConnected
-                        && currentTarget?.host == device.host
-                        && currentTarget?.port == device.port
+                        && currentTarget?.let { device.matchesAddress(it) } == true
             },
             actionEnabled = !busy && !adbConnecting,
             actionInProgress = { device -> adbConnecting && activeDeviceActionId == device.id },
@@ -331,8 +331,7 @@ internal fun DeviceTabPage(
             },
             onLongClick = { device ->
                 val connected = adbConnected
-                        && currentTarget?.host == device.host
-                        && currentTarget?.port == device.port
+                        && currentTarget?.let { device.matchesAddress(it) } == true
                 if (connected) {
                     AppRuntime.snackbar(R.string.device_cannot_modify_connected)
                 } else {
@@ -347,16 +346,8 @@ internal fun DeviceTabPage(
                 if (editingDeviceId == device.id) viewModel.setEditingDeviceId(null)
                 viewModel.onDeviceAction(device)
             },
-            onEditorSave = { device, updated ->
-                viewModel.updateShortcut(
-                    id = device.id,
-                    name = updated.name,
-                    host = updated.host,
-                    port = updated.port,
-                    startScrcpyOnConnect = updated.startScrcpyOnConnect,
-                    openFullscreenOnStart = updated.openFullscreenOnStart,
-                    scrcpyProfileId = updated.scrcpyProfileId,
-                )
+            onEditorSave = { _, updated ->
+                viewModel.upsertShortcut(updated)
             },
             onEditorDelete = { device ->
                 viewModel.removeShortcut(device.id)
@@ -376,7 +367,7 @@ internal fun DeviceTabPage(
             onAddDevice = {
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
-                viewModel.upsertShortcut(DeviceShortcut(host = target.host, port = target.port))
+                viewModel.upsertShortcut(DeviceShortcut(addresses = listOf(target.toString())))
                 AppRuntime.snackbar(R.string.device_added, target.host, target.port)
             },
             onConnect = {
@@ -400,7 +391,6 @@ internal fun DeviceTabPage(
 
     @Composable
     fun ScrcpyConfigSection() {
-        SectionSmallTitle("Scrcpy")
         ConfigPanel(
             busy = busy,
             activeProfileId = connectedScrcpyProfileId,
@@ -511,7 +501,6 @@ internal fun DeviceTabPage(
 
     @Composable
     fun ScrcpyConfigSectionForTwoPane() {
-        SectionSmallTitle("Scrcpy")
         ConfigPanel(
             busy = busy,
             activeProfileId = connectedScrcpyProfileId,
@@ -619,14 +608,26 @@ internal fun DeviceTabPage(
             }
 
             if (adbConnected) {
-                item {
-                    if (useTwoPaneConfigPanel) ScrcpyConfigSectionForTwoPane()
-                    else ScrcpyConfigSection()
-                }
-
-                if (includeInlinePreviewControls && canShowPreviewControls) {
-                    item(key = PREVIEW_CARD_ITEM_KEY) { PreviewSection() }
+                if (includeInlinePreviewControls && canShowPreviewControls && asBundle.previewCardOnTop) {
+                    item {
+                        SectionSmallTitle("Scrcpy")
+                        PreviewSection()
+                    }
                     item { VirtualButtonsSection() }
+                    item {
+                        if (useTwoPaneConfigPanel) ScrcpyConfigSectionForTwoPane()
+                        else ScrcpyConfigSection()
+                    }
+                } else {
+                    item {
+                        SectionSmallTitle("Scrcpy")
+                        if (useTwoPaneConfigPanel) ScrcpyConfigSectionForTwoPane()
+                        else ScrcpyConfigSection()
+                    }
+                    if (includeInlinePreviewControls && canShowPreviewControls) {
+                        item(key = PREVIEW_CARD_ITEM_KEY) { PreviewSection() }
+                        item { VirtualButtonsSection() }
+                    }
                 }
             }
 

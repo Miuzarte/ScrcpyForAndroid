@@ -5,6 +5,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
 }
 
@@ -150,6 +151,7 @@ dependencies {
     implementation(libs.bcpkix.jdk18on)
     implementation(libs.conscrypt.android)
     implementation(libs.reorderable)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.biometric)

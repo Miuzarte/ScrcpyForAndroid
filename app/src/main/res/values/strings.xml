@@ -59,6 +59,9 @@
     <string name="button_swap">Swap</string>
     <string name="label_ip_address">IP address</string>
     <string name="label_port">Port</string>
+    <string name="label_ip_port">IP:Port</string>
+    <string name="cd_add_address">Add address</string>
+    <string name="cd_delete_address">Delete address</string>
     <string name="label_device_name">Device name</string>
     <string name="label_name">Name</string>
     <string name="label_wlan_pairing_code">WLAN pairing code</string>
@@ -169,6 +172,8 @@
     <string name="pref_summary_debug_info">Display resolution, frame rate, and touch info as overlay in fullscreen</string>
     <string name="pref_title_hide_simple_settings">Hide simple settings on device page</string>
     <string name="pref_summary_hide_simple_settings">When enabled, the device page only keeps More parameters, All apps, Recent tasks, and Start/Stop buttons</string>
+    <string name="pref_title_preview_card_on_top">Show preview card above config</string>
+    <string name="pref_summary_preview_card_on_top">When enabled, the preview card and virtual buttons appear above the Scrcpy config card on the device page</string>
     <string name="pref_title_preview_card_height">Preview card height</string>
     <string name="pref_summary_preview_card_height">Preview card height on device page</string>
     <string name="pref_title_quick_device_sort">Quick device sort</string>

@@ -70,16 +70,16 @@ internal class DeviceAdbAutoReconnectManager(
             },
             discoverConnectService = discoverConnectService,
             onMdnsPortChanged = onMdnsPortChanged,
-            connectKnownShortcut = { target ->
-                if (!controller.runAutoAdbConnect(target.host, target.port, connectTimeoutMs)) {
+            connectKnownShortcut = { device, addressTarget ->
+                if (!controller.runAutoAdbConnect(addressTarget.host, addressTarget.port, connectTimeoutMs)) {
                     false
                 } else {
                     controller.handleAdbConnected(
-                        host = target.host,
-                        port = target.port,
-                        scrcpyProfileId = target.scrcpyProfileId,
+                        host = addressTarget.host,
+                        port = addressTarget.port,
+                        scrcpyProfileId = device.scrcpyProfileId,
                     )
-                    onKnownDeviceReconnected(target)
+                    onKnownDeviceReconnected(device)
                     true
                 }
             },

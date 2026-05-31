@@ -46,9 +46,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.R
-import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ArrowSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
@@ -72,6 +72,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.AddCircle
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.*
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
@@ -1123,6 +1126,7 @@ internal fun DeviceTile(
     actionEnabled: Boolean,
     actionInProgress: Boolean,
     editing: Boolean,
+    connectedAddress: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onAction: () -> Unit,
@@ -1139,34 +1143,31 @@ internal fun DeviceTile(
     var originalDraft by remember(editing, device.id) {
         mutableStateOf(if (editing) device else null)
     }
-    var draftPortText by remember(editing, device.id) {
-        mutableStateOf(if (editing) device.port.toString() else null)
+    val draftAddresses = remember(editing, device.id) {
+        mutableStateListOf<String>().also {
+            if (editing) it.addAll(device.addresses)
+        }
+    }
+
+    fun buildDraftFromAddresses(): DeviceShortcut {
+        val c = draft ?: return device
+        val cleaned = draftAddresses
+            .map { it.trim().replace('：', ':') }
+            .filter { it.isNotBlank() }
+        return c.copy(addresses = cleaned.ifEmpty { listOf("") })
     }
 
     LaunchedEffect(editing, draft) {
-        val currentDraft = draft ?: return@LaunchedEffect
         if (!editing) return@LaunchedEffect
         delay(Settings.BUNDLE_SAVE_DELAY)
-        val trimmedHost = currentDraft.host.trim()
-        if (trimmedHost.isBlank()) return@LaunchedEffect
-        val updated = DeviceShortcut(
-            id = currentDraft.id,
-            name = currentDraft.name.trim(),
-            host = trimmedHost,
-            port = currentDraft.port,
-            startScrcpyOnConnect = currentDraft.startScrcpyOnConnect,
-            openFullscreenOnStart = currentDraft.startScrcpyOnConnect
-                    && currentDraft.openFullscreenOnStart,
-            scrcpyProfileId = currentDraft.scrcpyProfileId,
-        )
-        if (updated != device) {
+        val updated = buildDraftFromAddresses()
+        if (updated != device && updated.host.isNotBlank()) {
             onEditorSave(updated)
         }
     }
 
     val currentDraft = draft ?: device
     val currentOriginalDraft = originalDraft ?: device
-    val currentDraftPortText = draftPortText ?: device.port.toString()
     val profileNames = remember(scrcpyProfilesState.profiles) {
         scrcpyProfilesState.profiles.map { it.name }
     }
@@ -1229,7 +1230,7 @@ internal fun DeviceTile(
                         color = colorScheme.onSurface,
                     )
                     Text(
-                        "${device.host}:${device.port}",
+                        connectedAddress ?: "${device.host}:${device.port}",
                         fontSize = 13.sp,
                         color = colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
@@ -1275,27 +1276,53 @@ internal fun DeviceTile(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    SuperTextField(
-                        value = currentDraft.host,
-                        onValueChange = { draft = currentDraft.copy(host = it) },
-                        label = stringResource(R.string.label_ip_address),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    SuperTextField(
-                        value = currentDraftPortText,
-                        onValueChange = {
-                            draftPortText = it.filter(Char::isDigit)
-                            draft = currentDraft.copy(
-                                port = draftPortText?.toIntOrNull() ?: Defaults.ADB_PORT,
-                            )
-                        },
-                        label = stringResource(R.string.label_port),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    draftAddresses.forEachIndexed { index, addr ->
+                        SuperTextField(
+                            value = addr,
+                            onValueChange = {
+                                draftAddresses[index] = it
+                                draft = (draft ?: device).copy(addresses = draftAddresses.toList())
+                            },
+                            label = stringResource(R.string.label_ip_port),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onFocusLost = {
+                                draftAddresses[index] = draftAddresses[index].replace('：', ':')
+                            },
+                            trailingIcon = {
+                                Row(
+                                    modifier = Modifier.padding(end = UiSpacing.Medium),
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            haptic.contextClick()
+                                            draftAddresses.add(index + 1, "")
+                                            draft = (draft ?: device).copy(addresses = draftAddresses.toList())
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = MiuixIcons.AddCircle,
+                                            contentDescription = stringResource(R.string.cd_add_address),
+                                        )
+                                    }
+                                    if (draftAddresses.size > 1) {
+                                        IconButton(
+                                            onClick = {
+                                                haptic.contextClick()
+                                                draftAddresses.removeAt(index)
+                                                draft = (draft ?: device).copy(addresses = draftAddresses.toList())
+                                            },
+                                        ) {
+                                            Icon(
+                                                imageVector = MiuixIcons.Delete,
+                                                contentDescription = stringResource(R.string.cd_delete_address),
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
                     CheckboxPreference(
                         title = stringResource(R.string.device_config_start_immediately),
                         checkboxLocation = CheckboxLocation.End,
@@ -1374,16 +1401,16 @@ internal fun DeviceTileList(
     actionEnabled: Boolean,
     actionInProgress: (DeviceShortcut) -> Boolean,
     editingDeviceId: String?,
+    currentTarget: ConnectionTarget? = null,
     onClick: (DeviceShortcut) -> Unit,
     onLongClick: (DeviceShortcut) -> Unit,
     onAction: (DeviceShortcut) -> Unit,
     onEditorSave: (DeviceShortcut, DeviceShortcut) -> Unit,
     onEditorDelete: (DeviceShortcut) -> Unit,
     onEditorCancel: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
     ) {
         devices.forEach { device ->
@@ -1393,6 +1420,10 @@ internal fun DeviceTileList(
                 actionEnabled = actionEnabled,
                 actionInProgress = actionInProgress(device),
                 editing = editingDeviceId == device.id,
+                connectedAddress = currentTarget?.let {
+                    if (device.matchesAddress(it)) it.toString()
+                    else null
+                },
                 onClick = { onClick(device) },
                 onLongClick = { onLongClick(device) },
                 onAction = { onAction(device) },

@@ -59,6 +59,9 @@
     <string name="button_swap">交换</string>
     <string name="label_ip_address">IP 地址</string>
     <string name="label_port">端口</string>
+    <string name="label_ip_port">IP:端口</string>
+    <string name="cd_add_address">添加地址</string>
+    <string name="cd_delete_address">删除地址</string>
     <string name="label_device_name">设备名</string>
     <string name="label_name">名称</string>
     <string name="label_wlan_pairing_code">WLAN 配对码</string>
@@ -169,6 +172,8 @@
     <string name="pref_summary_debug_info">在全屏界面悬浮显示分辨率、帧率和触点信息</string>
     <string name="pref_title_hide_simple_settings">设备页隐藏简单设置项</string>
     <string name="pref_summary_hide_simple_settings">启用后设备页仅保留更多参数、所有应用、最近任务和启动/停止按钮</string>
+    <string name="pref_title_preview_card_on_top">使预览卡显示在配置卡上方</string>
+    <string name="pref_summary_preview_card_on_top">启用后设备页预览卡和虚拟按钮将显示在 Scrcpy 配置卡的上方</string>
     <string name="pref_title_preview_card_height">预览卡高度</string>
     <string name="pref_summary_preview_card_height">设备页预览卡高度</string>
     <string name="pref_title_quick_device_sort">快速设备排序</string>

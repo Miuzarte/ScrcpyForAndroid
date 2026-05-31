@@ -69,6 +69,31 @@ internal class ConnectionController(
         adbCoordinator.connectWithTimeout(host, port, timeoutMs)
     }
 
+    suspend fun connectAddresses(
+        addresses: List<String>,
+        timeoutMs: Long,
+        probeTimeoutMs: Int,
+    ): ConnectionTarget {
+        return adbCoordinator.connectFirstReachable(addresses, timeoutMs, probeTimeoutMs)
+    }
+
+    suspend fun disconnectCurrentTargetBeforeConnectingAny(
+        addresses: List<String>,
+    ): ConnectionTarget? {
+        val current = state.adbSession.currentTarget ?: return null
+        if (!state.adbSession.isConnected) return null
+        if (addresses.any { addr ->
+                val ct = ConnectionTarget.unmarshalFrom(addr)
+                ct != null && ct.host == current.host && ct.port == current.port
+            }) return null
+
+        disconnectAdbConnection(
+            clearQuickOnlineForTarget = current,
+            cause = DisconnectCause.SwitchTarget,
+        )
+        return current
+    }
+
     suspend fun keepAliveCheck(timeoutMs: Long): Boolean {
         return adbCoordinator.isConnected(timeoutMs)
     }

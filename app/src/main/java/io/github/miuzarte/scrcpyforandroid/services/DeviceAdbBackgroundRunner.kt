@@ -1,5 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
+import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import kotlinx.coroutines.*
 import java.io.Closeable
@@ -64,7 +65,7 @@ internal class DeviceAdbBackgroundRunner: Closeable {
         probeTcpReachable: suspend (host: String, port: Int) -> Boolean,
         discoverConnectService: suspend () -> Pair<String, Int>?,
         onMdnsPortChanged: suspend (host: String, oldPort: Int, newPort: Int) -> Unit,
-        connectKnownShortcut: suspend (shortcut: DeviceShortcut) -> Boolean,
+        connectKnownShortcut: suspend (DeviceShortcut, ConnectionTarget) -> Boolean,
         connectDiscoveredShortcut: suspend (
             host: String,
             port: Int,
@@ -81,18 +82,17 @@ internal class DeviceAdbBackgroundRunner: Closeable {
 
             val quickCandidates = savedShortcuts()
             if (quickCandidates.isNotEmpty()) {
-                for (target in quickCandidates) {
+                for (device in quickCandidates) {
                     if (isConnected() || isAdbConnecting()) break
-                    if (isBlacklisted(target.host)) continue
-
-                    val targetKey = "${target.host}:${target.port}"
-                    if (quickConnectTriedOnce.contains(targetKey)) continue
-
-                    if (!probeTcpReachable(target.host, target.port)) continue
-                    quickConnectTriedOnce += targetKey
-
-                    if (connectKnownShortcut(target)) {
-                        break
+                    for (addr in device.addresses) {
+                        if (isConnected() || isAdbConnecting()) break
+                        val target = ConnectionTarget.unmarshalFrom(addr) ?: continue
+                        if (isBlacklisted(target.host)) continue
+                        val targetKey = "${target.host}:${target.port}"
+                        if (quickConnectTriedOnce.contains(targetKey)) continue
+                        if (!probeTcpReachable(target.host, target.port)) continue
+                        quickConnectTriedOnce += targetKey
+                        if (connectKnownShortcut(device, target)) break
                     }
                 }
                 if (isConnected()) break
@@ -110,16 +110,14 @@ internal class DeviceAdbBackgroundRunner: Closeable {
                 continue
             }
 
-            val knownDevice = savedShortcuts().firstOrNull { it.host == discoveredHost }
+            val knownDevice = savedShortcuts().firstOrNull { it.matchesHost(discoveredHost) }
             if (knownDevice == null) {
                 delay(retryIntervalMs)
                 continue
             }
 
             val portToReplace = savedShortcuts().firstOrNull {
-                it.host == discoveredHost &&
-                        it.port != knownDevice.port &&
-                        it.port != discoveredPort
+                it.matchesHost(discoveredHost) && it.port != knownDevice.port
             }?.port
             if (portToReplace != null) {
                 withContext(Dispatchers.Main) {

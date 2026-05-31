@@ -4,41 +4,105 @@ import android.os.Parcelable
 import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
-// Composable 用, 不可变 List
 class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> by devices {
-    fun marshalToString(
-        separator: String = DEFAULT_SEPARATOR,
-    ): String = joinToString(separator) { it.marshalToString() }
+    fun marshalToString(): String = DeviceShortcut.json.encodeToString(devices)
 
     companion object {
-        const val DEFAULT_SEPARATOR = "\n"
-
-        fun unmarshalFrom(
-            s: String,
-            separator: String = DEFAULT_SEPARATOR,
-        ): DeviceShortcuts {
+        fun unmarshalFrom(s: String): DeviceShortcuts {
             if (s.isBlank()) return DeviceShortcuts(emptyList())
+            val trimmed = s.trim()
+            if (trimmed.startsWith("[")) {
+                return runCatching {
+                    val list = DeviceShortcut.json.decodeFromString<List<DeviceShortcut>>(trimmed)
+                        .map {
+                            if (it.addresses.isEmpty()) it.copy(addresses = listOf(""))
+                            else it
+                        }
+                    DeviceShortcuts(list)
+                }.getOrDefault(DeviceShortcuts(emptyList()))
+            }
+            return unmarshalFromPipe(s)
+        }
+
+        private fun unmarshalFromPipe(s: String): DeviceShortcuts {
             var nextLegacyId = 1
-            val list = s.splitToSequence(separator)
+            val list = s.lines()
                 .mapNotNull { raw ->
-                    val firstValue = raw.split(DeviceShortcut.DEFAULT_SEPARATOR, limit = 2)
+                    val firstValue = raw.split("|", limit = 2)
                         .firstOrNull()
                         ?.trim()
                         .orEmpty()
                     if (firstValue.toIntOrNull() != null) {
-                        DeviceShortcut.unmarshalFrom(raw)
+                        unmarshalDeviceFromPipe(raw)
                     } else {
-                        DeviceShortcut.unmarshalFrom(
-                            s = raw,
+                        unmarshalDeviceFromPipe(
+                            raw,
                             fallbackId = nextLegacyId.toString(),
                         ).also {
                             if (it != null) nextLegacyId++
                         }
                     }
                 }
-                .toList()
             return DeviceShortcuts(list)
+        }
+
+        private fun unmarshalDeviceFromPipe(
+            s: String,
+            fallbackId: String? = null,
+        ): DeviceShortcut? {
+            val parts = s.split("|")
+            val idInData = parts.firstOrNull()
+                ?.trim()
+                ?.takeIf { it.toIntOrNull() != null }
+
+            return if (idInData != null) {
+                if (parts.size == 7) {
+                    val name = parts[1].trim()
+                    val host = parts[2].trim()
+                    val port = parts[3].trim().toIntOrNull() ?: Defaults.ADB_PORT
+                    val startScrcpyOnConnect = parts.getOrNull(4)?.trim() == "1"
+                    val openFullscreenOnStart = startScrcpyOnConnect
+                            && parts.getOrNull(5)?.trim() == "1"
+                    val scrcpyProfileId = parts.getOrNull(6)
+                        ?.trim()
+                        ?.takeUnless { it.isNullOrBlank() }
+                        ?: ScrcpyOptions.GLOBAL_PROFILE_ID
+
+                    if (host.isNotBlank()) DeviceShortcut(
+                        id = idInData,
+                        name = name,
+                        addresses = listOf("$host:$port"),
+                        startScrcpyOnConnect = startScrcpyOnConnect,
+                        openFullscreenOnStart = openFullscreenOnStart,
+                        scrcpyProfileId = scrcpyProfileId,
+                    )
+                    else null
+                } else null
+            } else if (fallbackId != null && parts.size == 6) {
+                val name = parts[0].trim()
+                val host = parts[1].trim()
+                val port = parts[2].trim().toIntOrNull() ?: Defaults.ADB_PORT
+                val startScrcpyOnConnect = parts.getOrNull(3)?.trim() == "1"
+                val openFullscreenOnStart = startScrcpyOnConnect
+                        && parts.getOrNull(4)?.trim() == "1"
+                val scrcpyProfileId = parts.getOrNull(5)
+                    ?.trim()
+                    ?.takeUnless { it.isNullOrBlank() }
+                    ?: ScrcpyOptions.GLOBAL_PROFILE_ID
+
+                if (host.isNotBlank()) DeviceShortcut(
+                    id = fallbackId,
+                    name = name,
+                    addresses = listOf("$host:$port"),
+                    startScrcpyOnConnect = startScrcpyOnConnect,
+                    openFullscreenOnStart = openFullscreenOnStart,
+                    scrcpyProfileId = scrcpyProfileId,
+                )
+                else null
+            } else null
         }
     }
 
@@ -71,6 +135,25 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
         val old = devices[idx]
         val updateById = id != null
 
+        val updatedAddresses = when {
+            updateById -> {
+                val h = host ?: old.host
+                val p = port ?: old.port
+                listOf("$h:$p")
+            }
+
+            newPort != null -> {
+                old.addresses.map { addr ->
+                    val parsed = ConnectionTarget.unmarshalFrom(addr)
+                    if (parsed != null && parsed.host == host && parsed.port == port) {
+                        "${parsed.host}:$newPort"
+                    } else addr
+                }
+            }
+
+            else -> old.addresses
+        }
+
         val updated = DeviceShortcut(
             id = old.id,
             name = when {
@@ -78,14 +161,12 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
                 updateNameOnlyWhenEmpty && old.name.isNotBlank() -> old.name
                 else -> name
             },
-            host = if (updateById) host ?: old.host else old.host,
-            port = if (updateById) port ?: old.port else newPort ?: old.port,
+            addresses = updatedAddresses,
             startScrcpyOnConnect = startScrcpyOnConnect ?: old.startScrcpyOnConnect,
             openFullscreenOnStart = openFullscreenOnStart ?: old.openFullscreenOnStart,
             scrcpyProfileId = scrcpyProfileId ?: old.scrcpyProfileId,
         )
 
-        // 若无任何变化，返回原实例
         if (updated == old) return this
 
         val newList = devices.toMutableList()
@@ -93,7 +174,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
                 this[idx] = updated
             }
         return DeviceShortcuts(
-            if ((updateById && (updated.host != old.host || updated.port != old.port))
+            if ((updateById && (updated.addresses != old.addresses))
                 || (newPort != null && newPort != old.port)
             )
                 newList.distinctBy { it.id }
@@ -114,7 +195,6 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
         }
         val newList = devices.toMutableList()
         if (existingIdx >= 0) {
-            // Keep existing id stable when matching by host:port.
             val existingId = devices[existingIdx].id
             newList[existingIdx] = normalizedShortcut.copy(id = existingId)
         } else {
@@ -139,119 +219,51 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
         if (fromIndex == toIndex) return this
         val mutable = devices.toMutableList()
         val item = mutable.removeAt(fromIndex)
-        // 如果目标位置在原位置之后，移除后列表长度减1，因此目标索引需减1
         val target = if (toIndex > fromIndex) toIndex - 1 else toIndex
         mutable.add(target, item)
         return DeviceShortcuts(mutable)
     }
 
-    // 删除指定设备
     fun remove(id: String) = DeviceShortcuts(devices.filterNot { it.id == id })
 
-    // 清空所有设备
     fun clear() = DeviceShortcuts(emptyList())
 
-    // 复制当前实例
     fun copy(devices: List<DeviceShortcut> = this.devices): DeviceShortcuts =
         DeviceShortcuts(devices)
 }
 
+@Serializable
 data class DeviceShortcut(
     val id: String = "",
     val name: String = "",
-    val host: String,
-    val port: Int = Defaults.ADB_PORT,
+    val addresses: List<String> = listOf(""),
     val startScrcpyOnConnect: Boolean = false,
     val openFullscreenOnStart: Boolean = false,
     val scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
 ) {
-    fun marshalToString(
-        separator: String = DEFAULT_SEPARATOR,
-    ): String = listOf(
-        id.trim(),
-        name.trim(),
-        host.trim(),
-        port.toString(),
-        if (startScrcpyOnConnect) "1" else "0",
-        if (openFullscreenOnStart) "1" else "0",
-        scrcpyProfileId.trim(),
-    ).joinToString(
-        separator = separator,
-    )
+    val host: String
+        get() {
+            val first = addresses.firstOrNull() ?: return ""
+            return ConnectionTarget.unmarshalFrom(first)?.host ?: ""
+        }
+
+    val port: Int
+        get() {
+            val first = addresses.firstOrNull() ?: return Defaults.ADB_PORT
+            return ConnectionTarget.unmarshalFrom(first)?.port ?: Defaults.ADB_PORT
+        }
+
+    fun matchesAddress(target: ConnectionTarget) = addresses.any { addr ->
+        val ct = ConnectionTarget.unmarshalFrom(addr)
+        ct != null && ct.host == target.host && ct.port == target.port
+    }
+
+    fun matchesHost(host: String) = addresses.any { addr ->
+        ConnectionTarget.unmarshalFrom(addr)?.host == host
+    }
 
     companion object {
-        const val DEFAULT_SEPARATOR = "|"
-        fun unmarshalFrom(
-            s: String,
-            separator: String = DEFAULT_SEPARATOR,
-            fallbackId: String? = null,
-        ): DeviceShortcut? {
-            val parts = s.split(separator)
-            val idInData = parts.firstOrNull()
-                ?.trim()
-                ?.takeIf { it.toIntOrNull() != null }
-            return if (idInData != null) when (parts.size) {
-                4, 5, 6, 7 -> {
-                    val name = parts[1].trim()
-                    val host = parts[2].trim()
-                    val port = parts[3].trim().toIntOrNull() ?: Defaults.ADB_PORT
-
-                    val startScrcpyOnConnect = parts.getOrNull(4)
-                        ?.trim() == "1"
-                    val openFullscreenOnStart = startScrcpyOnConnect
-                            && parts.getOrNull(5)
-                        ?.trim() == "1"
-                    val scrcpyProfileId = parts.getOrNull(6)
-                        ?.trim()
-                        .takeUnless { it.isNullOrBlank() }
-                        ?: ScrcpyOptions.GLOBAL_PROFILE_ID
-
-                    if (host.isNotBlank()) DeviceShortcut(
-                        id = idInData,
-                        name = name,
-                        host = host,
-                        port = port,
-                        startScrcpyOnConnect = startScrcpyOnConnect,
-                        openFullscreenOnStart = openFullscreenOnStart,
-                        scrcpyProfileId = scrcpyProfileId,
-                    )
-                    else null
-                }
-
-                else -> null
-            }
-            else when (parts.size) {
-                3, 4, 5, 6 -> {
-                    val id = fallbackId ?: return null
-                    val name = parts[0].trim()
-                    val host = parts[1].trim()
-                    val port = parts[2].trim().toIntOrNull() ?: Defaults.ADB_PORT
-
-                    val startScrcpyOnConnect = parts.getOrNull(3)
-                        ?.trim() == "1"
-                    val openFullscreenOnStart = startScrcpyOnConnect
-                            && parts.getOrNull(4)
-                        ?.trim() == "1"
-                    val scrcpyProfileId = parts.getOrNull(5)
-                        ?.trim()
-                        .takeUnless { it.isNullOrBlank() }
-                        ?: ScrcpyOptions.GLOBAL_PROFILE_ID
-
-                    if (host.isNotBlank()) DeviceShortcut(
-                        id = id,
-                        name = name,
-                        host = host,
-                        port = port,
-                        startScrcpyOnConnect = startScrcpyOnConnect,
-                        openFullscreenOnStart = openFullscreenOnStart,
-                        scrcpyProfileId = scrcpyProfileId,
-                    )
-                    else null
-                }
-
-                else -> null
-            }
-        }
+        val json = Json { ignoreUnknownKeys = true }
     }
 }
 

@@ -429,6 +429,14 @@ fun SettingsPage(
                         )
                     },
                 )
+                SwitchPreference(
+                    title = stringResource(R.string.pref_title_preview_card_on_top),
+                    summary = stringResource(R.string.pref_summary_preview_card_on_top),
+                    checked = asBundle.previewCardOnTop,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(previewCardOnTop = it)
+                    },
+                )
                 ArrowSlider(
                     title = stringResource(R.string.pref_title_preview_card_height),
                     summary = stringResource(R.string.pref_summary_preview_card_height),

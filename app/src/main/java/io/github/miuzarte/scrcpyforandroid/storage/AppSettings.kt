@@ -135,6 +135,10 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
             booleanPreferencesKey("hide_simple_config_items"),
             false,
         )
+        val PREVIEW_CARD_ON_TOP = Pair(
+            booleanPreferencesKey("preview_card_on_top"),
+            false,
+        )
         val DEVICE_PREVIEW_CARD_HEIGHT_DP = Pair(
             intPreferencesKey("device_preview_card_height_dp"),
             1080 / 3,
@@ -312,6 +316,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         val lowLatency: Boolean,
         val fullscreenDebugInfo: Boolean,
         val hideSimpleConfigItems: Boolean,
+        val previewCardOnTop: Boolean,
         val devicePreviewCardHeightDp: Int,
         val realtimeClipboardSyncToDevice: Boolean,
 
@@ -375,6 +380,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         bundleField(LOW_LATENCY) { it.lowLatency },
         bundleField(FULLSCREEN_DEBUG_INFO) { it.fullscreenDebugInfo },
         bundleField(HIDE_SIMPLE_CONFIG_ITEMS) { it.hideSimpleConfigItems },
+        bundleField(PREVIEW_CARD_ON_TOP) { it.previewCardOnTop },
         bundleField(DEVICE_PREVIEW_CARD_HEIGHT_DP) { it.devicePreviewCardHeightDp },
         bundleField(REALTIME_CLIPBOARD_SYNC_TO_DEVICE) { it.realtimeClipboardSyncToDevice },
 
@@ -439,6 +445,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         lowLatency = preferences.read(LOW_LATENCY),
         fullscreenDebugInfo = preferences.read(FULLSCREEN_DEBUG_INFO),
         hideSimpleConfigItems = preferences.read(HIDE_SIMPLE_CONFIG_ITEMS),
+        previewCardOnTop = preferences.read(PREVIEW_CARD_ON_TOP),
         devicePreviewCardHeightDp = preferences.read(DEVICE_PREVIEW_CARD_HEIGHT_DP),
         realtimeClipboardSyncToDevice = preferences.read(REALTIME_CLIPBOARD_SYNC_TO_DEVICE),
 

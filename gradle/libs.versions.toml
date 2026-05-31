@@ -5,6 +5,7 @@ boringssl = "20251124"
 conscryptAndroid = "2.5.3"
 datastorePreferences = "1.2.1"
 kotlin = "2.3.20"
+kotlinx-serialization = "1.11.0"
 coreKtx = "1.18.0"
 libcxx = "29.0.14206865"
 lifecycleRuntimeKtx = "2.10.0"
@@ -58,9 +59,11 @@ androidx-core-pip = { group = "androidx.core", name = "core-pip", version.ref = 
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "androidxBiometric" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto-ktx", version.ref = "androidxSecurityCrypto" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
