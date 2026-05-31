@@ -1,15 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.scaffolds
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material3.IconButton
@@ -51,13 +43,13 @@ class ReorderableList(
             val icon: ImageVector,
             val contentDescription: String,
             val onClick: () -> Unit,
-        ) : EndAction
+        ): EndAction
 
         data class Checkbox(
             val checked: Boolean,
             val enabled: Boolean = true,
             val onClick: () -> Unit,
-        ) : EndAction
+        ): EndAction
     }
 
     data class Item(
@@ -94,7 +86,7 @@ class ReorderableList(
                                         .height(IntrinsicSize.Min)
                                         .padding(
                                             horizontal = UiSpacing.CardTitle,
-                                            vertical = UiSpacing.FieldLabelBottom
+                                            vertical = UiSpacing.FieldLabelBottom,
                                         ),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -108,14 +100,14 @@ class ReorderableList(
                                                     Modifier.clickable(onClick = item.onClick)
                                                 } else {
                                                     Modifier
-                                                }
+                                                },
                                             ),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small)
+                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small),
                                     ) {
                                         if (item.icon != null) Icon(
                                             item.icon,
-                                            contentDescription = item.title
+                                            contentDescription = item.title,
                                         )
                                         Column {
                                             Text(
@@ -132,7 +124,7 @@ class ReorderableList(
                                     }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small)
+                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small),
                                     ) {
                                         item.endActions.forEach { action ->
                                             EndActionView(
@@ -181,7 +173,7 @@ class ReorderableList(
                                     modifier = Modifier
                                         .padding(
                                             horizontal = UiSpacing.CardTitle,
-                                            vertical = UiSpacing.FieldLabelBottom
+                                            vertical = UiSpacing.FieldLabelBottom,
                                         ),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
@@ -191,7 +183,7 @@ class ReorderableList(
                                                 Modifier.clickable(onClick = item.onClick)
                                             } else {
                                                 Modifier
-                                            }
+                                            },
                                         ),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {

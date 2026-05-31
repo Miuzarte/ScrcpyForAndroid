@@ -9,14 +9,14 @@ object PublicDirs {
     fun transferDirectory(): File {
         return File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            ROOT_DIRECTORY
+            ROOT_DIRECTORY,
         )
     }
 
     fun recordDirectory(): File {
         return File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            ROOT_DIRECTORY
+            ROOT_DIRECTORY,
         )
     }
 }

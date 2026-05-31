@@ -1,28 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -50,22 +36,8 @@ import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.SnackbarHost
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.basic.TopAppBar
+import kotlinx.coroutines.*
+import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
@@ -168,7 +140,7 @@ private fun RecordPreferencesPage(
             TextFieldValue(
                 text = soBundle.recordFilename,
                 selection = TextRange(soBundle.recordFilename.length),
-            )
+            ),
         )
     }
 
@@ -225,7 +197,7 @@ private fun RecordPreferencesPage(
             RecordFilenameTemplate.resolve(
                 template = draftTemplate.text,
                 sessionInfo = previewSessionInfo,
-            )
+            ),
         )
     }
     val listState = rememberSaveable(
@@ -293,7 +265,7 @@ private fun RecordPreferencesPage(
                         if (index > 0) HorizontalDivider()
                         Column(
                             modifier = Modifier.padding(horizontal = UiSpacing.Large),
-                            verticalArrangement = Arrangement.spacedBy(UiSpacing.Small)
+                            verticalArrangement = Arrangement.spacedBy(UiSpacing.Small),
                         ) {
                             Text(
                                 text = entry.value,
@@ -302,7 +274,7 @@ private fun RecordPreferencesPage(
                             )
                             Text(
                                 text = stringResource(
-                                    entry.descriptionResId ?: R.string.record_plain_text
+                                    entry.descriptionResId ?: R.string.record_plain_text,
                                 ),
                                 color = colorScheme.onSurfaceVariantSummary,
                                 fontSize = textStyles.body2.fontSize,

@@ -134,7 +134,7 @@ internal class DirectAdbPairingClient(
     private val port: Int,
     private val pairingCode: String,
     private val key: AdbPairingKey,
-) : Closeable {
+): Closeable {
 
     private enum class State {
         READY,

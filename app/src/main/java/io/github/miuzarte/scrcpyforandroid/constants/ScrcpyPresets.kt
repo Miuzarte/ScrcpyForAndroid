@@ -7,7 +7,7 @@ package io.github.miuzarte.scrcpyforandroid.constants
  * @param T The type of preset values (typically Int)
  * @param values The list of preset values
  */
-class Preset<T : Comparable<T>>(val values: List<T>) {
+class Preset<T: Comparable<T>>(val values: List<T>) {
     val lastIndex: Int get() = values.lastIndex
     val size: Int get() = values.size
     val indices: IntRange get() = values.indices

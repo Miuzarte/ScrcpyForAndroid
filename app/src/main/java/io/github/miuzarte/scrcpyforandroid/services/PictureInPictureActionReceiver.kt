@@ -9,7 +9,7 @@ import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import kotlinx.coroutines.runBlocking
 
 // not working in MIUI
-class PictureInPictureActionReceiver : BroadcastReceiver() {
+class PictureInPictureActionReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_STOP_SCRCPY) return
         val pendingResult = goAsync()

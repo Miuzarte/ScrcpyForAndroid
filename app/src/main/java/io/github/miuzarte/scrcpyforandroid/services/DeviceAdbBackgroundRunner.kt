@@ -1,15 +1,11 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExecutorCoroutineDispatcher
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.io.Closeable
 import java.util.concurrent.Executors
 
-internal class DeviceAdbBackgroundRunner : Closeable {
+internal class DeviceAdbBackgroundRunner: Closeable {
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "device-adb-monitor").apply { isDaemon = true }
     }

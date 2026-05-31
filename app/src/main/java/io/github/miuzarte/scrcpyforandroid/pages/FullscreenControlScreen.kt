@@ -10,29 +10,9 @@ import android.view.Surface
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -65,18 +45,8 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import io.github.miuzarte.scrcpyforandroid.util.Debouncer
-import io.github.miuzarte.scrcpyforandroid.widgets.AppListBottomSheet
-import io.github.miuzarte.scrcpyforandroid.widgets.AppListEntry
-import io.github.miuzarte.scrcpyforandroid.widgets.ScrcpyVideoSurface
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import io.github.miuzarte.scrcpyforandroid.widgets.*
+import kotlinx.coroutines.*
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.Text
@@ -126,7 +96,7 @@ fun FullscreenControlScreen(
 
     val buttonItems = remember(asBundle.virtualButtonsLayout) {
         VirtualButtonActions.splitLayout(
-            VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout)
+            VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout),
         )
     }
     val floatingActions = remember(buttonItems) {
@@ -137,7 +107,7 @@ fun FullscreenControlScreen(
     val fullscreenVirtualButtonHeight = asBundle.fullscreenVirtualButtonHeightDp.dp
     val fullscreenVirtualButtonDockSetting = remember(asBundle.fullscreenVirtualButtonDock) {
         AppSettings.FullscreenVirtualButtonDock.fromStoredValue(
-            asBundle.fullscreenVirtualButtonDock
+            asBundle.fullscreenVirtualButtonDock,
         )
     }
     var displayRotation by remember(activity) {
@@ -148,7 +118,7 @@ fun FullscreenControlScreen(
         if (displayManager == null || activity == null) {
             onDispose {}
         } else {
-            val listener = object : DisplayManager.DisplayListener {
+            val listener = object: DisplayManager.DisplayListener {
                 override fun onDisplayAdded(displayId: Int) = Unit
 
                 override fun onDisplayRemoved(displayId: Int) = Unit
@@ -171,7 +141,8 @@ fun FullscreenControlScreen(
             AppSettings.FullscreenVirtualButtonDock.FOLLOW_TOP,
             AppSettings.FullscreenVirtualButtonDock.FOLLOW_BOTTOM,
             AppSettings.FullscreenVirtualButtonDock.FOLLOW_LEFT,
-            AppSettings.FullscreenVirtualButtonDock.FOLLOW_RIGHT -> null
+            AppSettings.FullscreenVirtualButtonDock.FOLLOW_RIGHT,
+                -> null
 
             AppSettings.FullscreenVirtualButtonDock.FIXED_TOP -> VirtualButtonBar.FullscreenDock.TOP
             AppSettings.FullscreenVirtualButtonDock.FIXED_BOTTOM -> VirtualButtonBar.FullscreenDock.BOTTOM
@@ -250,7 +221,7 @@ fun FullscreenControlScreen(
             val restoreWindow = activity?.window
             if (restoreWindow != null) {
                 WindowInsetsControllerCompat(restoreWindow, restoreWindow.decorView).show(
-                    WindowInsetsCompat.Type.systemBars()
+                    WindowInsetsCompat.Type.systemBars(),
                 )
                 WindowCompat.setDecorFitsSystemWindows(restoreWindow, true)
             }
@@ -320,7 +291,7 @@ fun FullscreenControlScreen(
             Log.w("FullscreenControlPage", "commitImeText failed", error)
             AppRuntime.snackbar(
                 if (useClipboardPaste) R.string.fullscreen_paste_non_ascii
-                else R.string.fullscreen_text_input_failed
+                else R.string.fullscreen_text_input_failed,
             )
         }
     }
@@ -367,7 +338,7 @@ fun FullscreenControlScreen(
                         Log.w("FullscreenControl", "pasteLocalClipboard failed", error)
                         AppRuntime.snackbar(
                             if (useLegacyPaste) R.string.fullscreen_legacy_paste_failed
-                            else R.string.fullscreen_clipboard_sync_failed
+                            else R.string.fullscreen_clipboard_sync_failed,
                         )
                     }
                 }
@@ -383,7 +354,7 @@ fun FullscreenControlScreen(
                         Log.w(
                             "FullscreenControlPage",
                             "sendKeycode failed for keycode=$it",
-                            e
+                            e,
                         )
                     }
                 }
@@ -452,7 +423,7 @@ fun FullscreenControlScreen(
                             VirtualButtonBar.FullscreenDock.BOTTOM -> Alignment.BottomCenter
                             VirtualButtonBar.FullscreenDock.LEFT -> Alignment.CenterStart
                             VirtualButtonBar.FullscreenDock.RIGHT -> Alignment.CenterEnd
-                        }
+                        },
                     ),
                     dock = fullscreenVirtualButtonDock,
                     reverseOrder = fullscreenVirtualButtonReverseOrder,
@@ -582,10 +553,12 @@ private fun isFixedDockOrderReversed(
     )
     return when (visualDock) {
         VirtualButtonBar.FullscreenDock.TOP,
-        VirtualButtonBar.FullscreenDock.BOTTOM -> visualDirection == DockDirection.RIGHT_TO_LEFT
+        VirtualButtonBar.FullscreenDock.BOTTOM,
+            -> visualDirection == DockDirection.RIGHT_TO_LEFT
 
         VirtualButtonBar.FullscreenDock.LEFT,
-        VirtualButtonBar.FullscreenDock.RIGHT -> visualDirection == DockDirection.BOTTOM_TO_TOP
+        VirtualButtonBar.FullscreenDock.RIGHT,
+            -> visualDirection == DockDirection.BOTTOM_TO_TOP
     }
 }
 
@@ -707,7 +680,7 @@ fun FullscreenControlPage(
                     Modifier.pointerInteropFilter { event ->
                         touchEventHandler.handleMotionEvent(event)
                     }
-                else Modifier
+                else Modifier,
             )
             .onSizeChanged { size ->
                 touchAreaSize = size
@@ -736,7 +709,7 @@ fun FullscreenControlPage(
                     else
                         Modifier
                             .fillMaxHeight()
-                            .aspectRatio(sessionAspect)
+                            .aspectRatio(sessionAspect),
                 ),
         ) {
             ScrcpyVideoSurface(
@@ -750,7 +723,7 @@ fun FullscreenControlPage(
                                 bounds.top.toInt(),
                                 bounds.right.toInt(),
                                 bounds.bottom.toInt(),
-                            )
+                            ),
                         )
                     },
                 session = session,
@@ -779,7 +752,7 @@ fun FullscreenControlPage(
                 .align(Alignment.TopStart)
                 .padding(start = UiSpacing.ContentVertical, top = UiSpacing.ContentVertical)
                 .background(Color.Black.copy(alpha = 0.5f))
-                .padding(horizontal = UiSpacing.ContentVertical, vertical = UiSpacing.Medium)
+                .padding(horizontal = UiSpacing.ContentVertical, vertical = UiSpacing.Medium),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.Tiny)) {
                 Text(

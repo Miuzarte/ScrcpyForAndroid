@@ -2,7 +2,6 @@ package io.github.miuzarte.scrcpyforandroid.services
 
 import android.content.Context
 import androidx.annotation.StringRes
-import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbMdnsDiscoverer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy

@@ -190,7 +190,7 @@ object NativeAdbService {
             .map(String::trim)
             .lastOrNull { '/' in it }
             ?: throw IllegalStateException(
-                "Cannot resolve launch activity for $normalizedPackageName"
+                "Cannot resolve launch activity for $normalizedPackageName",
             )
 
         val displayArg = displayId

@@ -22,7 +22,7 @@ internal data class DeviceAdbSessionState(
     val connectedScrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
     val audioForwardingSupported: Boolean = true,
     val cameraMirroringSupported: Boolean = true,
-) : Parcelable
+): Parcelable
 
 internal class DeviceAdbConnectionCoordinator(
     private val adbService: NativeAdbService = NativeAdbService,

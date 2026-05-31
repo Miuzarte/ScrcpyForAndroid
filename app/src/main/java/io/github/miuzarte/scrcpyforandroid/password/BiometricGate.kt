@@ -61,7 +61,7 @@ object BiometricGate {
         prompt = BiometricPrompt(
             activity,
             ContextCompat.getMainExecutor(activity),
-            object : BiometricPrompt.AuthenticationCallback() {
+            object: BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     finish(true)
                 }
@@ -71,7 +71,7 @@ object BiometricGate {
                 }
 
                 override fun onAuthenticationFailed() = Unit
-            }
+            },
         )
 
         prompt.authenticate(
@@ -79,7 +79,7 @@ object BiometricGate {
                 .setAllowedAuthenticators(ALLOWED_AUTHENTICATORS)
                 .setTitle(title)
                 .setSubtitle(subtitle)
-                .build()
+                .build(),
         )
 
         continuation.invokeOnCancellation {

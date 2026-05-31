@@ -2,31 +2,18 @@ package io.github.miuzarte.scrcpyforandroid.storage
 
 import android.content.Context
 import android.os.Parcelable
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions.KeyInjectMode
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions.RecordFormat
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.DisplayImePolicy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.LogLevel
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Orientation
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.OrientationLock
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.*
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.parcelize.Parcelize
 import org.json.JSONObject
 
-class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
+class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
     companion object {
         const val GLOBAL_PROFILE_ID = "global"
         val GLOBAL_PROFILE_NAME_RES_ID = R.string.text_global
@@ -435,7 +422,7 @@ class ScrcpyOptions(context: Context) : Settings(context, "ScrcpyOptions") {
         val cameraTorch: Boolean,
         val keepActive: Boolean,
         val flexDisplay: Boolean,
-    ) : Parcelable {
+    ): Parcelable {
     }
 
     private val bundleFields = arrayOf<BundleField<Bundle>>(

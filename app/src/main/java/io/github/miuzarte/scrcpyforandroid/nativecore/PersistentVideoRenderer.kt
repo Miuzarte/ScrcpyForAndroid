@@ -1,15 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.graphics.SurfaceTexture
-import android.opengl.EGL14
-import android.opengl.EGLConfig
-import android.opengl.EGLContext
-import android.opengl.EGLDisplay
-import android.opengl.EGLExt
-import android.opengl.EGLSurface
-import android.opengl.GLES11Ext
-import android.opengl.GLES20
-import android.opengl.Matrix
+import android.opengl.*
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -85,7 +77,7 @@ class PersistentVideoRenderer {
                 eglConfig,
                 surface,
                 intArrayOf(EGL14.EGL_NONE),
-                0
+                0,
             )
             Log.i(tag, "attachDisplaySurface(): attached surfaceId=$newId")
             drawFrame()
@@ -96,7 +88,7 @@ class PersistentVideoRenderer {
         val requestId = surface?.let { System.identityHashCode(it) }
         Log.i(
             tag,
-            "detachDisplaySurface(): request surfaceId=$requestId releaseSurface=$releaseSurface current=${displaySurfaceId}"
+            "detachDisplaySurface(): request surfaceId=$requestId releaseSurface=$releaseSurface current=${displaySurfaceId}",
         )
         handler.post {
             if (released) return@post
@@ -137,7 +129,7 @@ class PersistentVideoRenderer {
                 eglConfig,
                 surface,
                 intArrayOf(EGL14.EGL_NONE),
-                0
+                0,
             )
             Log.i(tag, "attachRecordSurface(): attached surfaceId=$newId")
             drawFrame()
@@ -148,7 +140,7 @@ class PersistentVideoRenderer {
         val requestId = surface?.let { System.identityHashCode(it) }
         Log.i(
             tag,
-            "detachRecordSurface(): request surfaceId=$requestId releaseSurface=$releaseSurface current=$recordSurfaceId"
+            "detachRecordSurface(): request surfaceId=$requestId releaseSurface=$releaseSurface current=$recordSurfaceId",
         )
         handler.post {
             if (released) return@post
@@ -183,7 +175,7 @@ class PersistentVideoRenderer {
                     eglDisplay,
                     EGL14.EGL_NO_SURFACE,
                     EGL14.EGL_NO_SURFACE,
-                    EGL14.EGL_NO_CONTEXT
+                    EGL14.EGL_NO_CONTEXT,
                 )
                 if (eglPbufferSurface != EGL14.EGL_NO_SURFACE) {
                     EGL14.eglDestroySurface(eglDisplay, eglPbufferSurface)
@@ -227,7 +219,7 @@ class PersistentVideoRenderer {
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
             EGL14.EGL_ALPHA_SIZE, 8,
-            EGL14.EGL_NONE
+            EGL14.EGL_NONE,
         )
         check(EGL14.eglChooseConfig(eglDisplay, attribs, 0, configs, 0, 1, numConfigs, 0))
         eglConfig = configs[0]
@@ -236,30 +228,33 @@ class PersistentVideoRenderer {
             eglConfig,
             EGL14.EGL_NO_CONTEXT,
             intArrayOf(0x3098, 2, EGL14.EGL_NONE),
-            0
+            0,
         )
         check(eglContext != EGL14.EGL_NO_CONTEXT)
         eglPbufferSurface = EGL14.eglCreatePbufferSurface(
             eglDisplay,
             eglConfig,
             intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE),
-            0
+            0,
         )
         check(eglPbufferSurface != EGL14.EGL_NO_SURFACE)
         check(EGL14.eglMakeCurrent(eglDisplay, eglPbufferSurface, eglPbufferSurface, eglContext))
 
         oesTextureId = createExternalTexture()
         decoderSurfaceTexture = SurfaceTexture(oesTextureId).apply {
-            setOnFrameAvailableListener({
-                val n = frameAvailableCount.incrementAndGet()
-                if (n == 1L || n % 120L == 0L) {
-                    Log.i(
-                        tag,
-                        "onFrameAvailable(): available=$n consumed=${frameConsumedCount.get()} rendered=${frameRenderedCount.get()} display=${displaySurfaceId != null}"
-                    )
-                }
-                drawFrame()
-            }, handler)
+            setOnFrameAvailableListener(
+                {
+                    val n = frameAvailableCount.incrementAndGet()
+                    if (n == 1L || n % 120L == 0L) {
+                        Log.i(
+                            tag,
+                            "onFrameAvailable(): available=$n consumed=${frameConsumedCount.get()} rendered=${frameRenderedCount.get()} display=${displaySurfaceId != null}",
+                        )
+                    }
+                    drawFrame()
+                },
+                handler,
+            )
         }
         decoderSurface = Surface(decoderSurfaceTexture)
         Log.i(tag, "initializeLocked(): decoder surface created")
@@ -290,7 +285,7 @@ class PersistentVideoRenderer {
                 if (consumed == 1L || consumed % 120L == 0L) {
                     Log.i(
                         tag,
-                        "drawFrame(): consumed=$consumed available=${frameAvailableCount.get()} rendered=${frameRenderedCount.get()} display=${displaySurfaceId != null}"
+                        "drawFrame(): consumed=$consumed available=${frameAvailableCount.get()} rendered=${frameRenderedCount.get()} display=${displaySurfaceId != null}",
                     )
                 }
             }
@@ -322,7 +317,7 @@ class PersistentVideoRenderer {
             if (rendered == 1L || rendered % 120L == 0L) {
                 Log.i(
                     tag,
-                    "drawFrame(): rendered=$rendered consumed=${frameConsumedCount.get()} available=${frameAvailableCount.get()} viewport=${width[0]}x${height[0]}"
+                    "drawFrame(): rendered=$rendered consumed=${frameConsumedCount.get()} available=${frameAvailableCount.get()} viewport=${width[0]}x${height[0]}",
                 )
             }
         }
@@ -391,22 +386,22 @@ class PersistentVideoRenderer {
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_MIN_FILTER,
-            GLES20.GL_LINEAR
+            GLES20.GL_LINEAR,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_MAG_FILTER,
-            GLES20.GL_LINEAR
+            GLES20.GL_LINEAR,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_WRAP_S,
-            GLES20.GL_CLAMP_TO_EDGE
+            GLES20.GL_CLAMP_TO_EDGE,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_WRAP_T,
-            GLES20.GL_CLAMP_TO_EDGE
+            GLES20.GL_CLAMP_TO_EDGE,
         )
         return textures[0]
     }
@@ -439,7 +434,7 @@ class PersistentVideoRenderer {
                         1f, -1f, 1f, 1f,
                         -1f, 1f, 0f, 0f,
                         1f, 1f, 1f, 0f,
-                    )
+                    ),
                 )
                 position(0)
             }

@@ -7,30 +7,12 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,14 +38,7 @@ import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
-import top.yukonga.miuix.kmp.basic.DropdownEntry
-import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
@@ -123,9 +98,9 @@ fun TerminalScreen(
                                         onClick = {
                                             output = ""
                                         },
-                                    )
-                                )
-                            )
+                                    ),
+                                ),
+                            ),
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.More,
@@ -140,7 +115,7 @@ fun TerminalScreen(
         Box(
             modifier =
                 if (blurActive) Modifier.layerBackdrop(blurBackdrop)
-                else Modifier
+                else Modifier,
         ) {
             TerminalPage(
                 viewModel = viewModel,
@@ -298,7 +273,7 @@ private fun TerminalPage(
     }
 
     val terminalViewClient = remember {
-        object : TerminalViewClient {
+        object: TerminalViewClient {
             override fun onScale(scale: Float): Float {
                 when {
                     scale >= FONT_SCALE_STEP_THRESHOLD -> {
@@ -360,7 +335,7 @@ private fun TerminalPage(
                 terminalView?.setTerminalCursorBlinkerRate(500)
                 terminalView?.setTerminalCursorBlinkerState(
                     start = true,
-                    startOnlyIfCursorEnabled = true
+                    startOnlyIfCursorEnabled = true,
                 )
                 viewModel.syncOutput { onOutputChange(it) }
             }
@@ -419,7 +394,7 @@ private fun TerminalPage(
     // theme changes
     LaunchedEffect(
         colorScheme.surface,
-        colorScheme.onSurface
+        colorScheme.onSurface,
     ) {
         applyTheme()
         terminalView?.onScreenUpdated()
@@ -546,7 +521,7 @@ private fun TerminalPage(
             TerminalExtraKeyButton(
                 "CTRL",
                 Modifier.weight(1f),
-                active = viewModel.ctrlLatched
+                active = viewModel.ctrlLatched,
             ) {
                 haptic.contextClick()
                 viewModel.ctrlLatched = !viewModel.ctrlLatched
@@ -554,7 +529,7 @@ private fun TerminalPage(
             TerminalExtraKeyButton(
                 "ALT",
                 Modifier.weight(1f),
-                active = viewModel.altLatched
+                active = viewModel.altLatched,
             ) {
                 haptic.contextClick()
                 viewModel.altLatched = !viewModel.altLatched
@@ -639,7 +614,7 @@ private fun TerminalOutputBottomSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(2f / 3f)
+                .fillMaxHeight(2f / 3f),
         ) {
             item {
                 TextField(

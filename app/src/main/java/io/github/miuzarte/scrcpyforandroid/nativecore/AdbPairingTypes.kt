@@ -11,11 +11,7 @@ import java.math.BigInteger
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.security.KeyFactory
-import java.security.PrivateKey
-import java.security.Provider
-import java.security.SecureRandom
-import java.security.Security
+import java.security.*
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.interfaces.RSAPrivateKey
@@ -73,7 +69,7 @@ internal class AdbPairingKey(
     }
 
     private val keyManager: X509ExtendedKeyManager
-        get() = object : X509ExtendedKeyManager() {
+        get() = object: X509ExtendedKeyManager() {
             private val keyAlias = "adbkey"
 
             override fun chooseClientAlias(
@@ -110,7 +106,7 @@ internal class AdbPairingKey(
     @get:SuppressLint("CustomX509TrustManager")
     @get:Suppress("TrustAllX509TrustManager")
     private val trustManager: X509ExtendedTrustManager
-        get() = object : X509ExtendedTrustManager() {
+        get() = object: X509ExtendedTrustManager() {
             // ADB pairing uses SPAKE2 + exported keying material to authenticate the peer.
             // The peer cert is ephemeral/self-signed, so PKIX validation is intentionally bypassed here.
             private fun acceptForPairing(
@@ -213,4 +209,4 @@ private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
 /**
  * Thrown when the supplied pairing code is invalid during the pairing flow.
  */
-internal class AdbInvalidPairingCodeException : Exception()
+internal class AdbInvalidPairingCodeException: Exception()

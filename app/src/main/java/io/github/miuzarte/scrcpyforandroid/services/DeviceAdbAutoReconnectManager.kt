@@ -7,7 +7,7 @@ internal class DeviceAdbAutoReconnectManager(
     private val controller: ConnectionController,
     private val stateStore: ConnectionStateStore,
     private val backgroundRunner: DeviceAdbBackgroundRunner = DeviceAdbBackgroundRunner(),
-) : Closeable {
+): Closeable {
     suspend fun runKeepAliveLoop(
         isForeground: () -> Boolean,
         intervalMs: Long,
@@ -31,7 +31,7 @@ internal class DeviceAdbAutoReconnectManager(
             onReconnectFailure = onReconnectFailure,
             shouldAutoReconnect = {
                 stateStore.state.value.disconnectCause != DisconnectCause.User &&
-                    stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
+                        stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
             },
         )
     }

@@ -1,15 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.scrcpy
 
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.DisplayImePolicy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.LogLevel
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Orientation
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.OrientationLock
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.*
 import io.github.miuzarte.scrcpyforandroid.services.NativeRecordingSupport
 
 data class ClientOptions(
@@ -304,7 +295,7 @@ data class ClientOptions(
 
         if (!video && !audio && !control) {
             throw IllegalArgumentException(
-                "nothing to do"
+                "nothing to do",
             )
         }
 
@@ -315,13 +306,13 @@ data class ClientOptions(
         if (newDisplay.isNotBlank()) {
             if (videoSource != VideoSource.DISPLAY) {
                 throw IllegalArgumentException(
-                    "--new-display is only available with --video-source=display"
+                    "--new-display is only available with --video-source=display",
                 )
             }
 
             if (!video) {
                 throw IllegalArgumentException(
-                    "--new-display is incompatible with --no-video"
+                    "--new-display is incompatible with --no-video",
                 )
             }
         }
@@ -329,39 +320,39 @@ data class ClientOptions(
         if (videoSource == VideoSource.CAMERA) {
             if (displayId > 0) {
                 throw IllegalArgumentException(
-                    "--display-id is only available with --video-source=display"
+                    "--display-id is only available with --video-source=display",
                 )
             }
 
             if (displayImePolicy != DisplayImePolicy.UNDEFINED) {
                 throw IllegalArgumentException(
-                    "--display-ime-policy is only available with --video-source=display"
+                    "--display-ime-policy is only available with --video-source=display",
                 )
             }
 
             if (cameraId.isNotBlank() && cameraFacing != CameraFacing.ANY) {
                 throw IllegalArgumentException(
-                    "Cannot specify both --camera-id and --camera-facing"
+                    "Cannot specify both --camera-id and --camera-facing",
                 )
             }
 
             if (cameraSize.isNotBlank()) {
                 if (maxSize > 0u) {
                     throw IllegalArgumentException(
-                        "Cannot specify both --camera-size and -m/--max-size"
+                        "Cannot specify both --camera-size and -m/--max-size",
                     )
                 }
 
                 if (cameraAr.isNotBlank()) {
                     throw IllegalArgumentException(
-                        "--camera-high-speed requires an explicit --camera-fps value"
+                        "--camera-high-speed requires an explicit --camera-fps value",
                     )
                 }
             }
 
             if (cameraHighSpeed && cameraFps <= 0u) {
                 throw IllegalArgumentException(
-                    "--camera-high-speed requires an explicit --camera-fps value"
+                    "--camera-high-speed requires an explicit --camera-fps value",
                 )
             }
 
@@ -376,13 +367,13 @@ data class ClientOptions(
             || cameraSize.isNotBlank()
         ) {
             throw IllegalArgumentException(
-                "Camera options are only available with --video-source=camera"
+                "Camera options are only available with --video-source=camera",
             )
         }
 
         if (displayId > 0 && newDisplay.isNotBlank()) {
             throw IllegalArgumentException(
-                "Cannot specify both --display-id and --new-display"
+                "Cannot specify both --display-id and --new-display",
             )
         }
 
@@ -390,19 +381,19 @@ data class ClientOptions(
             if (videoSource != VideoSource.DISPLAY || newDisplay.isBlank()) {
                 throw IllegalArgumentException(
                     "-x/--flex-display can only be applied to displays created " +
-                            "with --new-display"
+                            "with --new-display",
                 )
             }
 
             if (!control) {
                 throw IllegalArgumentException(
-                    "-n/--no-control is not compatible with -x/--flex-display"
+                    "-n/--no-control is not compatible with -x/--flex-display",
                 )
             }
 
             if (crop.isNotBlank()) {
                 throw IllegalArgumentException(
-                    "--crop is not compatible with -x/--flex-display"
+                    "--crop is not compatible with -x/--flex-display",
                 )
             }
         }
@@ -411,7 +402,7 @@ data class ClientOptions(
             && displayId == 0 && newDisplay.isBlank()
         ) {
             throw IllegalArgumentException(
-                "--display-ime-policy is only supported on a secondary display"
+                "--display-ime-policy is only supported on a secondary display",
             )
         }
 
@@ -432,27 +423,27 @@ data class ClientOptions(
         if (audioDup) {
             if (!audio) {
                 throw IllegalArgumentException(
-                    "--audio-dup not supported if audio is disabled"
+                    "--audio-dup not supported if audio is disabled",
                 )
             }
 
             if (audioSource != AudioSource.PLAYBACK) {
                 throw IllegalArgumentException(
-                    "--audio-dup is specific to --audio-source=playback"
+                    "--audio-dup is specific to --audio-source=playback",
                 )
             }
         }
 
         if (recordFormat != RecordFormat.AUTO && recordFilename.isBlank()) {
             throw IllegalArgumentException(
-                "Record format specified without recording"
+                "Record format specified without recording",
             )
         }
 
         if (recordFilename.isNotBlank()) {
             if (!video && !audio) {
                 throw IllegalArgumentException(
-                    "Video and audio disabled, nothing to record"
+                    "Video and audio disabled, nothing to record",
                 )
             }
 
@@ -461,14 +452,14 @@ data class ClientOptions(
                 if (recordFormat == RecordFormat.AUTO) {
                     throw IllegalArgumentException(
                         "No format specified for recording file " +
-                                "(try with --record-format=mp4)"
+                                "(try with --record-format=mp4)",
                     )
                 }
             }
 
             if (!NativeRecordingSupport.isSupported(recordFormat)) {
                 throw IllegalArgumentException(
-                    "Android native recording currently supports only MP4/M4A"
+                    "Android native recording currently supports only MP4/M4A",
                 )
             }
 
@@ -476,14 +467,14 @@ data class ClientOptions(
                 if (recordOrientation.isMirror()) {
                     throw IllegalArgumentException(
                         "Record orientation only supports rotation, " +
-                                "not flipping: ${recordOrientation.string}"
+                                "not flipping: ${recordOrientation.string}",
                     )
                 }
             }
 
             if (video && recordFormat.isAudioOnly()) {
                 throw IllegalArgumentException(
-                    "Audio container does not support video stream"
+                    "Audio container does not support video stream",
                 )
             }
 
@@ -554,32 +545,32 @@ data class ClientOptions(
         if (!control) {
             if (turnScreenOff) {
                 throw IllegalArgumentException(
-                    "Cannot request to turn screen off if control is disabled"
+                    "Cannot request to turn screen off if control is disabled",
                 )
             }
             if (stayAwake) {
                 throw IllegalArgumentException(
-                    "Cannot request to stay awake if control is disabled"
+                    "Cannot request to stay awake if control is disabled",
                 )
             }
             if (showTouches) {
                 throw IllegalArgumentException(
-                    "Cannot request to show touches if control is disabled"
+                    "Cannot request to show touches if control is disabled",
                 )
             }
             if (powerOffOnClose) {
                 throw IllegalArgumentException(
-                    "Cannot request power off on close if control is disabled"
+                    "Cannot request power off on close if control is disabled",
                 )
             }
             if (startApp.isNotBlank()) {
                 throw IllegalArgumentException(
-                    "Cannot start an Android app if control is disabled"
+                    "Cannot start an Android app if control is disabled",
                 )
             }
             if (keepActive) {
                 throw IllegalArgumentException(
-                    "Cannot keep device active if control is disabled"
+                    "Cannot keep device active if control is disabled",
                 )
             }
         }

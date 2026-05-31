@@ -186,7 +186,8 @@ class TouchEventHandler(
         val isHoverMotion = when (event.actionMasked) {
             MotionEvent.ACTION_HOVER_ENTER,
             MotionEvent.ACTION_HOVER_MOVE,
-            MotionEvent.ACTION_HOVER_EXIT -> true
+            MotionEvent.ACTION_HOVER_EXIT,
+                -> true
 
             MotionEvent.ACTION_MOVE -> buttons == 0
             else -> false
@@ -201,7 +202,8 @@ class TouchEventHandler(
         ) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN,
-                MotionEvent.ACTION_BUTTON_PRESS -> {
+                MotionEvent.ACTION_BUTTON_PRESS,
+                    -> {
                     coroutineScope.launch {
                         runCatching {
                             onBackOrScreenOn(0)
@@ -212,7 +214,8 @@ class TouchEventHandler(
                 }
 
                 MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_BUTTON_RELEASE -> {
+                MotionEvent.ACTION_BUTTON_RELEASE,
+                    -> {
                     coroutineScope.launch {
                         runCatching {
                             onBackOrScreenOn(1)
@@ -234,7 +237,8 @@ class TouchEventHandler(
             MotionEvent.ACTION_MOVE -> MotionEvent.ACTION_MOVE
 
             MotionEvent.ACTION_BUTTON_PRESS,
-            MotionEvent.ACTION_BUTTON_RELEASE -> return true
+            MotionEvent.ACTION_BUTTON_RELEASE,
+                -> return true
 
             else -> return true
         }
@@ -343,7 +347,7 @@ class TouchEventHandler(
                         Log.w(
                             FULLSCREEN_TOUCH_LOG_TAG,
                             "handlePointerDown failed for pointerId=$pointerId",
-                            e
+                            e,
                         )
                     }
                 }
@@ -373,7 +377,7 @@ class TouchEventHandler(
                     Log.w(
                         FULLSCREEN_TOUCH_LOG_TAG,
                         "handlePointerMove failed for pointerId=$pointerId",
-                        e
+                        e,
                     )
                 }
             }

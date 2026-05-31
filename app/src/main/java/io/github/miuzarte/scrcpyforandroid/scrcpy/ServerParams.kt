@@ -1,15 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.scrcpy
 
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.DisplayImePolicy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.LogLevel
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Orientation
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.OrientationLock
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Tick
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.*
 
 // 启动 scrcpy 前直接继承自 [ClientOptions],
 // 不需要默认值

@@ -3,13 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.ui.component.miuix.modifier
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.AwaitPointerEventScope
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.util.fastFirstOrNull
 
 suspend fun PointerInputScope.inspectDragGestures(
@@ -26,7 +20,7 @@ suspend fun PointerInputScope.inspectDragGestures(
         onDrag(initialDown, Offset.Zero)
         val upEvent = drag(
             pointerId = initialDown.id,
-            onDrag = { onDrag(it, it.positionChange()) }
+            onDrag = { onDrag(it, it.positionChange()) },
         )
         if (upEvent == null) {
             onDragCancel()

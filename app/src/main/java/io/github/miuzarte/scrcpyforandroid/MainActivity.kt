@@ -21,7 +21,7 @@ import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
 // 生物认证需要 FragmentActivity
-class MainActivity : FragmentActivity() {
+class MainActivity: FragmentActivity() {
 
     override fun attachBaseContext(newBase: Context) {
         val languageTag = getAppLanguageTag(newBase)

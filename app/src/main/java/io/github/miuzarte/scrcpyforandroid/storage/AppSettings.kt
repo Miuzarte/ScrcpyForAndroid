@@ -3,19 +3,14 @@ package io.github.miuzarte.scrcpyforandroid.storage
 import android.content.Context
 import android.os.Parcelable
 import androidx.annotation.StringRes
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 
-class AppSettings(context: Context) : Settings(context, "AppSettings") {
+class AppSettings(context: Context): Settings(context, "AppSettings") {
     object ThemeModes {
         data class Option(
             @field:StringRes val labelResId: Int,
@@ -92,6 +87,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
             stringPreferencesKey("language_tag"),
             "",
         )
+
         // Theme
         val THEME_BASE_INDEX = Pair(
             intPreferencesKey("theme_base_index"),
@@ -360,7 +356,7 @@ class AppSettings(context: Context) : Settings(context, "AppSettings") {
         val lastUpdateCheckAt: Long,
         val clearLogsOnExit: Boolean,
         val hideDeviceLogs: Boolean,
-    ) : Parcelable {
+    ): Parcelable {
     }
 
     private val bundleFields = arrayOf<BundleField<Bundle>>(

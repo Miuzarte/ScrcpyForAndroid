@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
+class ScrcpyProfiles(context: Context): Settings(context, "ScrcpyProfiles") {
     companion object {
         private val PROFILES_JSON = Pair(
             stringPreferencesKey("profiles_json"),
@@ -36,7 +36,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
     private fun stateFromPreferences(preferences: androidx.datastore.preferences.core.Preferences): State {
         val raw = preferences.read(PROFILES_JSON)
         return normalizeState(
-            runCatching { decodeState(raw) }.getOrNull() ?: State(emptyList())
+            runCatching { decodeState(raw) }.getOrNull() ?: State(emptyList()),
         )
     }
 
@@ -107,8 +107,8 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
             current.copy(
                 profiles = current.profiles.map {
                     if (it.id == id) updated else it
-                }
-            )
+                },
+            ),
         )
         saveState(next)
         return next.profiles.firstOrNull { it.id == id }
@@ -120,8 +120,8 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
         if (current.profiles.none { it.id == id }) return false
         val next = normalizeState(
             current.copy(
-                profiles = current.profiles.filterNot { it.id == id }
-            )
+                profiles = current.profiles.filterNot { it.id == id },
+            ),
         )
         saveState(next)
         return true
@@ -213,7 +213,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
                 JSONObject()
                     .put("id", profile.id)
                     .put("name", profile.name)
-                    .put("bundle", encodeBundleToJson(profile.bundle))
+                    .put("bundle", encodeBundleToJson(profile.bundle)),
             )
         }
         return array.toString()
@@ -236,7 +236,7 @@ class ScrcpyProfiles(context: Context) : Settings(context, "ScrcpyProfiles") {
                         name = name.ifBlank { textNewProfile },
                         bundle = decodeBundleFromJson(item.optJSONObject("bundle")),
                         isBuiltinGlobal = id == ScrcpyOptions.GLOBAL_PROFILE_ID,
-                    )
+                    ),
                 )
             }
         }

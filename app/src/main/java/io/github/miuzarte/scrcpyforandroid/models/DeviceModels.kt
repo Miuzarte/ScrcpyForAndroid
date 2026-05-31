@@ -6,7 +6,7 @@ import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.parcelize.Parcelize
 
 // Composable 用, 不可变 List
-class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> by devices {
+class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> by devices {
     fun marshalToString(
         separator: String = DEFAULT_SEPARATOR,
     ): String = joinToString(separator) { it.marshalToString() }
@@ -97,7 +97,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>) : List<DeviceShortcut> 
                 || (newPort != null && newPort != old.port)
             )
                 newList.distinctBy { it.id }
-            else newList
+            else newList,
         )
     }
 
@@ -176,7 +176,7 @@ data class DeviceShortcut(
         if (openFullscreenOnStart) "1" else "0",
         scrcpyProfileId.trim(),
     ).joinToString(
-        separator = separator
+        separator = separator,
     )
 
     companion object {
@@ -259,7 +259,7 @@ data class DeviceShortcut(
 data class ConnectionTarget(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
-) : Parcelable {
+): Parcelable {
     override fun toString(): String =
         if (':' in host) "[$host]:$port"
         else "$host:$port"

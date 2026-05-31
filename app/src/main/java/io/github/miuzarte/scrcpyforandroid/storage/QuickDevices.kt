@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 
-class QuickDevices(context: Context) : Settings(context, "QuickDevices") {
+class QuickDevices(context: Context): Settings(context, "QuickDevices") {
     companion object {
         val QUICK_DEVICES_LIST = Pair(
             stringPreferencesKey("quick_devices_list"),
@@ -26,7 +26,7 @@ class QuickDevices(context: Context) : Settings(context, "QuickDevices") {
     data class Bundle(
         val quickDevicesList: String,
         val quickConnectInput: String,
-    ) : Parcelable {
+    ): Parcelable {
     }
 
     private val bundleFields = arrayOf<BundleField<Bundle>>(

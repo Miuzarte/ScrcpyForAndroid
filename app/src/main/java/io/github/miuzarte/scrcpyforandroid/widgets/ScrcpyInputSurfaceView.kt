@@ -13,7 +13,7 @@ class ScrcpyInputSurfaceView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
-) : SurfaceView(context, attrs, defStyleAttr) {
+): SurfaceView(context, attrs, defStyleAttr) {
     interface InputCallbacks {
         fun handleKeyEvent(event: KeyEvent): Boolean
         fun handleCommitText(text: CharSequence): Boolean
@@ -46,7 +46,7 @@ class ScrcpyInputSurfaceView @JvmOverloads constructor(
 
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
-        return object : BaseInputConnection(this, false) {
+        return object: BaseInputConnection(this, false) {
             override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
                 if (inputCallbacks?.handleCommitText(text) == true) return true
                 return super.commitText(text, newCursorPosition)

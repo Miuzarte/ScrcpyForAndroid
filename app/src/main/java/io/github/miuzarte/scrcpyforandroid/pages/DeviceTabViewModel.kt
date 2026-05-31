@@ -11,13 +11,8 @@ import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.services.AppScreenOn
-import io.github.miuzarte.scrcpyforandroid.services.DisconnectCause
-import io.github.miuzarte.scrcpyforandroid.services.EventLogMessage
+import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
-import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
-import io.github.miuzarte.scrcpyforandroid.services.render
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
@@ -27,25 +22,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.*
 
 private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
 private const val ADB_KEEPALIVE_INTERVAL_MS = 3_000L
@@ -58,7 +37,7 @@ private const val ADB_TCP_PROBE_TIMEOUT_MS = 500
 internal class DeviceTabViewModel(
     internal val scrcpy: Scrcpy,
     connectionServices: DeviceConnectionServices,
-) : ViewModel() {
+): ViewModel() {
 
     val scrcpyListings: Scrcpy.Listings get() = scrcpy.listings
 
@@ -107,7 +86,7 @@ internal class DeviceTabViewModel(
     val quickConnectInput: StateFlow<String> = _quickConnectInput.asStateFlow()
 
     private val _savedShortcuts = MutableStateFlow(
-        DeviceShortcuts.unmarshalFrom(_qdBundle.value.quickDevicesList)
+        DeviceShortcuts.unmarshalFrom(_qdBundle.value.quickDevicesList),
     )
     val savedShortcuts: StateFlow<DeviceShortcuts> = _savedShortcuts.asStateFlow()
 
@@ -223,13 +202,13 @@ internal class DeviceTabViewModel(
     val virtualButtonLayout: StateFlow<Pair<List<VirtualButtonAction>, List<VirtualButtonAction>>> =
         _asBundle.map {
             VirtualButtonActions.splitLayout(
-                VirtualButtonActions.parseStoredLayout(it.virtualButtonsLayout)
+                VirtualButtonActions.parseStoredLayout(it.virtualButtonsLayout),
             )
         }.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
             VirtualButtonActions.splitLayout(
-                VirtualButtonActions.parseStoredLayout(_asBundle.value.virtualButtonsLayout)
+                VirtualButtonActions.parseStoredLayout(_asBundle.value.virtualButtonsLayout),
             ),
         )
 
@@ -397,7 +376,7 @@ internal class DeviceTabViewModel(
                     EventLogMessage.Resource(
                         R.string.vm_send_action,
                         listOf(EventLogMessage.Resource(action.titleResId)),
-                    )
+                    ),
                 ) {
                     scrcpy.injectKeycode(0, keycode)
                     scrcpy.injectKeycode(1, keycode)
@@ -432,7 +411,7 @@ internal class DeviceTabViewModel(
     private fun runBusy(
         label: EventLogMessage,
         onFinished: (() -> Unit)? = null,
-        block: suspend () -> Unit
+        block: suspend () -> Unit,
     ) {
         if (_busy.value) return
         viewModelScope.launch {
@@ -492,7 +471,7 @@ internal class DeviceTabViewModel(
         val result = connectionController.disconnectAdbConnection(
             clearQuickOnlineForTarget,
             cause,
-            statusLine
+            statusLine,
         )
         result.clearedTarget?.let { target ->
             if (target.host.isNotBlank())
@@ -535,14 +514,14 @@ internal class DeviceTabViewModel(
                 host = host,
                 port = port,
                 name = fullLabel,
-                updateNameOnlyWhenEmpty = true
+                updateNameOnlyWhenEmpty = true,
             )
         }
 
         logEvent(
             "ADB connected: model=${info.model}, serial=${info.serial.ifBlank { "unknown" }}, " +
                     "manufacturer=${info.manufacturer.ifBlank { "unknown" }}, brand=${info.brand.ifBlank { "unknown" }}, " +
-                    "device=${info.device.ifBlank { "unknown" }}, android=${info.androidRelease.ifBlank { "unknown" }}, sdk=${info.sdkInt}"
+                    "device=${info.device.ifBlank { "unknown" }}, android=${info.androidRelease.ifBlank { "unknown" }}, sdk=${info.sdkInt}",
         )
         AppRuntime.snackbar(R.string.vm_adb_connected)
 
@@ -607,7 +586,8 @@ internal class DeviceTabViewModel(
             if (!resolvedOptions.video) "off"
             else {
                 val codec = session.codec?.string ?: "null"
-                val sizeHint = if (session.width > 0 && session.height > 0) " ${session.width}x${session.height}" else ""
+                val sizeHint =
+                    if (session.width > 0 && session.height > 0) " ${session.width}x${session.height}" else ""
                 val bitrateSuffix = if (activeBundle.videoBitRate <= 0) " @default"
                 else " @%.1fMbps".format(activeBundle.videoBitRate / 1_000_000f)
                 "$codec$sizeHint$bitrateSuffix"
@@ -623,11 +603,11 @@ internal class DeviceTabViewModel(
         logEvent(
             "scrcpy 已启动: device=${session.deviceName}, video=$videoDetail, audio=$audioDetail, " +
                     "control=${resolvedOptions.control}, turnScreenOff=${resolvedOptions.turnScreenOff}, " +
-                    "maxSize=${resolvedOptions.maxSize}, maxFps=${resolvedOptions.maxFps}"
+                    "maxSize=${resolvedOptions.maxSize}, maxFps=${resolvedOptions.maxFps}",
         )
         AppRuntime.snackbar(
             if (resolvedOptions.recordFilename.isNotBlank()) R.string.vm_scrcpy_started_recording
-            else R.string.vm_scrcpy_started
+            else R.string.vm_scrcpy_started,
         )
     }
 
@@ -699,13 +679,13 @@ internal class DeviceTabViewModel(
             }
             logEvent(
                 if (useLegacyPaste) R.string.vm_legacy_paste_injected
-                else R.string.vm_clipboard_synced_paste
+                else R.string.vm_clipboard_synced_paste,
             )
         }.onFailure { error ->
             logEvent(R.string.vm_clipboard_paste_failed, level = Log.WARN, error = error)
             AppRuntime.snackbar(
                 if (useLegacyPaste) R.string.fullscreen_legacy_paste_failed
-                else R.string.fullscreen_clipboard_sync_failed
+                else R.string.fullscreen_clipboard_sync_failed,
             )
         }
     }
@@ -723,7 +703,7 @@ internal class DeviceTabViewModel(
             )
             AppRuntime.snackbar(
                 if (useClipboardPaste) R.string.fullscreen_paste_non_ascii
-                else R.string.fullscreen_text_input_failed
+                else R.string.fullscreen_text_input_failed,
             )
         }
     }
@@ -747,7 +727,7 @@ internal class DeviceTabViewModel(
                         port = device.port,
                         autoStartScrcpy = device.startScrcpyOnConnect,
                         autoEnterFullScreen = device.startScrcpyOnConnect && device.openFullscreenOnStart,
-                        scrcpyProfileId = device.scrcpyProfileId
+                        scrcpyProfileId = device.scrcpyProfileId,
                     )
                     connectionController.updateQuickConnected(false)
                 } catch (error: Exception) {
@@ -818,7 +798,7 @@ internal class DeviceTabViewModel(
             )
             AppRuntime.snackbar(
                 if (ok) R.string.vm_pairing_succeeded
-                else R.string.vm_pairing_failed
+                else R.string.vm_pairing_failed,
             )
         }
     }
@@ -850,7 +830,7 @@ internal class DeviceTabViewModel(
                         viewModelScope.launch {
                             disconnectAdbConnection(
                                 cause = DisconnectCause.KeepAliveFailed,
-                                statusLine = "ADB disconnected"
+                                statusLine = "ADB disconnected",
                             )
                         }
                         logEvent(R.string.vm_auto_reconnect_failed, level = Log.ERROR, error = error)
@@ -979,7 +959,7 @@ internal class DeviceTabViewModel(
             screenHeight,
             pressure,
             actionButton,
-            buttons
+            buttons,
         )
     }
 
@@ -1001,9 +981,9 @@ internal class DeviceTabViewModel(
     class Factory(
         private val scrcpy: Scrcpy,
         private val connectionServices: DeviceConnectionServices,
-    ) : ViewModelProvider.Factory {
+    ): ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        override fun <T: ViewModel> create(modelClass: Class<T>): T {
             return DeviceTabViewModel(scrcpy, connectionServices) as T
         }
     }

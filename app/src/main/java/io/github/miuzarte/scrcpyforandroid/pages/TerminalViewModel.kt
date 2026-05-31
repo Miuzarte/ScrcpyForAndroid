@@ -16,15 +16,11 @@ import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.BundleSyncDelegate
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.SnackbarResult
 import java.nio.charset.StandardCharsets
 import kotlin.math.roundToInt
@@ -32,7 +28,7 @@ import kotlin.math.roundToInt
 private const val DEFAULT_TERMINAL_FONT_SIZE_SP = 14f
 private const val LOG_TAG = "TerminalScreen"
 
-internal class TerminalViewModel : ViewModel() {
+internal class TerminalViewModel: ViewModel() {
 
     private val asBundleSync = BundleSyncDelegate(
         sharedFlow = appSettings.bundleState,

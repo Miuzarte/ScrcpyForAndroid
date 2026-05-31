@@ -86,7 +86,7 @@ object FileManagerService {
     private val listTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     private val displayTimeFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")
     private val listLineRegex = Regex(
-        """^\s*(\d+)\s+([\-bcdlps][rwxstST-]{9})\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+(.+)$"""
+        """^\s*(\d+)\s+([\-bcdlps][rwxstST-]{9})\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+(.+)$""",
     )
     private val sizeFormatter = DecimalFormat("0.00")
 
@@ -101,7 +101,7 @@ object FileManagerService {
             .filterNot { it.name == "." || it.name == ".." }
             .sortedWith(
                 compareByDescending<RemoteFileEntry> { it.isDirectory }
-                    .thenBy { it.name.lowercase() }
+                    .thenBy { it.name.lowercase() },
             )
             .toList()
     }
@@ -173,7 +173,7 @@ object FileManagerService {
                 targetFile.outputStream().use { output ->
                     NativeAdbService.pull(
                         joinRemotePath(snapshot.remoteRootPath, relativePath),
-                        output
+                        output,
                     )
                 }
             }
@@ -189,7 +189,7 @@ object FileManagerService {
         NativeAdbService.ensureConnectionResponsive()
         val rootDocument = DocumentsContract.buildDocumentUriUsingTree(
             treeUri,
-            DocumentsContract.getTreeDocumentId(treeUri)
+            DocumentsContract.getTreeDocumentId(treeUri),
         )
         val target = createUniqueDocument(context, rootDocument, fileName, guessMimeType(fileName))
         context.contentResolver.openOutputStream(target, "w").use { output ->
@@ -206,7 +206,7 @@ object FileManagerService {
         NativeAdbService.ensureConnectionResponsive()
         val rootDocument = DocumentsContract.buildDocumentUriUsingTree(
             treeUri,
-            DocumentsContract.getTreeDocumentId(treeUri)
+            DocumentsContract.getTreeDocumentId(treeUri),
         )
         val folderName = snapshot.remoteRootPath.substringAfterLast('/').ifBlank { "Scrcpy" }
         val folderRoot = createUniqueDirectoryDocument(context, rootDocument, folderName)
@@ -327,7 +327,7 @@ object FileManagerService {
         val dateTime = runCatching {
             LocalDateTime.parse(
                 "${match.groupValues[7]} ${match.groupValues[8]}",
-                listTimeFormatter
+                listTimeFormatter,
             )
         }.getOrNull()
         val nameField = match.groupValues[9]
@@ -542,7 +542,7 @@ object FileManagerService {
     private fun createUniqueDirectoryDocument(
         context: Context,
         parentDocument: Uri,
-        baseName: String
+        baseName: String,
     ): Uri {
         var name = baseName
         var index = 1
@@ -551,7 +551,7 @@ object FileManagerService {
                 context,
                 parentDocument,
                 name,
-                DocumentsContract.Document.MIME_TYPE_DIR
+                DocumentsContract.Document.MIME_TYPE_DIR,
             ) != null
         ) {
             name = "$baseName ($index)"
@@ -592,7 +592,7 @@ object FileManagerService {
     private fun ensureTreeDirectory(
         context: Context,
         rootDocument: Uri,
-        relativePath: String
+        relativePath: String,
     ): Uri {
         var current = rootDocument
         if (relativePath.isBlank()) return current
@@ -603,14 +603,15 @@ object FileManagerService {
                     context,
                     current,
                     segment,
-                    DocumentsContract.Document.MIME_TYPE_DIR
+                    DocumentsContract.Document.MIME_TYPE_DIR,
                 )
                 current = existing ?: DocumentsContract.createDocument(
                     context.contentResolver,
                     current,
                     DocumentsContract.Document.MIME_TYPE_DIR,
                     segment,
-                ) ?: throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_dir)}: $segment")
+                )
+                        ?: throw IOException("${AppRuntime.stringResource(R.string.fm_exception_cannot_create_dir)}: $segment")
             }
         return current
     }
@@ -653,15 +654,15 @@ object FileManagerService {
 
 class DirectorySnapshotSession private constructor(
     private val shellSession: InteractiveShellSession,
-) : Closeable {
+): Closeable {
     suspend fun load(path: String): DirectoryDownloadSnapshot {
         val normalizedPath = path.trimEnd('/').ifBlank { "/" }
         val totalBytes = parseDuBytes(
-            shellSession.execute("du -sb ${FileManagerService.quoteShellArg(normalizedPath)}")
+            shellSession.execute("du -sb ${FileManagerService.quoteShellArg(normalizedPath)}"),
         )
 
         val directories = shellSession.execute(
-            "find ${FileManagerService.quoteShellArg(normalizedPath)} -type d"
+            "find ${FileManagerService.quoteShellArg(normalizedPath)} -type d",
         )
             .lineSequence()
             .map(String::trim)
@@ -671,7 +672,7 @@ class DirectorySnapshotSession private constructor(
             .toList()
 
         val files = shellSession.execute(
-            "find ${FileManagerService.quoteShellArg(normalizedPath)} -type f"
+            "find ${FileManagerService.quoteShellArg(normalizedPath)} -type f",
         )
             .lineSequence()
             .map(String::trim)
@@ -723,7 +724,7 @@ class DirectorySnapshotSession private constructor(
 
 private class InteractiveShellSession private constructor(
     private val stream: AdbSocketStream,
-) : Closeable {
+): Closeable {
     private val mutex = Mutex()
 
     suspend fun execute(command: String): String = withContext(Dispatchers.IO) {

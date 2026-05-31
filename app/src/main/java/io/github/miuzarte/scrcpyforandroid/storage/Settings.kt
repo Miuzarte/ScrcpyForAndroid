@@ -2,11 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.storage
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
@@ -14,17 +10,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import kotlin.reflect.KProperty
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -37,7 +24,7 @@ abstract class Settings(
         ReplaceFileCorruptionHandler {
             Log.e(TAG, "Preferences corrupted, resetting.", it)
             emptyPreferences()
-        }
+        },
 ) {
     private val settingsScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -56,7 +43,7 @@ abstract class Settings(
     }
 
     protected fun <B, T> bundleField(pair: Pair<T>, selector: (B) -> T): BundleField<B> =
-        object : BundleField<B> {
+        object: BundleField<B> {
             override suspend fun persist(settings: Settings, current: B, new: B) {
                 val currentValue = selector(current)
                 val newValue = selector(new)
@@ -70,7 +57,7 @@ abstract class Settings(
      * 设置项委托类，自动提供 get/set/observe/asState/asMutableState 方法
      */
     inner class SettingProperty<T>(
-        val pair: Pair<T>
+        val pair: Pair<T>,
     ) {
         // 创建时注册自身
         init {
@@ -107,7 +94,7 @@ abstract class Settings(
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
         name = this.name,
         corruptionHandler = corruptionHandler,
-        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
     )
 
     // 对外暴露的 DataStore 实例
@@ -121,7 +108,7 @@ abstract class Settings(
             .stateIn(
                 scope = settingsScope,
                 started = SharingStarted.Eagerly,
-                initialValue = runBlocking { loadBundle(reader) }
+                initialValue = runBlocking { loadBundle(reader) },
             )
 
     protected suspend fun <B> loadBundle(reader: (Preferences) -> B): B =
@@ -156,7 +143,7 @@ abstract class Settings(
         val state = asState(pair)
 
         return rememberSaveable(state.value) {
-            object : MutableState<T> {
+            object: MutableState<T> {
                 override var value: T
                     get() = state.value
                     set(newValue) {

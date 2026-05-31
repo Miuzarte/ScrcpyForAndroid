@@ -11,7 +11,6 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,7 +88,10 @@ object NativeCoreFacade {
                 }
             }
             if (session.width <= 0 || session.height <= 0) {
-                Log.i(TAG, "attachVideoSurface(): defer decoder, session size not yet known (${session.width}x${session.height})")
+                Log.i(
+                    TAG,
+                    "attachVideoSurface(): defer decoder, session size not yet known (${session.width}x${session.height})",
+                )
                 return
             }
             createOrReplaceDecoder(session)
@@ -112,13 +114,13 @@ object NativeCoreFacade {
             if (requestId != null && currentId != null && requestId != currentId) {
                 Log.i(
                     TAG,
-                    "detachVideoSurface(): skip stale request requestSurfaceId=$requestId currentSurfaceId=$currentId"
+                    "detachVideoSurface(): skip stale request requestSurfaceId=$requestId currentSurfaceId=$currentId",
                 )
                 return
             }
             Log.i(
                 TAG,
-                "detachVideoSurface(): surfaceId=$requestId releaseDecoder=$releaseDecoder"
+                "detachVideoSurface(): surfaceId=$requestId releaseDecoder=$releaseDecoder",
             )
             activeSurfaceId = null
             renderer.detachDisplaySurface(surface, releaseSurface = false)
@@ -197,7 +199,7 @@ object NativeCoreFacade {
             if (packetCount == 1L || packetCount % 120L == 0L) {
                 Log.i(
                     TAG,
-                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
+                    "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}",
                 )
             }
 
@@ -207,7 +209,7 @@ object NativeCoreFacade {
                     packet.data,
                     packet.ptsUs,
                     packet.isKeyFrame,
-                    packet.isConfig
+                    packet.isConfig,
                 )
             }
         }
@@ -233,7 +235,10 @@ object NativeCoreFacade {
                     (info.width != currentSessionInfo!!.width || info.height != currentSessionInfo!!.height)
                 ) {
                     // Flex display: rebuild decoder on size change
-                    Log.i(TAG, "onVideoSizeChanged(): rebuild decoder ${currentSessionInfo!!.width}x${currentSessionInfo!!.height} → ${info.width}x${info.height}")
+                    Log.i(
+                        TAG,
+                        "onVideoSizeChanged(): rebuild decoder ${currentSessionInfo!!.width}x${currentSessionInfo!!.height} → ${info.width}x${info.height}",
+                    )
                     currentSessionInfo = info
                     createOrReplaceDecoder(info)
                 }
@@ -306,7 +311,7 @@ object NativeCoreFacade {
             "createOrReplaceDecoder(): " +
                     "codec=${session.codec?.string ?: "null"}, " +
                     "size=${session.width}x${session.height}, " +
-                    "persistent=true"
+                    "persistent=true",
         )
         val newDecoder = AnnexBDecoder(
             width = session.width,
@@ -325,7 +330,7 @@ object NativeCoreFacade {
                 }
                 Log.i(
                     TAG,
-                    "videoSizeChanged(): ${current.width}x${current.height} -> ${width}x${height}"
+                    "videoSizeChanged(): ${current.width}x${current.height} -> ${width}x${height}",
                 )
                 currentSessionInfo = current.copy(width = width, height = height)
                 mainHandler.post {

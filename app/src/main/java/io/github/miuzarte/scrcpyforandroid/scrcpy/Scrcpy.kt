@@ -12,36 +12,18 @@ import io.github.miuzarte.scrcpyforandroid.constants.Defaults
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbSocketStream
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.nativecore.ScrcpyAudioPlayer
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.EncoderType
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.ListOptions
-import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.*
+import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
-import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
-import io.github.miuzarte.scrcpyforandroid.services.NativeAacRecorder
-import io.github.miuzarte.scrcpyforandroid.services.NativeMp4Recorder
-import io.github.miuzarte.scrcpyforandroid.services.NativeWavRecorder
-import io.github.miuzarte.scrcpyforandroid.services.RecordingFileResolver
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import java.io.BufferedInputStream
-import java.io.BufferedReader
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.EOFException
-import java.io.File
-import java.io.InputStreamReader
+import java.io.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.ArrayDeque
@@ -228,7 +210,7 @@ class Scrcpy(
                     TAG,
                     "start(): create audio player codecId=0x${
                         info.audioCodecId.toUInt().toString(16)
-                    }"
+                    }",
                 )
                 val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, lowLatency)
                 audioPlayer = player
@@ -243,7 +225,8 @@ class Scrcpy(
                 val recordFile = RecordingFileResolver.resolve(options, info)
                 when (options.recordFormat) {
                     ClientOptions.RecordFormat.MP4,
-                    ClientOptions.RecordFormat.M4A -> {
+                    ClientOptions.RecordFormat.M4A,
+                        -> {
                         val recorder = NativeMp4Recorder(
                             outputFile = recordFile,
                             includeVideo = options.video,
@@ -296,13 +279,16 @@ class Scrcpy(
             }
 
             Log.i(
-                TAG, "start(): Session started successfully - device=${info.deviceName}, " +
-                        "video=${if (options.video) buildString {
-                            append(info.codec?.string ?: "null")
-                            if (info.width > 0 && info.height > 0) append(" ${info.width}x${info.height}")
-                        } else "off"}, " +
+                TAG,
+                "start(): Session started successfully - device=${info.deviceName}, " +
+                        "video=${
+                            if (options.video) buildString {
+                                append(info.codec?.string ?: "null")
+                                if (info.width > 0 && info.height > 0) append(" ${info.width}x${info.height}")
+                            } else "off"
+                        }, " +
                         "audio=${if (options.audio) options.audioCodec.string else "off"}, " +
-                        "control=${options.control}"
+                        "control=${options.control}",
             )
 
             return@withContext info
@@ -637,9 +623,11 @@ class Scrcpy(
                     runTrackedFetch {
                         val output = executeList(ListOptions.CAMERA_SIZES)
                         val parsed = parseCameraSizes(output)
-                            .sortedWith(compareByDescending { size ->
-                                size.substringBefore('x').toIntOrNull() ?: 0
-                            })
+                            .sortedWith(
+                                compareByDescending { size ->
+                                    size.substringBefore('x').toIntOrNull() ?: 0
+                                },
+                            )
                         cachedCameraSizes = parsed
                         logListPreview(
                             list = ListOptions.CAMERA_SIZES,
@@ -789,7 +777,7 @@ class Scrcpy(
                     id = match.groupValues[1].toInt(),
                     width = match.groupValues[2].toInt(),
                     height = match.groupValues[3].toInt(),
-                )
+                ),
             )
         }
         return displays.toList()
@@ -810,7 +798,7 @@ class Scrcpy(
                     facing = CameraFacing.fromString(facing),
                     activeSize = activeSize,
                     fps = fpsValues.map(Int::toUShort),
-                )
+                ),
             )
         }
         return cameras.toList()
@@ -832,7 +820,7 @@ class Scrcpy(
                     system = match.groupValues[1] == "*",
                     label = match.groupValues[2].trim(),
                     packageName = match.groupValues[3].trim(),
-                )
+                ),
             )
         }
         return apps.toList().sortedBy { appSortKey(it) }
@@ -1079,7 +1067,7 @@ class Scrcpy(
                             Log.w(TAG, "audio disabled by server")
                             if (options.requireAudio) {
                                 throw IllegalStateException(
-                                    "Audio is required but was disabled by the server"
+                                    "Audio is required but was disabled by the server",
                                 )
                             }
                             0
@@ -1089,7 +1077,7 @@ class Scrcpy(
                             Log.e(TAG, "audio stream configuration error from server")
                             if (options.requireAudio) {
                                 throw IllegalStateException(
-                                    "Audio is required but the server failed to configure audio capture"
+                                    "Audio is required but the server failed to configure audio capture",
                                 )
                             }
                             0
@@ -1098,7 +1086,7 @@ class Scrcpy(
                         else -> {
                             Log.i(
                                 TAG,
-                                "audio stream codec=0x${streamCodecId.toUInt().toString(16)}"
+                                "audio stream codec=0x${streamCodecId.toUInt().toString(16)}",
                             )
                             streamCodecId
                         }
@@ -1191,7 +1179,7 @@ class Scrcpy(
                                         (headerBuf[11].toInt() and 0xFF)
                                 Log.i(
                                     TAG,
-                                    "video session packet: ${sw}x${sh} clientResized=$clientResized"
+                                    "video session packet: ${sw}x${sh} clientResized=$clientResized",
                                 )
                                 onVideoSessionSize(sw, sh)
                                 continue
@@ -1261,7 +1249,7 @@ class Scrcpy(
                             val packet = AudioPacket(
                                 data = payload,
                                 ptsUs = ptsUs,
-                                isConfig = isConfig
+                                isConfig = isConfig,
                             )
                             audioConsumers.forEach { it(packet) }
                         } catch (_: EOFException) {
@@ -1349,7 +1337,7 @@ class Scrcpy(
                     screenHeight,
                     pressure,
                     actionButton,
-                    buttons
+                    buttons,
                 )
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "injectTouch(): control channel not available", e)
@@ -1373,7 +1361,7 @@ class Scrcpy(
                     screenHeight,
                     hScroll,
                     vScroll,
-                    buttons
+                    buttons,
                 )
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "injectScroll(): control channel not available", e)
@@ -1496,15 +1484,15 @@ class Scrcpy(
 
         private fun startServerLogThread(
             serverStream: AdbSocketStream,
-            socketName: String
+            socketName: String,
         ): Thread {
             return thread(start = true, name = "scrcpy-server-log") {
                 try {
                     BufferedReader(
                         InputStreamReader(
                             serverStream.inputStream,
-                            Charsets.UTF_8
-                        )
+                            Charsets.UTF_8,
+                        ),
                     ).use { reader ->
                         while (true) {
                             val line = reader.readLine() ?: break
@@ -1539,7 +1527,7 @@ class Scrcpy(
 
         private suspend fun openAbstractSocketWithRetry(
             socketName: String,
-            expectDummyByte: Boolean
+            expectDummyByte: Boolean,
         ): AdbSocketStream {
             var lastEx: Exception? = null
             repeat(CONNECT_RETRY_COUNT) { attempt ->
@@ -1713,7 +1701,7 @@ class Scrcpy(
                 screenHeight: Int,
                 hScroll: Float,
                 vScroll: Float,
-                buttons: Int
+                buttons: Int,
             ) {
                 output.writeByte(TYPE_INJECT_SCROLL_EVENT)
                 writePosition(x, y, screenWidth, screenHeight)

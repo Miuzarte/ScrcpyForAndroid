@@ -1,15 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.scaffolds
 
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -60,7 +52,7 @@ fun LazyColumn(
                     Modifier.pointerInput(Unit) {
                         detectTapGestures(onTap = { focusManager.clearFocus() })
                     }
-                else Modifier
+                else Modifier,
             ),
     ) {
         val contentWidthModifier =
@@ -78,7 +70,7 @@ fun LazyColumn(
                     .then(
                         if (scrollBehavior != null)
                             Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-                        else Modifier
+                        else Modifier,
                     ),
                 state = state,
                 contentPadding = mergedContentPadding,

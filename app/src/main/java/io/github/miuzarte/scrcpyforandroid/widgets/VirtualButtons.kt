@@ -3,48 +3,16 @@ package io.github.miuzarte.scrcpyforandroid.widgets
 import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.DashboardCustomize
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Keyboard
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Password
-import androidx.compose.material.icons.rounded.PowerSettingsNew
-import androidx.compose.material.icons.rounded.Screenshot
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -69,20 +37,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.DropdownDefaults
-import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.ListPopupDefaults
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
-import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
-import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import kotlin.ranges.coerceAtLeast
+import kotlin.ranges.coerceIn
 
 enum class VirtualButtonAction(
     val id: String,
@@ -94,97 +55,97 @@ enum class VirtualButtonAction(
         "more",
         R.string.vb_more,
         MiuixIcons.More,
-        null
+        null,
     ),
     HOME(
         "home",
         R.string.vb_home,
         Icons.Rounded.Home,
-        UiAndroidKeycodes.HOME
+        UiAndroidKeycodes.HOME,
     ),
     BACK(
         "back",
         R.string.vb_back,
         Icons.AutoMirrored.Rounded.ArrowBack,
-        UiAndroidKeycodes.BACK
+        UiAndroidKeycodes.BACK,
     ),
     APP_SWITCH(
         "app_switch",
         R.string.vb_app_switch,
         Icons.Rounded.Apps,
-        UiAndroidKeycodes.APP_SWITCH
+        UiAndroidKeycodes.APP_SWITCH,
     ),
     MENU(
         "menu",
         R.string.vb_menu,
         Icons.Rounded.Menu,
-        UiAndroidKeycodes.MENU
+        UiAndroidKeycodes.MENU,
     ),
     NOTIFICATION(
         "notification",
         R.string.vb_notifications,
         Icons.Rounded.Notifications,
-        UiAndroidKeycodes.NOTIFICATION
+        UiAndroidKeycodes.NOTIFICATION,
     ),
     VOLUME_UP(
         "volume_up",
         R.string.vb_volume_up,
         Icons.AutoMirrored.Rounded.VolumeUp,
-        UiAndroidKeycodes.VOLUME_UP
+        UiAndroidKeycodes.VOLUME_UP,
     ),
     VOLUME_DOWN(
         "volume_down",
         R.string.vb_volume_down,
         Icons.AutoMirrored.Rounded.VolumeDown,
-        UiAndroidKeycodes.VOLUME_DOWN
+        UiAndroidKeycodes.VOLUME_DOWN,
     ),
     VOLUME_MUTE(
         "volume_mute",
         R.string.vb_volume_mute,
         Icons.AutoMirrored.Rounded.VolumeOff,
-        UiAndroidKeycodes.VOLUME_MUTE
+        UiAndroidKeycodes.VOLUME_MUTE,
     ),
     POWER(
         "power",
         R.string.vb_lock_screen,
         Icons.Rounded.PowerSettingsNew,
-        UiAndroidKeycodes.POWER
+        UiAndroidKeycodes.POWER,
     ),
     SCREENSHOT(
         "screenshot",
         R.string.vb_screenshot,
         Icons.Rounded.Screenshot,
-        UiAndroidKeycodes.SYSRQ
+        UiAndroidKeycodes.SYSRQ,
     ),
     PASSWORD_INPUT(
         "password_input",
         R.string.vb_fill_password,
         Icons.Rounded.Password,
-        null
+        null,
     ),
     ALL_APPS(
         "all_apps",
         R.string.vb_all_apps,
         Icons.Rounded.Apps,
-        null
+        null,
     ),
     RECENT_TASKS(
         "recent_tasks",
         R.string.vb_recent_tasks,
         Icons.Rounded.DashboardCustomize,
-        null
+        null,
     ),
     TOGGLE_IME(
         "toggle_ime",
         R.string.vb_toggle_ime,
         Icons.Rounded.Keyboard,
-        null
+        null,
     ),
     PASTE_LOCAL_CLIPBOARD(
         "paste_local_clipboard",
         R.string.vb_paste_clipboard,
         Icons.Rounded.ContentPaste,
-        null
+        null,
     );
 }
 
@@ -418,7 +379,7 @@ class VirtualButtonBar(
                         Icon(
                             imageVector = action.icon,
                             contentDescription = stringResource(action.titleResId),
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
 
@@ -475,7 +436,7 @@ class VirtualButtonBar(
                         Icon(
                             imageVector = action.icon,
                             contentDescription = stringResource(action.titleResId),
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
 
@@ -546,7 +507,7 @@ class VirtualButtonBar(
                             latest.copy(
                                 fullscreenFloatingButtonXFraction = offsetXFraction,
                                 fullscreenFloatingButtonYFraction = offsetYFraction,
-                            )
+                            ),
                         )
                     }
                 }
@@ -637,7 +598,7 @@ class VirtualButtonBar(
                                     )
                                 } else {
                                     Modifier
-                                }
+                                },
                             ),
                     )
                 }
@@ -785,7 +746,7 @@ class VirtualButtonBar(
 
     private class BottomSafeContextMenuPositionProvider(
         private val bottomPadding: Dp,
-    ) : PopupPositionProvider {
+    ): PopupPositionProvider {
         private val delegate = ListPopupDefaults.ContextMenuPositionProvider
 
         override fun calculatePosition(

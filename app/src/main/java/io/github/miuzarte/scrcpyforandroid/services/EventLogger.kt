@@ -10,11 +10,11 @@ import java.util.Date
 import java.util.Locale
 
 sealed interface EventLogMessage {
-    data class Raw(val text: String) : EventLogMessage
+    data class Raw(val text: String): EventLogMessage
     data class Resource(
         @param:StringRes val resId: Int,
         val args: List<Any> = emptyList(),
-    ) : EventLogMessage
+    ): EventLogMessage
 }
 
 data class EventLogEntry(

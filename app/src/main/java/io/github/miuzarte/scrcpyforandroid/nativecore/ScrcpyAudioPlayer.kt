@@ -3,12 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 // Go reader note: Audio output helper for scrcpy stream: decodes/plays PCM or codec audio frames.
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
-import android.media.MediaCodec
-import android.media.MediaFormat
+import android.media.*
 import android.os.Build
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
@@ -54,7 +49,7 @@ class ScrcpyAudioPlayer(
                 TAG,
                 "feedPacket(): config packet size=${data.size} codec=0x${
                     codecId.toUInt().toString(16)
-                }"
+                }",
             )
             when (codecId) {
                 Codec.OPUS.id -> prepareOpus(data)
@@ -101,7 +96,7 @@ class ScrcpyAudioPlayer(
             val format = MediaFormat.createAudioFormat(
                 MediaFormat.MIMETYPE_AUDIO_OPUS,
                 SAMPLE_RATE,
-                CHANNELS
+                CHANNELS,
             )
             format.setByteBuffer("csd-0", ByteBuffer.wrap(opusHead))
             // pre-skip field: 2 bytes LE at offset 10 of the OpusHead
@@ -132,7 +127,7 @@ class ScrcpyAudioPlayer(
             val format = MediaFormat.createAudioFormat(
                 MediaFormat.MIMETYPE_AUDIO_FLAC,
                 SAMPLE_RATE,
-                CHANNELS
+                CHANNELS,
             )
             if (flacConfig.isNotEmpty()) {
                 format.setByteBuffer("csd-0", ByteBuffer.wrap(flacConfig))
@@ -196,11 +191,11 @@ class ScrcpyAudioPlayer(
         val attributesBuilder = AudioAttributes.Builder()
             .setUsage(
                 if (lowLatency) AudioAttributes.USAGE_GAME
-                else AudioAttributes.USAGE_MEDIA
+                else AudioAttributes.USAGE_MEDIA,
             )
             .setContentType(
                 if (lowLatency) AudioAttributes.CONTENT_TYPE_SONIFICATION
-                else AudioAttributes.CONTENT_TYPE_MOVIE
+                else AudioAttributes.CONTENT_TYPE_MOVIE,
             )
         if (lowLatency) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -215,7 +210,7 @@ class ScrcpyAudioPlayer(
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .setSampleRate(SAMPLE_RATE)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                    .build()
+                    .build(),
             )
             .setBufferSizeInBytes(bufferSize)
             .setTransferMode(AudioTrack.MODE_STREAM)
@@ -229,7 +224,7 @@ class ScrcpyAudioPlayer(
             Log.i(
                 TAG,
                 "low-latency audio requested: nativeSampleRate=$nativeSampleRate streamSampleRate=$SAMPLE_RATE " +
-                        "framesPerBurst=$framesPerBurst bufferSize=$bufferSize performanceMode=${track.performanceMode}"
+                        "framesPerBurst=$framesPerBurst bufferSize=$bufferSize performanceMode=${track.performanceMode}",
             )
         }
         return track

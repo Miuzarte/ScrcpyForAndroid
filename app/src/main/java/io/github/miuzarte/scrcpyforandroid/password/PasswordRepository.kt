@@ -22,7 +22,7 @@ object PasswordRepository {
     private const val PASSWORD_SUFFIX = ".password"
     private const val CREATED_WITH_AUTH_SUFFIX = ".created_with_auth"
 
-    class PasswordStorageCorruptedException(cause: Throwable) : Exception(cause)
+    class PasswordStorageCorruptedException(cause: Throwable): Exception(cause)
 
     private val _entriesState = MutableStateFlow<List<PasswordEntry>>(emptyList())
     val entriesState: StateFlow<List<PasswordEntry>> = _entriesState.asStateFlow()
@@ -191,7 +191,8 @@ object PasswordRepository {
             is PasswordStorageCorruptedException -> throwable.cause ?: throwable
             is KeyStoreException,
             is GeneralSecurityException,
-            is KeyPermanentlyInvalidatedException -> throwable
+            is KeyPermanentlyInvalidatedException,
+                -> throwable
 
             else -> throwable
         }

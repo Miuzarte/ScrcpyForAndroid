@@ -6,24 +6,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.miuzarte.scrcpyforandroid.R
-import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
-import io.github.miuzarte.scrcpyforandroid.services.DirectoryDownloadSnapshot
-import io.github.miuzarte.scrcpyforandroid.services.DirectorySnapshotSession
-import io.github.miuzarte.scrcpyforandroid.services.FileManagerService
-import io.github.miuzarte.scrcpyforandroid.services.RemoteFileEntry
-import io.github.miuzarte.scrcpyforandroid.services.RemoteFileKind
-import io.github.miuzarte.scrcpyforandroid.services.RemoteFileStat
+import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.storage.BundleSyncDelegate
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -36,11 +23,11 @@ internal enum class FileManagerSortField { NAME, SIZE, TIME, EXTENSION }
 internal data class FileManagerScrollPosition(val index: Int, val offset: Int)
 
 internal sealed interface PendingTreeDownload {
-    data class File(val remotePath: String, val fileName: String) : PendingTreeDownload
-    data class Directory(val snapshot: DirectoryDownloadSnapshot) : PendingTreeDownload
+    data class File(val remotePath: String, val fileName: String): PendingTreeDownload
+    data class Directory(val snapshot: DirectoryDownloadSnapshot): PendingTreeDownload
 }
 
-internal class FileManagerViewModel : ViewModel() {
+internal class FileManagerViewModel: ViewModel() {
 
     private val asBundleSync = BundleSyncDelegate(
         sharedFlow = appSettings.bundleState,
@@ -82,7 +69,7 @@ internal class FileManagerViewModel : ViewModel() {
     val sortField: StateFlow<FileManagerSortField> = asBundle
         .map {
             runCatching { FileManagerSortField.valueOf(it.fileManagerSortBy) }.getOrDefault(
-                FileManagerSortField.NAME
+                FileManagerSortField.NAME,
             )
         }
         .stateIn(
@@ -473,7 +460,7 @@ internal fun sortEntries(
     }
     return entries.sortedWith(
         compareByDescending<RemoteFileEntry> { it.isDirectory }
-            .then(if (descending) comparator.reversed() else comparator)
+            .then(if (descending) comparator.reversed() else comparator),
     )
 }
 

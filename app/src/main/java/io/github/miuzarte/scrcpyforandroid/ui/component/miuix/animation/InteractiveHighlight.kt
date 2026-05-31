@@ -49,7 +49,7 @@ class InteractiveHighlight(
         float dist = distance(coord, position);
         float intensity = smoothstep(radius, radius * 0.5, dist);
         return color * intensity;
-    }"""
+    }""",
     )
 
     val modifier: Modifier = Modifier.drawWithContent {
@@ -57,7 +57,7 @@ class InteractiveHighlight(
         if (progress > 0f) {
             drawRect(
                 Color.White.copy(0.06f * progress),
-                blendMode = BlendMode.Plus
+                blendMode = BlendMode.Plus,
             )
             shader.apply {
                 val shaderPosition = position(size, positionAnimation.value)
@@ -70,7 +70,7 @@ class InteractiveHighlight(
             }
             drawRect(
                 ShaderBrush(shader),
-                blendMode = BlendMode.Plus
+                blendMode = BlendMode.Plus,
             )
         }
 
@@ -97,7 +97,7 @@ class InteractiveHighlight(
                     launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
                     launch { positionAnimation.animateTo(startPosition, positionAnimationSpec) }
                 }
-            }
+            },
         ) { change, _ ->
             animationScope.launch { positionAnimation.snapTo(change.position) }
         }

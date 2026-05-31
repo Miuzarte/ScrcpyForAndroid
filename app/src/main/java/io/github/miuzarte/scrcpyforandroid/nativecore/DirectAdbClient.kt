@@ -7,24 +7,13 @@ import io.github.miuzarte.scrcpyforandroid.storage.AdbClientData
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage
 import kotlinx.coroutines.runBlocking
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
-import java.io.Closeable
-import java.io.EOFException
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.*
 import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.security.KeyFactory
-import java.security.KeyPairGenerator
-import java.security.MessageDigest
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.Signature
+import java.security.*
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
@@ -72,7 +61,8 @@ internal object DirectAdbTransport {
             port,
             privateKey,
             publicKeyX509,
-            keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue })
+            keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+        )
         conn.handshake()
         Log.i(TAG, "connect(): handshake success for $host:$port")
         return conn
@@ -186,7 +176,7 @@ internal object DirectAdbTransport {
                             importedPrivateKeyFileName = "",
                             importedPublicKeyX509 = "",
                             importedPublicKeyFileName = "",
-                        )
+                        ),
                     )
                     loadOrCreate()
                 }.also { cachedKeys = it }
@@ -232,21 +222,21 @@ internal object DirectAdbTransport {
                                 current.copy(
                                     rsaPublicKeyX509 = encoded,
                                 )
-                            }
+                            },
                         )
                     }
 
                 Log.i(
                     TAG,
                     "loadOrCreate(): loaded persisted RSA key pair from DataStore, " +
-                            "fp=${fingerprint(pub)}"
+                            "fp=${fingerprint(pub)}",
                 )
                 return Pair(priv, pub)
             } catch (e: Exception) {
                 Log.w(
                     TAG,
                     "loadOrCreate(): failed to load persisted key from DataStore, regenerating",
-                    e
+                    e,
                 )
             }
         }
@@ -264,12 +254,12 @@ internal object DirectAdbTransport {
                 importedPrivateKeyFileName = "",
                 importedPublicKeyX509 = "",
                 importedPublicKeyFileName = "",
-            )
+            ),
         )
 
         Log.i(
             TAG,
-            "loadOrCreate(): generated new RSA key pair, fp=${fingerprint(kp.public.encoded)}"
+            "loadOrCreate(): generated new RSA key pair, fp=${fingerprint(kp.public.encoded)}",
         )
         return Pair(kp.private, kp.public.encoded)
     }
@@ -427,7 +417,7 @@ internal object DirectAdbTransport {
         val exponent = buf.int.toLong() and 0xffffffffL
         val modulus = BigInteger(1, modulusLE.reversedArray())
         return KeyFactory.getInstance("RSA").generatePublic(
-            RSAPublicKeySpec(modulus, BigInteger.valueOf(exponent))
+            RSAPublicKeySpec(modulus, BigInteger.valueOf(exponent)),
         )
     }
 
@@ -538,7 +528,7 @@ internal class DirectAdbConnection(
     private val privateKey: PrivateKey,
     private val publicKeyX509: ByteArray,
     private val keyName: String = AppSettings.ADB_KEY_NAME.defaultValue,
-) : AutoCloseable {
+): AutoCloseable {
 
     private val sha1DigestInfoPrefix = byteArrayOf(
         0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2B, 0x0E,
@@ -623,9 +613,9 @@ internal class DirectAdbConnection(
                     else -> throw IOException(
                         "ADB: unexpected message 0x${
                             afterSign.command.toString(
-                                16
+                                16,
                             )
-                        } after AUTH_SIGNATURE"
+                        } after AUTH_SIGNATURE",
                     )
                 }
             }
@@ -837,7 +827,7 @@ internal class DirectAdbConnection(
         command: Int,
         arg0: Int = 0,
         arg1: Int = 0,
-        data: ByteArray = ByteArray(0)
+        data: ByteArray = ByteArray(0),
     ) {
         val crc = data.fold(0L) { acc, b -> acc + (b.toLong() and 0xFF) }.toInt()
         val header = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
@@ -957,7 +947,7 @@ internal class DirectAdbConnection(
 class AdbSocketStream(
     val localId: Int,
     private val sender: (cmd: Int, arg0: Int, arg1: Int, `data`: ByteArray) -> Unit,
-) : Closeable {
+): Closeable {
 
     companion object {
         private const val A_WRTE = 0x45545257
@@ -1016,7 +1006,7 @@ class AdbSocketStream(
         queue.offer(EndOfStreamMarker)
     }
 
-    private inner class InStream : InputStream() {
+    private inner class InStream: InputStream() {
         private var chunk: ByteArray? = null
         private var off = 0
 
@@ -1047,7 +1037,7 @@ class AdbSocketStream(
         override fun available(): Int = chunk?.let { it.size - off } ?: 0
     }
 
-    private inner class OutStream : OutputStream() {
+    private inner class OutStream: OutputStream() {
         override fun write(b: Int) = write(byteArrayOf(b.toByte()))
         override fun write(b: ByteArray, off: Int, len: Int) {
             if (closed) throw IOException("ADB stream closed")

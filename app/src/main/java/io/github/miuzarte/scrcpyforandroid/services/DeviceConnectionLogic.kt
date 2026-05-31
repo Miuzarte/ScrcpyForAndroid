@@ -25,7 +25,7 @@ data class ConnectedDeviceInfo(
 internal suspend fun fetchConnectedDeviceInfo(
     adbService: NativeAdbService,
     host: String,
-    port: Int
+    port: Int,
 ): ConnectedDeviceInfo = withContext(Dispatchers.IO) {
     val values = runCatching {
         adbService.shellBatch {

@@ -20,7 +20,7 @@ private val OS2_PHONE_LIGHT = BgEffectConfig.Config(
         0.95f,
         0.14f,
         0.27f,
-        0.8f
+        0.8f,
     ),
     colors1 = OS2_PHONE_LIGHT_COLORS,
     colors2 = OS2_PHONE_LIGHT_COLORS,
@@ -51,7 +51,7 @@ private val OS2_PHONE_DARK = BgEffectConfig.Config(
         0.81f,
         0.14f,
         0.24f,
-        0.72f
+        0.72f,
     ),
     colors1 = OS2_PHONE_DARK_COLORS,
     colors2 = OS2_PHONE_DARK_COLORS,
@@ -82,7 +82,7 @@ private val OS2_PAD_LIGHT = BgEffectConfig.Config(
         0.68f,
         0.28f,
         0.26f,
-        0.62f
+        0.62f,
     ),
     colors1 = OS2_PAD_LIGHT_COLORS,
     colors2 = OS2_PAD_LIGHT_COLORS,
@@ -113,7 +113,7 @@ private val OS2_PAD_DARK = BgEffectConfig.Config(
         0.71f,
         0.43f,
         0.09f,
-        0.75f
+        0.75f,
     ),
     colors1 = OS2_PAD_DARK_COLORS,
     colors2 = OS2_PAD_DARK_COLORS,

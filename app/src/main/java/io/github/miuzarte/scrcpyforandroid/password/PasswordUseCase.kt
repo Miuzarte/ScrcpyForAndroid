@@ -27,7 +27,7 @@ class PasswordUseCase {
 
         val password = entry.cipherText
             ?: return Result.failure(
-                IllegalStateException(AppRuntime.stringResource(R.string.password_expired))
+                IllegalStateException(AppRuntime.stringResource(R.string.password_expired)),
             )
         return Result.success(password.copyOf())
     }

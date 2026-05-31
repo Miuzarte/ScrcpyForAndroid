@@ -2,9 +2,9 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Build
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import android.util.Log
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -56,7 +56,7 @@ internal object AdbMdnsDiscoverer {
         val discoveryFinished = AtomicBoolean(false)
         val latch = CountDownLatch(1)
 
-        val discoveryListener = object : NsdManager.DiscoveryListener {
+        val discoveryListener = object: NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) {
                 Log.v(TAG, "discovery started: $serviceType")
             }
@@ -79,7 +79,7 @@ internal object AdbMdnsDiscoverer {
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (discoveryFinished.get()) return
                 Log.v(TAG, "service found: ${serviceInfo.serviceName}")
-                val resolveListener = object : NsdManager.ResolveListener {
+                val resolveListener = object: NsdManager.ResolveListener {
                     override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                         Log.v(TAG, "resolve failed: ${serviceInfo.serviceName}, error=$errorCode")
                     }

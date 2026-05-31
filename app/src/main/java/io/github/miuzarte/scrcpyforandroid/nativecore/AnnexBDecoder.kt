@@ -94,14 +94,14 @@ class AnnexBDecoder(
                 if (inCount == 1L || inCount % 180L == 0L || isConfig) {
                     Log.i(
                         TAG,
-                        "feed(): mime=$decoderMime in=$inCount size=${data.size} key=$isKeyFrame cfg=$isConfig pts=$ptsUs"
+                        "feed(): mime=$decoderMime in=$inCount size=${data.size} key=$isKeyFrame cfg=$isConfig pts=$ptsUs",
                     )
                 }
             } else {
                 if (isConfig || isKeyFrame) {
                     Log.w(
                         TAG,
-                        "drop critical packet: mime=$decoderMime size=${data.size} key=$isKeyFrame cfg=$isConfig"
+                        "drop critical packet: mime=$decoderMime size=${data.size} key=$isKeyFrame cfg=$isConfig",
                     )
                 }
             }
@@ -110,7 +110,7 @@ class AnnexBDecoder(
             Log.w(
                 TAG,
                 "feed failed: mime=$decoderMime size=${data.size} key=$isKeyFrame cfg=$isConfig",
-                it
+                it,
             )
         }
     }

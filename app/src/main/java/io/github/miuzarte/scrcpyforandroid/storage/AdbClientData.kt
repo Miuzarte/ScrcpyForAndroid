@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 
-class AdbClientData(context: Context) : Settings(context, "AdbClient") {
+class AdbClientData(context: Context): Settings(context, "AdbClient") {
     companion object {
         val RSA_PRIVATE_KEY = Pair(
             stringPreferencesKey("rsa_private_key"),
@@ -50,7 +50,7 @@ class AdbClientData(context: Context) : Settings(context, "AdbClient") {
         val importedPrivateKeyFileName: String,
         val importedPublicKeyX509: String,
         val importedPublicKeyFileName: String,
-    ) : Parcelable {
+    ): Parcelable {
     }
 
     private val bundleFields = arrayOf<BundleField<Bundle>>(

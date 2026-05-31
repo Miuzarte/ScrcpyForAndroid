@@ -9,11 +9,7 @@ import androidx.compose.ui.unit.Dp
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.miuix.OverlaySpinnerPreference
 import io.github.miuzarte.scrcpyforandroid.miuix.SpinnerEntry
-import top.yukonga.miuix.kmp.basic.BasicComponentColors
-import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
-import top.yukonga.miuix.kmp.basic.DropdownColors
-import top.yukonga.miuix.kmp.basic.DropdownDefaults
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.*
 
 /**
  * [OverlaySpinnerPreference] wrapper with fallback value display and loading state.
@@ -57,7 +53,7 @@ fun OverlaySpinnerWithFallback(
                     SpinnerEntry(
                         title = overrideEndActionValue,
                         enabled = true, // 保持启用以显示蓝色而非灰色
-                    )
+                    ),
                 )
             }
             if (dataLoading) {
@@ -66,7 +62,7 @@ fun OverlaySpinnerWithFallback(
                         icon = { mod -> InfiniteProgressIndicator(mod) },
                         title = textLoading,
                         enabled = false,
-                    )
+                    ),
                 )
             }
         }

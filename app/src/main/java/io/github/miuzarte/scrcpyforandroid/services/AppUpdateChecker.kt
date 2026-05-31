@@ -32,10 +32,10 @@ object AppUpdateChecker {
     )
 
     sealed interface State {
-        data object Idle : State
-        data object Checking : State
-        data object Error : State
-        data class Ready(val release: ReleaseInfo) : State
+        data object Idle: State
+        data object Checking: State
+        data object Error: State
+        data class Ready(val release: ReleaseInfo): State
     }
 
     private val checkMutex = Mutex()
