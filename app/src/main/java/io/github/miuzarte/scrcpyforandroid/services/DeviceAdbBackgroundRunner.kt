@@ -116,9 +116,15 @@ internal class DeviceAdbBackgroundRunner: Closeable {
                 continue
             }
 
-            val portToReplace = savedShortcuts().firstOrNull {
-                it.matchesHost(discoveredHost) && it.port != knownDevice.port
-            }?.port
+            val portToReplace = savedShortcuts()
+                .filter { it != knownDevice }
+                .firstNotNullOfOrNull { device ->
+                    device.addresses.firstNotNullOfOrNull { addr ->
+                        val ct = ConnectionTarget.unmarshalFrom(addr)
+                        if (ct != null && ct.host == discoveredHost && ct.port != discoveredPort) ct.port
+                        else null
+                    }
+                }
             if (portToReplace != null) {
                 withContext(Dispatchers.Main) {
                     onMdnsPortChanged(discoveredHost, portToReplace, discoveredPort)
