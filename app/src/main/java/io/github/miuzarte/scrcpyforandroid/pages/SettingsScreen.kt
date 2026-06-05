@@ -31,6 +31,7 @@ import io.github.miuzarte.scrcpyforandroid.MainActivity
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.nativecore.DirectAdbTransport
+import io.github.miuzarte.scrcpyforandroid.nativecore.MtlsConfig
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ArrowSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
@@ -43,6 +44,7 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings.FullscreenVirtual
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.adbClientData
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.mtlsData
 import io.github.miuzarte.scrcpyforandroid.ui.*
 import kotlinx.coroutines.*
 import top.yukonga.miuix.kmp.basic.*
@@ -78,6 +80,12 @@ suspend fun clearTerminalFont(context: Context) =
 suspend fun readTextFromUri(context: Context, uri: Uri): String =
     withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            ?: error("Cannot open selected file")
+    }
+
+suspend fun readBytesFromUri(context: Context, uri: Uri): ByteArray =
+    withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: error("Cannot open selected file")
     }
 
@@ -1060,6 +1068,204 @@ fun SettingsPage(
                         )
                     },
                 )
+            }
+        }
+
+        item {
+            SectionSmallTitle(stringResource(R.string.section_mtls))
+            Card {
+                val mtlsBundle by mtlsData.bundleState.collectAsState()
+
+                SwitchPreference(
+                    title = stringResource(R.string.pref_title_mtls_enabled),
+                    summary = stringResource(R.string.pref_summary_mtls_enabled),
+                    checked = asBundle.mtlsEnabled,
+                    onCheckedChange = {
+                        asBundle = asBundle.copy(mtlsEnabled = it)
+                    },
+                )
+
+                val mtlsCaPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri: Uri? ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    scope.launch {
+                        runCatching {
+                            val fileName = queryAdbKeyDisplayName(context, uri)
+                                ?.takeIf { it.isNotBlank() }
+                                ?: uri.lastPathSegment.orEmpty()
+                            val content = readTextFromUri(context, uri)
+                            mtlsData.saveBundle(
+                                mtlsBundle.copy(
+                                    caCertificate = content,
+                                    caCertificateFileName = fileName,
+                                )
+                            )
+                            fileName
+                        }.onSuccess {
+                            AppRuntime.snackbar(R.string.pref_mtls_ca_imported, it)
+                        }.onFailure { e ->
+                            AppRuntime.snackbar(
+                                R.string.pref_mtls_import_failed,
+                                e.message ?: e.javaClass.simpleName,
+                            )
+                        }
+                    }
+                }
+
+                val mtlsPkcs12Picker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri: Uri? ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    scope.launch {
+                        runCatching {
+                            val fileName = queryAdbKeyDisplayName(context, uri)
+                                ?.takeIf { it.isNotBlank() }
+                                ?: uri.lastPathSegment.orEmpty()
+                            val pkcs12Bytes = readBytesFromUri(context, uri)
+                            val ca = mtlsBundle.caCertificate
+                            require(ca.isNotBlank()) { "Import CA certificate first" }
+                            val (certPem, keyPem) = MtlsConfig.extractPemFromPkcs12(pkcs12Bytes)
+                            MtlsConfig.fromPkcs12(ca, pkcs12Bytes)
+                            mtlsData.saveBundle(
+                                mtlsBundle.copy(
+                                    clientCertificate = certPem,
+                                    clientPrivateKey = keyPem,
+                                    clientCertFileName = fileName,
+                                    clientKeyFileName = "",
+                                )
+                            )
+                            fileName
+                        }.onSuccess {
+                            AppRuntime.snackbar(R.string.pref_mtls_pkcs12_imported, it)
+                        }.onFailure { e ->
+                            AppRuntime.snackbar(
+                                R.string.pref_mtls_import_failed,
+                                e.message ?: e.javaClass.simpleName,
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.padding(vertical = UiSpacing.Large),
+                    verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.pref_title_mtls_ca_cert),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextField(
+                            value = mtlsBundle.caCertificateFileName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = stringResource(
+                                if (mtlsBundle.caCertificate.isBlank()) R.string.pref_mtls_not_imported
+                                else R.string.pref_mtls_imported
+                            ),
+                            useLabelAsPlaceholder = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                Row(modifier = Modifier.padding(end = UiSpacing.Medium)) {
+                                    if (mtlsBundle.caCertificate.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                haptic.contextClick()
+                                                scope.launch {
+                                                    mtlsData.saveBundle(
+                                                        mtlsBundle.copy(
+                                                            caCertificate = "",
+                                                            caCertificateFileName = "",
+                                                        )
+                                                    )
+                                                    AppRuntime.snackbar(R.string.pref_mtls_certs_cleared)
+                                                }
+                                            },
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Clear,
+                                                contentDescription = stringResource(R.string.cd_clear),
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.contextClick()
+                                            mtlsCaPicker.launch(arrayOf("*/*"))
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_file),
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.pref_title_mtls_client_cert),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        TextField(
+                            value = mtlsBundle.clientCertFileName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = stringResource(
+                                if (mtlsBundle.clientCertificate.isBlank()) R.string.pref_mtls_not_imported
+                                else R.string.pref_mtls_imported
+                            ),
+                            useLabelAsPlaceholder = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                Row(modifier = Modifier.padding(end = UiSpacing.Medium)) {
+                                    if (mtlsBundle.clientCertificate.isNotBlank()) {
+                                        IconButton(
+                                            onClick = {
+                                                haptic.contextClick()
+                                                scope.launch {
+                                                    mtlsData.saveBundle(
+                                                        mtlsBundle.copy(
+                                                            clientCertificate = "",
+                                                            clientPrivateKey = "",
+                                                            clientCertFileName = "",
+                                                            clientKeyFileName = "",
+                                                        )
+                                                    )
+                                                    AppRuntime.snackbar(R.string.pref_mtls_certs_cleared)
+                                                }
+                                            },
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Clear,
+                                                contentDescription = stringResource(R.string.cd_clear),
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.contextClick()
+                                            mtlsPkcs12Picker.launch(arrayOf("*/*"))
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FileOpen,
+                                            contentDescription = stringResource(R.string.cd_select_file),
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
 

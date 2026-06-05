@@ -11,12 +11,14 @@ import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.nativecore.MtlsConfig
 import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
+import io.github.miuzarte.scrcpyforandroid.storage.Storage.mtlsData
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.quickDevices
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
@@ -489,11 +491,23 @@ internal class DeviceTabViewModel(
     }
 
     suspend fun connectWithTimeout(host: String, port: Int) {
-        connectionController.connectWithTimeout(host, port, ADB_CONNECT_TIMEOUT_MS)
+        val mtls = try {
+            buildMtlsConfigIfEnabled()
+        } catch (e: Exception) {
+            AppRuntime.snackbar(R.string.pref_mtls_import_failed, e.message ?: e.javaClass.simpleName)
+            return
+        }
+        connectionController.connectWithTimeout(host, port, ADB_CONNECT_TIMEOUT_MS, mtls)
     }
 
     suspend fun connectAddresses(addresses: List<String>): ConnectionTarget {
-        return connectionController.connectAddresses(addresses, ADB_CONNECT_TIMEOUT_MS, ADB_TCP_PROBE_TIMEOUT_MS)
+        val mtls = try {
+            buildMtlsConfigIfEnabled()
+        } catch (e: Exception) {
+            AppRuntime.snackbar(R.string.pref_mtls_import_failed, e.message ?: e.javaClass.simpleName)
+            throw e
+        }
+        return connectionController.connectAddresses(addresses, ADB_CONNECT_TIMEOUT_MS, ADB_TCP_PROBE_TIMEOUT_MS, mtls)
     }
 
     suspend fun disconnectCurrentTargetBeforeConnectingAny(addresses: List<String>) {
@@ -985,6 +999,20 @@ internal class DeviceTabViewModel(
 
     suspend fun startAppViaAdb(packageName: String) {
         adbCoordinator.startApp(packageName = packageName)
+    }
+
+    private suspend fun buildMtlsConfigIfEnabled(): MtlsConfig? {
+        val settings = appSettings.bundleState.value
+        if (!settings.mtlsEnabled) return null
+        val data = mtlsData.bundleState.value
+        val ca = data.caCertificate.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("mTLS enabled but CA certificate not imported")
+        val clientCert = data.clientCertificate.takeIf { it.isNotBlank() }
+        val clientKey = data.clientPrivateKey.takeIf { it.isNotBlank() }
+        if (clientCert == null || clientKey == null) {
+            throw IllegalStateException("mTLS enabled but client certificate not imported")
+        }
+        return MtlsConfig.fromPem(ca, clientCert, clientKey)
     }
 
     class Factory(

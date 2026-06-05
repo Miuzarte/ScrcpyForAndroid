@@ -237,6 +237,20 @@
     <string name="pref_warning_list_apps">--list-apps 操作可能非常耗时（特别是在息屏状态下），启用后可能导致连接设备后阻塞过久！</string>
     <string name="pref_cannot_open_settings">无法打开设置</string>
 
+    <!-- Settings - mTLS -->
+    <string name="section_mtls">mTLS 认证</string>
+    <string name="pref_title_mtls_enabled">启用 mTLS</string>
+    <string name="pref_summary_mtls_enabled">通过反向代理（如 nginx）连接时使用双向 TLS 认证</string>
+    <string name="pref_title_mtls_ca_cert">CA 证书</string>
+    <string name="pref_title_mtls_client_cert">客户端证书（PKCS12）</string>
+    <string name="pref_mtls_not_imported">未导入</string>
+    <string name="pref_mtls_imported">已导入</string>
+    <string name="pref_mtls_ca_imported">CA 证书已导入：%1$s</string>
+    <string name="pref_mtls_pkcs12_imported">PKCS12 已导入：%1$s</string>
+    <string name="pref_mtls_import_failed">mTLS 导入失败：%1$s</string>
+    <string name="pref_mtls_certs_cleared">mTLS 证书已清除</string>
+    <string name="pref_mtls_clear">清除 mTLS 证书</string>
+
     <!-- Settings - Terminal -->
     <string name="section_terminal">终端</string>
     <string name="pref_title_terminal_font_size">终端字号</string>

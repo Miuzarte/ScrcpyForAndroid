@@ -54,14 +54,15 @@ internal object DirectAdbTransport {
     @Volatile
     var keyName: String = AppSettings.ADB_KEY_NAME.defaultValue
 
-    fun connect(host: String, port: Int): DirectAdbConnection {
-        Log.i(TAG, "connect(): opening direct adbd transport to $host:$port")
+    fun connect(host: String, port: Int, mtlsConfig: MtlsConfig? = null): DirectAdbConnection {
+        Log.i(TAG, "connect(): opening direct adbd transport to $host:$port (mtls=${mtlsConfig != null})")
         val conn = DirectAdbConnection(
             host,
             port,
             privateKey,
             publicKeyX509,
             keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+            mtlsConfig,
         )
         conn.handshake()
         Log.i(TAG, "connect(): handshake success for $host:$port")
@@ -528,6 +529,7 @@ internal class DirectAdbConnection(
     private val privateKey: PrivateKey,
     private val publicKeyX509: ByteArray,
     private val keyName: String = AppSettings.ADB_KEY_NAME.defaultValue,
+    private val mtlsConfig: MtlsConfig? = null,
 ): AutoCloseable {
 
     private val sha1DigestInfoPrefix = byteArrayOf(
@@ -580,10 +582,14 @@ internal class DirectAdbConnection(
         rawIn = BufferedInputStream(socket.getInputStream(), 65_536)
         rawOut = socket.getOutputStream()
 
+        if (mtlsConfig != null) {
+            upgradeToMtls(mtlsConfig)
+        }
+
         sendMsg(A_CNXN, VERSION, MAX_PAYLOAD, "host::\u0000".toByteArray(Charsets.UTF_8))
 
         var first = recvMsg()
-        if (first.command == A_STLS) {
+        if (first.command == A_STLS && mtlsConfig == null) {
             sendMsg(A_STLS, STLS_VERSION, 0)
             upgradeToTls()
             first = recvMsg()
@@ -633,6 +639,15 @@ internal class DirectAdbConnection(
             alias = keyName,
         )
         val sslSocket = pairingKey.sslContext.socketFactory
+            .createSocket(socket, host, port, true) as SSLSocket
+        sslSocket.startHandshake()
+        tlsSocket = sslSocket
+        rawIn = BufferedInputStream(sslSocket.inputStream, 65_536)
+        rawOut = sslSocket.outputStream
+    }
+
+    private fun upgradeToMtls(mtlsConfig: MtlsConfig) {
+        val sslSocket = mtlsConfig.sslContext.socketFactory
             .createSocket(socket, host, port, true) as SSLSocket
         sslSocket.startHandshake()
         tlsSocket = sslSocket
@@ -854,6 +869,9 @@ internal class DirectAdbConnection(
         val dataLen = buf.int
         buf.int
         buf.int
+        if (dataLen < 0 || dataLen > MAX_PAYLOAD) {
+            throw IOException("ADB: invalid data length $dataLen (possibly non-ADB traffic, check if mTLS is required)")
+        }
         val data =
             if (dataLen > 0) ByteArray(dataLen).also { rawIn.readExact(it) } else ByteArray(0)
         return AdbMsg(command, arg0, arg1, data)

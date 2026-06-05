@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.services
 
 import android.os.Parcelable
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.nativecore.MtlsConfig
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.coroutines.Dispatchers
@@ -27,11 +28,11 @@ internal data class DeviceAdbSessionState(
 internal class DeviceAdbConnectionCoordinator(
     private val adbService: NativeAdbService = NativeAdbService,
 ) {
-    suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long) {
+    suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long, mtlsConfig: MtlsConfig? = null) {
         withContext(Dispatchers.IO) {
             val resolved = resolveHost(host)
             withTimeout(timeoutMs) {
-                adbService.connect(resolved, port)
+                adbService.connect(resolved, port, mtlsConfig)
             }
         }
     }
@@ -40,6 +41,7 @@ internal class DeviceAdbConnectionCoordinator(
         addresses: List<String>,
         timeoutMs: Long,
         probeTimeoutMs: Int,
+        mtlsConfig: MtlsConfig? = null,
     ): ConnectionTarget {
         var lastError: Throwable? = null
         return withContext(Dispatchers.IO) {
@@ -48,7 +50,7 @@ internal class DeviceAdbConnectionCoordinator(
                     ?: throw IllegalStateException("Invalid address: ${addresses[0]}")
                 val resolved = resolveHost(target.host)
                 withTimeout(timeoutMs) {
-                    adbService.connect(resolved, target.port)
+                    adbService.connect(resolved, target.port, mtlsConfig)
                 }
                 return@withContext target
             }
@@ -71,7 +73,7 @@ internal class DeviceAdbConnectionCoordinator(
             for ((_, target, resolved) in candidates) {
                 try {
                     withTimeout(timeoutMs) {
-                        adbService.connect(resolved, target.port)
+                        adbService.connect(resolved, target.port, mtlsConfig)
                     }
                     return@withContext target
                 } catch (e: Exception) {

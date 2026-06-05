@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.nativecore.MtlsConfig
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 
@@ -65,16 +66,17 @@ internal class ConnectionController(
         }
     }
 
-    suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long) {
-        adbCoordinator.connectWithTimeout(host, port, timeoutMs)
+    suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long, mtlsConfig: MtlsConfig? = null) {
+        adbCoordinator.connectWithTimeout(host, port, timeoutMs, mtlsConfig)
     }
 
     suspend fun connectAddresses(
         addresses: List<String>,
         timeoutMs: Long,
         probeTimeoutMs: Int,
+        mtlsConfig: MtlsConfig? = null,
     ): ConnectionTarget {
-        return adbCoordinator.connectFirstReachable(addresses, timeoutMs, probeTimeoutMs)
+        return adbCoordinator.connectFirstReachable(addresses, timeoutMs, probeTimeoutMs, mtlsConfig)
     }
 
     suspend fun disconnectCurrentTargetBeforeConnectingAny(
@@ -106,9 +108,10 @@ internal class ConnectionController(
         host: String,
         port: Int,
         timeoutMs: Long,
+        mtlsConfig: MtlsConfig? = null,
     ): Boolean {
         return runCatching {
-            connectWithTimeout(host, port, timeoutMs)
+            connectWithTimeout(host, port, timeoutMs, mtlsConfig)
             true
         }.getOrElse { error ->
             stateStore.update {

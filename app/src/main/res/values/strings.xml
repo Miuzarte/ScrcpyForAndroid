@@ -237,6 +237,20 @@
     <string name="pref_warning_list_apps">--list-apps may be very time-consuming (especially when screen is off); enabling may cause excessive blocking after connecting to the device!</string>
     <string name="pref_cannot_open_settings">Cannot open settings</string>
 
+    <!-- Settings - mTLS -->
+    <string name="section_mtls">mTLS Authentication</string>
+    <string name="pref_title_mtls_enabled">Enable mTLS</string>
+    <string name="pref_summary_mtls_enabled">Use mutual TLS authentication when connecting through a reverse proxy (e.g. nginx)</string>
+    <string name="pref_title_mtls_ca_cert">CA Certificate</string>
+    <string name="pref_title_mtls_client_cert">Client Certificate (PKCS12)</string>
+    <string name="pref_mtls_not_imported">Not imported</string>
+    <string name="pref_mtls_imported">Imported</string>
+    <string name="pref_mtls_ca_imported">CA certificate imported: %1$s</string>
+    <string name="pref_mtls_pkcs12_imported">PKCS12 imported: %1$s</string>
+    <string name="pref_mtls_import_failed">mTLS import failed: %1$s</string>
+    <string name="pref_mtls_certs_cleared">mTLS certificates cleared</string>
+    <string name="pref_mtls_clear">Clear mTLS certificates</string>
+
     <!-- Settings - Terminal -->
     <string name="section_terminal">Terminal</string>
     <string name="pref_title_terminal_font_size">Terminal font size</string>

@@ -262,6 +262,12 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
             false,
         )
 
+        // mTLS
+        val MTLS_ENABLED = Pair(
+            booleanPreferencesKey("mtls_enabled"),
+            false,
+        )
+
         // Terminal
         val TERMINAL_FONT_SIZE_SP = Pair(
             floatPreferencesKey("terminal_font_size_sp"),
@@ -350,6 +356,9 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         val adbMdnsLanDiscovery: Boolean,
         val adbAutoLoadAppListOnConnect: Boolean,
 
+        // mTLS
+        val mtlsEnabled: Boolean,
+
         // Terminal
         val terminalFontSizeSp: Float,
         val terminalFontDisplayName: String,
@@ -413,6 +422,9 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         bundleField(ADB_AUTO_RECONNECT_PAIRED_DEVICE) { it.adbAutoReconnectPairedDevice },
         bundleField(ADB_MDNS_LAN_DISCOVERY) { it.adbMdnsLanDiscovery },
         bundleField(ADB_AUTO_LOAD_APP_LIST_ON_CONNECT) { it.adbAutoLoadAppListOnConnect },
+
+        // mTLS
+        bundleField(MTLS_ENABLED) { it.mtlsEnabled },
 
         // Terminal
         bundleField(TERMINAL_FONT_SIZE_SP) { it.terminalFontSizeSp },
@@ -482,6 +494,9 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         adbAutoReconnectPairedDevice = preferences.read(ADB_AUTO_RECONNECT_PAIRED_DEVICE),
         adbMdnsLanDiscovery = preferences.read(ADB_MDNS_LAN_DISCOVERY),
         adbAutoLoadAppListOnConnect = preferences.read(ADB_AUTO_LOAD_APP_LIST_ON_CONNECT),
+
+        // mTLS
+        mtlsEnabled = preferences.read(MTLS_ENABLED),
 
         // Terminal
         terminalFontSizeSp = preferences.read(TERMINAL_FONT_SIZE_SP),

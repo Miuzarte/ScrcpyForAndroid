@@ -87,10 +87,11 @@ object NativeAdbService {
     suspend fun connect(
         host: String,
         port: Int,
+        mtlsConfig: MtlsConfig? = null,
         timeout: Duration = Duration.INFINITE,
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
-            Log.i(TAG, "connect(): host=$host port=$port")
+            Log.i(TAG, "connect(): host=$host port=$port mtls=${mtlsConfig != null}")
 
             if (connection != null
                 && connection!!.isAlive()
@@ -102,7 +103,7 @@ object NativeAdbService {
             disconnectInternal()
 
             try {
-                val conn = withTimeout(timeout) { transport.connect(host, port) }
+                val conn = withTimeout(timeout) { transport.connect(host, port, mtlsConfig) }
                 connection = conn
                 connectedHost = host
                 connectedPort = port
