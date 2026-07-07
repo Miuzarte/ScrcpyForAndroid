@@ -21,7 +21,7 @@ material = "1.13.0"
 reorderable = "3.0.0"
 runtime = "1.10.6"
 androidxCorePip = "1.0.0-alpha03"
-androidxBiometric = "1.4.0-alpha06"
+androidxBiometric = "1.4.0-alpha07"
 androidxSecurityCrypto = "1.1.0"
 
 [libraries]
