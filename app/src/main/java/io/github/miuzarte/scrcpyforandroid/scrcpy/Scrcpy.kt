@@ -1117,7 +1117,7 @@ class Scrcpy(
                 )
 
                 val controlWriter = controlStream?.let { stream ->
-                    ControlWriter(DataOutputStream(stream.outputStream))
+                    ControlWriter(DataOutputStream(BufferedOutputStream(stream.outputStream)))
                 }
                 val controlInput = controlStream?.let { stream ->
                     if (stream === firstStream) firstInput
