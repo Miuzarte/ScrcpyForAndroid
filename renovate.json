@@ -2,5 +2,10 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "dependencyDashboard": true,
+  "gitSubmodule": {
+    "enabled": false
+  },
+  "schedule": ["before 6am on Monday"]
 }
