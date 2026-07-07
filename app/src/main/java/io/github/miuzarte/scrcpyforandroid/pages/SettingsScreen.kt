@@ -38,6 +38,7 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperTextField
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
+import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings.FullscreenVirtualButtonDock
 import io.github.miuzarte.scrcpyforandroid.storage.Settings
@@ -47,6 +48,10 @@ import io.github.miuzarte.scrcpyforandroid.ui.*
 import kotlinx.coroutines.*
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Download
+import top.yukonga.miuix.kmp.icon.extended.Share
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -231,6 +236,59 @@ fun SettingsPage(
             }.onFailure { e ->
                 AppRuntime.snackbar(
                     R.string.pref_adb_key_import_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
+            }
+        }
+    }
+
+    var exportingKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var showResetKeyConfirm by rememberSaveable { mutableStateOf(false) }
+
+    val exportPrivateKeyPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    DirectAdbTransport.privateKey
+                    val pem = DirectAdbTransport.getPrivateKeyPem()
+                        ?: error("Private key not available")
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(pem.toByteArray())
+                    } ?: error("Cannot open output stream")
+                }
+            }.onSuccess {
+                AppRuntime.snackbar(R.string.pref_adb_key_exported_file)
+            }.onFailure { e ->
+                AppRuntime.snackbar(
+                    R.string.pref_adb_key_export_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
+            }
+        }
+    }
+
+    val exportPublicKeyPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    DirectAdbTransport.publicKeyX509
+                    val pem = DirectAdbTransport.getPublicKeyPem()
+                        ?: error("Public key not available")
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(pem.toByteArray())
+                    } ?: error("Cannot open output stream")
+                }
+            }.onSuccess {
+                AppRuntime.snackbar(R.string.pref_adb_key_exported_file)
+            }.onFailure { e ->
+                AppRuntime.snackbar(
+                    R.string.pref_adb_key_export_failed,
                     e.message ?: e.javaClass.simpleName,
                 )
             }
@@ -935,26 +993,7 @@ fun SettingsPage(
                                     IconButton(
                                         onClick = {
                                             haptic.contextClick()
-                                            scope.launch {
-                                                runCatching {
-                                                    withContext(Dispatchers.IO) {
-                                                        DirectAdbTransport.resetKeys()
-                                                    }
-                                                }.onSuccess {
-                                                    AppRuntime.snackbar(
-                                                        if (it.removedImportedKey)
-                                                            R.string.pref_adb_key_removed
-                                                        else
-                                                            R.string.pref_adb_key_reset,
-                                                        it.fingerprint,
-                                                    )
-                                                }.onFailure { e ->
-                                                    AppRuntime.snackbar(
-                                                        R.string.pref_adb_key_import_failed,
-                                                        e.message ?: e.javaClass.simpleName,
-                                                    )
-                                                }
-                                            }
+                                            showResetKeyConfirm = true
                                         },
                                     ) {
                                         Icon(
@@ -970,11 +1009,22 @@ fun SettingsPage(
                                     IconButton(
                                         onClick = {
                                             haptic.contextClick()
+                                            exportingKey = "private"
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = MiuixIcons.Share,
+                                            contentDescription = stringResource(R.string.cd_export_adb_key),
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.contextClick()
                                             adbPrivateKeyPicker.launch(arrayOf("*/*"))
                                         },
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.FileOpen,
+                                            imageVector = MiuixIcons.Download,
                                             contentDescription = stringResource(R.string.cd_select_file),
                                         )
                                     }
@@ -1014,11 +1064,22 @@ fun SettingsPage(
                                     IconButton(
                                         onClick = {
                                             haptic.contextClick()
+                                            exportingKey = "public"
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = MiuixIcons.Share,
+                                            contentDescription = stringResource(R.string.cd_export_adb_key),
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.contextClick()
                                             adbPublicKeyPicker.launch(arrayOf("*/*"))
                                         },
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.FileOpen,
+                                            imageVector = MiuixIcons.Download,
                                             contentDescription = stringResource(R.string.cd_select_file),
                                         )
                                     }
@@ -1190,6 +1251,141 @@ fun SettingsPage(
                     },
                 )
             }
+        }
+    }
+
+    ExportAdbKeyDialog(
+        show = exportingKey != null,
+        isPrivateKey = exportingKey == "private",
+        onDismissRequest = { exportingKey = null },
+        onDismissFinished = { exportingKey = null },
+        onExportToClipboard = {
+            val target = exportingKey
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        if (target == "private") {
+                            DirectAdbTransport.privateKey
+                            DirectAdbTransport.getPrivateKeyPem()
+                        } else {
+                            DirectAdbTransport.publicKeyX509
+                            DirectAdbTransport.getPublicKeyPem()
+                        } ?: error("Key not available")
+                    }
+                }.onSuccess { pem ->
+                    LocalInputService.setClipboardText(context, pem)
+                    AppRuntime.snackbar(R.string.pref_adb_key_exported_clipboard)
+                }.onFailure { e ->
+                    AppRuntime.snackbar(
+                        R.string.pref_adb_key_export_failed,
+                        e.message ?: e.javaClass.simpleName,
+                    )
+                }
+            }
+        },
+        onExportToFile = {
+            if (exportingKey == "private") {
+                exportPrivateKeyPicker.launch("adbkey")
+            } else {
+                exportPublicKeyPicker.launch("adbkey.pub")
+            }
+        },
+    )
+
+    OverlayDialog(
+        show = showResetKeyConfirm,
+        title = stringResource(R.string.pref_adb_key_reset_confirm_title),
+        summary = stringResource(R.string.pref_adb_key_reset_confirm_summary),
+        defaultWindowInsetsPadding = false,
+        onDismissRequest = { showResetKeyConfirm = false },
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(UiSpacing.ContentHorizontal),
+        ) {
+            TextButton(
+                text = stringResource(R.string.button_cancel),
+                onClick = {
+                    haptic.contextClick()
+                    showResetKeyConfirm = false
+                },
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                text = stringResource(R.string.button_confirm),
+                onClick = {
+                    haptic.confirm()
+                    showResetKeyConfirm = false
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                DirectAdbTransport.resetKeys()
+                            }
+                        }.onSuccess {
+                            AppRuntime.snackbar(
+                                if (it.removedImportedKey)
+                                    R.string.pref_adb_key_removed
+                                else
+                                    R.string.pref_adb_key_reset,
+                                it.fingerprint,
+                            )
+                        }.onFailure { e ->
+                            AppRuntime.snackbar(
+                                R.string.pref_adb_key_import_failed,
+                                e.message ?: e.javaClass.simpleName,
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExportAdbKeyDialog(
+    show: Boolean,
+    isPrivateKey: Boolean,
+    onDismissRequest: () -> Unit,
+    onDismissFinished: () -> Unit,
+    onExportToClipboard: () -> Unit,
+    onExportToFile: () -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    OverlayDialog(
+        show = show,
+        title = stringResource(R.string.pref_adb_key_export),
+        summary = stringResource(
+            if (isPrivateKey) R.string.pref_adb_key_export_private_summary
+            else R.string.pref_adb_key_export_public_summary,
+        ),
+        defaultWindowInsetsPadding = false,
+        onDismissRequest = onDismissRequest,
+        onDismissFinished = onDismissFinished,
+    ) {
+        Spacer(Modifier.height(UiSpacing.ContentVertical * 2))
+        Column(
+            verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+        ) {
+            TextButton(
+                text = stringResource(R.string.pref_adb_key_export_to_clipboard),
+                onClick = {
+                    haptic.contextClick()
+                    onExportToClipboard()
+                    onDismissRequest()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(
+                text = stringResource(R.string.pref_adb_key_export_to_file),
+                onClick = {
+                    haptic.contextClick()
+                    onExportToFile()
+                    onDismissRequest()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

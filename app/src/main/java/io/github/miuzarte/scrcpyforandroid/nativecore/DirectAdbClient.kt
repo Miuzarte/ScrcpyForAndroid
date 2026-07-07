@@ -51,6 +51,18 @@ internal object DirectAdbTransport {
     val privateKey: PrivateKey get() = keys().first
     val publicKeyX509: ByteArray get() = keys().second
 
+    fun getPrivateKeyPem(): String? = cachedKeys?.let { (priv, _) ->
+        "-----BEGIN PRIVATE KEY-----\n" +
+                Base64.encodeToString(priv.encoded, Base64.DEFAULT) +
+                "-----END PRIVATE KEY-----"
+    }
+
+    fun getPublicKeyPem(): String? = cachedKeys?.let { (_, pub) ->
+        "-----BEGIN PUBLIC KEY-----\n" +
+                Base64.encodeToString(pub, Base64.DEFAULT) +
+                "-----END PUBLIC KEY-----"
+    }
+
     @Volatile
     var keyName: String = AppSettings.ADB_KEY_NAME.defaultValue
 

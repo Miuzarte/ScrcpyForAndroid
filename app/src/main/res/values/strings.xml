@@ -228,6 +228,17 @@
     <string name="pref_adb_key_import_failed">ADB key import failed: %1$s</string>
     <string name="pref_adb_key_remove">Remove</string>
     <string name="pref_adb_key_regenerate">Regenerate</string>
+    <string name="pref_adb_key_export">Export</string>
+    <string name="pref_adb_key_export_private_summary">Export private key to...</string>
+    <string name="pref_adb_key_export_public_summary">Export public key to...</string>
+    <string name="pref_adb_key_export_to_clipboard">Clipboard</string>
+    <string name="pref_adb_key_export_to_file">File</string>
+    <string name="pref_adb_key_exported_clipboard">Exported to clipboard</string>
+    <string name="pref_adb_key_exported_file">Exported to file</string>
+    <string name="pref_adb_key_export_failed">Export failed: %1$s</string>
+    <string name="cd_export_adb_key">Export</string>
+    <string name="pref_adb_key_reset_confirm_title">Reset ADB key</string>
+    <string name="pref_adb_key_reset_confirm_summary">After resetting, all previously authorized devices will need to be re-authorized.\nContinue?</string>
     <string name="pref_title_auto_discovery">Auto enable discovery service when pairing</string>
     <string name="pref_summary_auto_discovery">Automatically search for available pairing ports after opening the pairing dialog</string>
     <string name="pref_title_auto_reconnect">Auto reconnect paired devices</string>
