@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import java.lang.ref.WeakReference
 
 class StreamActivity: FragmentActivity() {
-    private val basicPip = BasicPictureInPicture(this)
+    private val basicPip = BasicPictureInPicture(this, ContextCompat.getMainExecutor(this))
 
     private val pipActionReceiver = PictureInPictureActionReceiver()
     private var isPipActionReceiverRegistered = false
