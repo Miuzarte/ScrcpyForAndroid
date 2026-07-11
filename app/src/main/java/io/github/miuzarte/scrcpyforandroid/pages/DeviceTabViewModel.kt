@@ -32,6 +32,8 @@ private const val ADB_KEEPALIVE_TIMEOUT_MS = 1_500L
 private const val ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS = 2_000L
 private const val ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS = 2_000L
 private const val ADB_TCP_PROBE_TIMEOUT_MS = 500
+private const val ADB_HEALTH_CHECK_INTERVAL_MS = 3_000L
+private const val TAG = "DeviceTabViewModel"
 
 @OptIn(FlowPreview::class)
 internal class DeviceTabViewModel(
@@ -94,6 +96,11 @@ internal class DeviceTabViewModel(
     val isAppInForeground: StateFlow<Boolean> = _isAppInForeground.asStateFlow()
 
     private val sessionReconnectBlacklistHosts = mutableSetOf<String>()
+    // 防止快速多次点击 USB 卡片（1 秒 debounce）
+    private val lastUsbClickMs = java.util.concurrent.atomic.AtomicLong(0L)
+    // 当前活跃的 USB 隧道，重试时先关闭再重建
+    @Volatile
+    private var currentTunnel: io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel? = null
 
     val adbConnected: StateFlow<Boolean> = connectionState
         .map { it.adbSession.isConnected }
@@ -138,13 +145,14 @@ internal class DeviceTabViewModel(
     val connectedScrcpyProfileId: StateFlow<String> = combine(
         connectionState.map { it.adbSession },
         _savedShortcuts,
-    ) { session, shortcuts ->
+        AppRuntime.currentConnectionProfileId,
+    ) { session, shortcuts, runtimeProfileId ->
         val target = session.currentTarget
         if (session.isConnected && target != null)
             shortcuts.firstOrNull { it.matchesAddress(target) }?.scrcpyProfileId
-                ?: session.connectedScrcpyProfileId
+                ?: runtimeProfileId
         else
-            session.connectedScrcpyProfileId
+            runtimeProfileId
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
@@ -386,6 +394,8 @@ internal class DeviceTabViewModel(
     }
 
     fun startScrcpy() = runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
+        // 启动前检查ADB连接状态，如已断开则尝试重连
+        ensureAdbConnectedBeforeAction()
         startScrcpySession()
     }
 
@@ -394,10 +404,12 @@ internal class DeviceTabViewModel(
     }
 
     fun startScrcpy(packageName: String) = runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
+        ensureAdbConnectedBeforeAction()
         startScrcpySession(startAppOverride = packageName)
     }
 
     fun launchAppWithFallback(packageName: String) = runBusy(EventLogMessage.Resource(R.string.vm_launch_app)) {
+        ensureAdbConnectedBeforeAction()
         runCatching { scrcpy.startApp(packageName) }
             .onSuccess { logEvent(R.string.vm_app_started_on_display, packageName) }
             .onFailure { error ->
@@ -434,6 +446,20 @@ internal class DeviceTabViewModel(
         }
     }
 
+    @Volatile
+    private var _adbConnectJob: Job? = null
+
+    /**
+     * 取消当前正在进行的ADB连接
+     * 先通过coordinator强制关闭pendingSocket中断阻塞的socket.connect()，
+     * 再取消协程Job。
+     */
+    fun cancelAdbConnect() {
+        adbCoordinator.cancelPendingConnect()
+        _adbConnectJob?.cancel()
+        _adbConnectJob = null
+    }
+
     private fun runAdbConnect(
         label: EventLogMessage,
         onStarted: (() -> Unit)? = null,
@@ -441,11 +467,13 @@ internal class DeviceTabViewModel(
         block: suspend () -> Unit,
     ) {
         if (_adbConnecting.value) return
-        viewModelScope.launch {
+        _adbConnectJob = viewModelScope.launch {
             onStarted?.invoke()
             _adbConnecting.value = true
             try {
                 block()
+            } catch (_: CancellationException) {
+                logEvent(R.string.vm_label_cancelled, label, level = Log.INFO)
             } catch (_: TimeoutCancellationException) {
                 logEvent(R.string.vm_label_timeout, label, level = Log.WARN)
             } catch (e: IllegalArgumentException) {
@@ -457,6 +485,7 @@ internal class DeviceTabViewModel(
                 logEvent(R.string.vm_label_failed, label, detail, level = Log.ERROR, error = e)
             } finally {
                 _adbConnecting.value = false
+                _adbConnectJob = null
                 onFinished?.invoke()
             }
         }
@@ -496,6 +525,56 @@ internal class DeviceTabViewModel(
         return connectionController.connectAddresses(addresses, ADB_CONNECT_TIMEOUT_MS, ADB_TCP_PROBE_TIMEOUT_MS)
     }
 
+    /**
+     * 连接USB设备
+     *
+     * @param deviceInfo USB设备信息
+     */
+    fun connectUsbDevice(deviceInfo: io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceInfo) {
+        // 1 秒 debounce：防止快速连点重复弹授权
+        val now = System.currentTimeMillis()
+        if (now - lastUsbClickMs.get() < 1000) return
+        lastUsbClickMs.set(now)
+
+        viewModelScope.launch {
+            var tunnel: io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel? = null
+            try {
+                if (!deviceInfo.hasPermission) {
+                    logEvent("USB permission required for ${deviceInfo.getDisplayName()}")
+                    return@launch
+                }
+
+                // 关旧隧道，释放 USB 接口
+                runCatching { currentTunnel?.close() }
+                currentTunnel = null
+
+                // 开新隧道
+                val appContext = AppRuntime.context
+                tunnel = io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel(appContext, deviceInfo.device)
+                val (inputStream, outputStream) = tunnel.open()
+                currentTunnel = tunnel
+
+                adbCoordinator.connectUsb(deviceInfo.device, inputStream, outputStream)
+
+                val vidPid = String.format("0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId)
+                handleAdbConnected(
+                    host = vidPid, port = 0,
+                    deviceId = deviceInfo.device.deviceId,
+                    connectionType = io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB
+                )
+
+                logEvent("USB connected to ${deviceInfo.getDisplayName()}")
+            } catch (e: Exception) {
+                runCatching { tunnel?.close() }
+                // 只关闭本协程的隧道，不覆盖新协程已创建的隧道引用
+                if (currentTunnel === tunnel) currentTunnel = null
+                // 重置 debounce，允许拔线后立即重试
+                lastUsbClickMs.set(0L)
+                logEvent("USB connection failed: ${e.message}")
+            }
+        }
+    }
+
     suspend fun disconnectCurrentTargetBeforeConnectingAny(addresses: List<String>) {
         val disconnected = connectionController.disconnectCurrentTargetBeforeConnectingAny(addresses)
             ?: return
@@ -512,13 +591,18 @@ internal class DeviceTabViewModel(
         autoStartScrcpy: Boolean = false,
         autoEnterFullScreen: Boolean = false,
         scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
+        deviceId: Int? = null,
+        connectionType: io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType = io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.LAN,
     ) {
-        val connected = connectionController.handleAdbConnected(host, port, scrcpyProfileId)
+        val connected = connectionController.handleAdbConnected(host, port, scrcpyProfileId, deviceId, connectionType)
         val info = connected.info
         val fullLabel =
             if (info.serial.isNotBlank()) "${info.model} (${info.serial})" else info.model
 
         applyConnectedDeviceCapabilities(info.sdkInt)
+
+        // USB 的 host 是 VID/PID；快捷方式地址本身带 usb: 前缀（解析后 host 即 VID/PID），
+        // 这里必须用原始 host 查找才能命中并更新名称
         _savedShortcuts.update {
             it.update(
                 host = host,
@@ -624,6 +708,7 @@ internal class DeviceTabViewModel(
     suspend fun stopScrcpySession() {
         val activeBundle = resolveScrcpyBundle(connectedScrcpyProfileId.value)
         val options = scrcpyOptions.toClientOptions(activeBundle).fix()
+
         if (options.killAdbOnClose) {
             currentTarget.value?.host?.let { sessionReconnectBlacklistHosts += it }
             val result = connectionController.stopScrcpySession(killAdbOnClose = true)
@@ -985,6 +1070,149 @@ internal class DeviceTabViewModel(
 
     suspend fun startAppViaAdb(packageName: String) {
         adbCoordinator.startApp(packageName = packageName)
+    }
+
+    /**
+     * 在执行ADB操作前检查连接状态，如果已断开则尝试自动重连
+     * @throws IllegalStateException 如果无法重连
+     */
+    private suspend fun ensureAdbConnectedBeforeAction() {
+        val state = connectionState.value.adbSession
+        if (!state.isConnected) return
+
+        val isActuallyConnected = runCatching {
+            adbCoordinator.isConnected(ADB_KEEPALIVE_TIMEOUT_MS)
+        }.getOrDefault(false)
+
+        if (isActuallyConnected) return
+
+        // 连接已断开，尝试自动重连
+        val target = state.currentTarget
+        if (target != null) {
+            Log.w(TAG, "ADB连接已断开，尝试自动重连到 ${target.host}:${target.port}")
+            try {
+                connectionController.connectWithTimeout(target.host, target.port, ADB_CONNECT_TIMEOUT_MS)
+                connectionController.handleAdbConnected(target.host, target.port, state.connectedScrcpyProfileId)
+                Log.i(TAG, "ADB自动重连成功")
+                AppRuntime.snackbar(R.string.vm_auto_reconnect_succeeded)
+            } catch (e: Exception) {
+                // 重连失败，更新状态为断开
+                connectionController.disconnectAdbConnection(
+                    clearQuickOnlineForTarget = target,
+                    cause = DisconnectCause.KeepAliveFailed,
+                    statusLine = "ADB connection lost",
+                )
+                Log.e(TAG, "ADB自动重连失败", e)
+                throw IllegalStateException("ADB连接已断开且自动重连失败，请手动重新连接", e)
+            }
+        } else {
+            // 没有保存的目标，直接断开状态
+            connectionController.disconnectAdbConnection(
+                cause = DisconnectCause.KeepAliveFailed,
+                statusLine = "ADB connection lost",
+            )
+            throw IllegalStateException("ADB连接已断开，请重新连接设备")
+        }
+    }
+
+    /**
+     * 启动定时连接状态检测循环，每3秒检测一次实际连接状态
+     */
+    fun startConnectionHealthCheckLoop() {
+        if (_connectionHealthCheckStarted) return
+        _connectionHealthCheckStarted = true
+        viewModelScope.launch {
+            while (_connectionHealthCheckStarted) {
+                try {
+                    val state = connectionState.value.adbSession
+                    if (state.isConnected) {
+                        val isActuallyConnected = runCatching {
+                            adbCoordinator.isConnected(ADB_KEEPALIVE_TIMEOUT_MS)
+                        }.getOrDefault(false)
+
+                        if (!isActuallyConnected) {
+                            // 检测到连接已断开
+                            val target = state.currentTarget
+                            if (target != null) {
+                                // USB连接不做TCP重连，直接标记断开
+                                if (target.connectionType == io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB) {
+                                    connectionController.disconnectAdbConnection(
+                                        clearQuickOnlineForTarget = target,
+                                        cause = DisconnectCause.KeepAliveFailed,
+                                        statusLine = "ADB connection lost",
+                                    )
+                                    Log.w(TAG, "定时检测：USB连接已断开")
+                                } else {
+                                    // LAN连接尝试自动重连
+                                    try {
+                                        connectionController.connectWithTimeout(
+                                            target.host,
+                                            target.port,
+                                            ADB_CONNECT_TIMEOUT_MS,
+                                        )
+                                        connectionController.handleAdbConnected(
+                                            target.host,
+                                            target.port,
+                                            state.connectedScrcpyProfileId,
+                                        )
+                                        Log.i(TAG, "定时检测：ADB自动重连成功")
+                                        // ADB重连成功后，智能处理scrcpy session
+                                        restartScrcpySessionIfNeeded()
+                                    } catch (e: Exception) {
+                                        connectionController.disconnectAdbConnection(
+                                            clearQuickOnlineForTarget = target,
+                                            cause = DisconnectCause.KeepAliveFailed,
+                                            statusLine = "ADB connection lost",
+                                        )
+                                        Log.e(TAG, "定时检测：ADB自动重连失败", e)
+                                    }
+                                }
+                            } else {
+                                connectionController.disconnectAdbConnection(
+                                    cause = DisconnectCause.KeepAliveFailed,
+                                    statusLine = "ADB connection lost",
+                                )
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // 忽略检测过程中的异常
+                }
+                delay(ADB_HEALTH_CHECK_INTERVAL_MS)
+            }
+        }
+    }
+
+    fun stopConnectionHealthCheckLoop() {
+        _connectionHealthCheckStarted = false
+    }
+
+    private var _connectionHealthCheckStarted = false
+
+    /**
+     * ADB重连成功后，智能处理scrcpy session
+     * - 如果scrcpy session还在运行（控制通道已失效），自动重启session
+     * - 如果session已停止，仅提示用户手动重新投屏
+     */
+    private fun restartScrcpySessionIfNeeded() {
+        viewModelScope.launch {
+            if (scrcpy.isStarted()) {
+                Log.i(TAG, "ADB重连后重启scrcpy session")
+                try {
+                    scrcpy.stop()
+                } catch (_: Exception) {}
+                delay(300)
+                try {
+                    startScrcpySession()
+                    AppRuntime.snackbar(R.string.vm_auto_reconnect_restart_scrcpy)
+                } catch (e: Exception) {
+                    Log.e(TAG, "ADB重连后重启scrcpy失败", e)
+                    AppRuntime.snackbar(R.string.vm_auto_reconnect_restart_scrcpy_failed)
+                }
+            } else {
+                AppRuntime.snackbar(R.string.vm_auto_reconnect_succeeded)
+            }
+        }
     }
 
     class Factory(

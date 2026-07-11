@@ -230,6 +230,7 @@ internal fun DeviceTabPage(
     LaunchedEffect(Unit) { viewModel.startAutoReconnectLoop() }
     LaunchedEffect(Unit) { viewModel.startProfileIdSync() }
     LaunchedEffect(Unit) { viewModel.startRecentTasksAutoRefresh() }
+    LaunchedEffect(Unit) { viewModel.startConnectionHealthCheckLoop() }
 
     fun openFullscreenControl() {
         if (viewModel.shouldOpenFullscreenCompat())
@@ -305,6 +306,7 @@ internal fun DeviceTabPage(
 
     @Composable
     fun StatusSection() {
+
         StatusCard(
             statusLine = statusLine,
             adbConnected = adbConnected,
@@ -312,6 +314,7 @@ internal fun DeviceTabPage(
             sessionInfo = sessionInfo,
             busyLabel = null,
             connectedDeviceLabel = connectedDeviceLabel,
+            connectionType = currentTarget?.connectionType ?: io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.LAN,
         )
     }
 
@@ -348,8 +351,19 @@ internal fun DeviceTabPage(
                 if (editingDeviceId == device.id) viewModel.setEditingDeviceId(null)
                 viewModel.onDeviceAction(device)
             },
-            onEditorSave = { _, updated ->
-                viewModel.upsertShortcut(updated)
+            onCancelAction = { device ->
+                viewModel.cancelAdbConnect()
+            },
+            onEditorSave = { device, updated ->
+                viewModel.updateShortcut(
+                    id = device.id,
+                    name = updated.name,
+                    host = updated.host,
+                    port = updated.port,
+                    startScrcpyOnConnect = updated.startScrcpyOnConnect,
+                    openFullscreenOnStart = updated.openFullscreenOnStart,
+                    scrcpyProfileId = updated.scrcpyProfileId,
+                )
             },
             onEditorDelete = { device ->
                 viewModel.removeShortcut(device.id)
@@ -366,6 +380,7 @@ internal fun DeviceTabPage(
             onValueChange = { viewModel.setQuickConnectInput(it) },
             onFocusLost = { viewModel.saveQuickConnectInput() },
             enabled = !adbConnecting,
+            connecting = adbConnecting,
             onAddDevice = {
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
@@ -376,6 +391,9 @@ internal fun DeviceTabPage(
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
                 viewModel.onQuickConnect(target)
+            },
+            onCancelConnect = {
+                viewModel.cancelAdbConnect()
             },
         )
     }
@@ -392,6 +410,17 @@ internal fun DeviceTabPage(
     }
 
     @Composable
+    fun UsbSection() {
+        SectionSmallTitle(stringResource(R.string.usb_connection))
+        UsbDeviceCard(
+            onDeviceClick = { deviceInfo ->
+                // 处理USB设备点击
+                viewModel.connectUsbDevice(deviceInfo)
+            }
+        )
+    }
+
+    @Composable
     fun ScrcpyConfigSection() {
         ConfigPanel(
             busy = busy,
@@ -401,7 +430,7 @@ internal fun DeviceTabPage(
             audioForwardingSupported = connectionState.adbSession.audioForwardingSupported,
             cameraMirroringSupported = connectionState.adbSession.cameraMirroringSupported,
             adbConnecting = adbConnecting,
-            isQuickConnected = isQuickConnected,
+            isQuickConnected = isQuickConnected || (adbConnected && currentTarget?.connectionType == io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB),
             advancedEndActionText = connectedScrcpyProfileName,
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
@@ -511,7 +540,7 @@ internal fun DeviceTabPage(
             audioForwardingSupported = connectionState.adbSession.audioForwardingSupported,
             cameraMirroringSupported = connectionState.adbSession.cameraMirroringSupported,
             adbConnecting = adbConnecting,
-            isQuickConnected = isQuickConnected,
+            isQuickConnected = isQuickConnected || (adbConnected && currentTarget?.connectionType == io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB),
             advancedEndActionText = connectedScrcpyProfileName,
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
@@ -602,6 +631,8 @@ internal fun DeviceTabPage(
                 val newProfileId = profileIds.getOrNull(index) ?: return@TabRow
                 if (newProfileId == connectedScrcpyProfileId) return@TabRow
                 haptic.contextClick()
+                // 脱离快捷设备：直接写入 session 级状态
+                AppRuntime.currentConnectionProfileId.value = newProfileId
                 val device = currentTarget?.let { ct ->
                     savedShortcuts.firstOrNull { it.matchesAddress(ct) }
                 }
@@ -646,6 +677,7 @@ internal fun DeviceTabPage(
             if (!adbConnected) {
                 item { QuickConnectSection() }
                 item { PairingSection() }
+                item { UsbSection() }
             }
 
             if (adbConnected) {

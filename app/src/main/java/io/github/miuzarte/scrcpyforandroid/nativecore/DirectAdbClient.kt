@@ -65,17 +65,48 @@ internal object DirectAdbTransport {
     @Volatile
     var keyName: String = AppSettings.ADB_KEY_NAME.defaultValue
 
-    fun connect(host: String, port: Int): DirectAdbConnection {
-        Log.i(TAG, "connect(): opening direct adbd transport to $host:$port")
+    /**
+     * 通过TCP连接ADB设备
+     */
+    fun connect(host: String, port: Int, timeoutMs: Int = 10_000): DirectAdbConnection {
+        Log.i(TAG, "connect(): opening direct adbd transport to $host:$port (timeout=${timeoutMs}ms)")
         val conn = DirectAdbConnection(
             host,
             port,
             privateKey,
             publicKeyX509,
             keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+            tcpMarker = true
+        )
+        conn.handshake(timeoutMs)
+        Log.i(TAG, "connect(): handshake success for $host:$port")
+        return conn
+    }
+
+    /**
+     * 通过USB流连接ADB设备
+     *
+     * @param inputStream USB输入流
+     * @param outputStream USB输出流
+     * @param deviceId USB设备ID（可选）
+     * @return DirectAdbConnection 连接实例
+     */
+    fun connectUsb(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        deviceId: Int? = null
+    ): DirectAdbConnection {
+        Log.i(TAG, "connectUsb(): opening USB ADB transport (deviceId=$deviceId)")
+        val conn = DirectAdbConnection(
+            inputStream,
+            outputStream,
+            privateKey,
+            publicKeyX509,
+            keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+            deviceId
         )
         conn.handshake()
-        Log.i(TAG, "connect(): handshake success for $host:$port")
+        Log.i(TAG, "connectUsb(): handshake success for USB device $deviceId")
         return conn
     }
 
@@ -539,10 +570,15 @@ internal object DirectAdbTransport {
 }
 
 /**
- * Represents a single direct ADB connection over TCP (optionally upgraded to TLS).
+ * Represents a single direct ADB connection over TCP (optionally upgraded to TLS)
+ * or over injected streams (e.g., USB).
  *
  * Exposes framed ADB streams via `openStream` and handles the protocol handshake,
  * reader thread and stream routing.
+ *
+ * 支持两种连接方式：
+ * 1. TCP连接：通过host:port建立Socket连接
+ * 2. 流式连接：通过注入的InputStream/OutputStream建立连接（用于USB等非TCP场景）
  */
 internal class DirectAdbConnection(
     val host: String,
@@ -557,7 +593,23 @@ internal class DirectAdbConnection(
         0x03, 0x02, 0x1A, 0x05, 0x00, 0x04, 0x14,
     )
 
-    private val socket = Socket()
+    // 连接类型标识
+    enum class ConnectionType {
+        TCP,    // TCP Socket连接
+        STREAM  // 流式连接（USB等）
+    }
+
+    var connectionType: ConnectionType = ConnectionType.TCP
+        private set
+    
+    // TCP连接相关
+    var socket: Socket? = null
+        private set
+    
+    // 流式连接相关（USB等）
+    private var injectedInputStream: InputStream? = null
+    private var injectedOutputStream: OutputStream? = null
+    
     private lateinit var rawIn: BufferedInputStream
     private lateinit var rawOut: OutputStream
     private var tlsSocket: SSLSocket? = null
@@ -567,6 +619,45 @@ internal class DirectAdbConnection(
     @Volatile
     private var closed = false
     private var readerThread: Thread? = null
+
+    /**
+     * TCP连接构造函数
+     */
+    constructor(
+        host: String,
+        port: Int,
+        privateKey: PrivateKey,
+        publicKeyX509: ByteArray,
+        keyName: String,
+        @Suppress("UNUSED_PARAMETER") tcpMarker: Boolean = true  // 用于区分构造函数
+    ) : this(host, port, privateKey, publicKeyX509, keyName) {
+        this.connectionType = ConnectionType.TCP
+        this.socket = Socket()
+    }
+
+    /**
+     * 流式连接构造函数（用于USB等非TCP场景）
+     * 通过注入的InputStream/OutputStream建立ADB连接
+     */
+    constructor(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        privateKey: PrivateKey,
+        publicKeyX509: ByteArray,
+        keyName: String = AppSettings.ADB_KEY_NAME.defaultValue,
+        deviceId: Int? = null
+    ) : this(
+        host = "usb:${deviceId ?: "unknown"}",  // 使用USB标识作为host
+        port = 0,  // USB连接不使用端口
+        privateKey = privateKey,
+        publicKeyX509 = publicKeyX509,
+        keyName = keyName
+    ) {
+        this.connectionType = ConnectionType.STREAM
+        this.socket = null
+        this.injectedInputStream = inputStream
+        this.injectedOutputStream = outputStream
+    }
 
     companion object {
         private const val TAG = "DirectAdbConnection"
@@ -586,22 +677,73 @@ internal class DirectAdbConnection(
     }
 
     /**
-     * Perform the ADB protocol handshake over TCP.
+     * 执行ADB协议握手
      *
-     * - Establishes TCP, negotiates optional TLS (STLS), and performs the ADB
-     *   authentication exchange (TOKEN -> SIGNATURE or PUBKEY flow).
-     * - After a successful handshake, starts a reader thread to process incoming
-     *   ADB frames and dispatch them to logical streams.
+     * 支持两种连接方式：
+     * 1. TCP连接：建立Socket连接，支持TLS升级
+     * 2. 流式连接：使用注入的InputStream/OutputStream（用于USB等场景）
+     *
+     * 握手流程：
+     * - 发送CNXN消息
+     * - 处理可选的STLS（TLS升级）
+     * - 处理AUTH认证（TOKEN -> SIGNATURE 或 PUBKEY 流程）
+     * - 成功后启动读取线程
      */
-    fun handshake() {
-        Log.i(TAG, "handshake(): tcp connect -> $host:$port")
-        socket.connect(InetSocketAddress(host, port), 10_000)
-        socket.tcpNoDelay = true
-        socket.keepAlive = true
-        socket.soTimeout = 60_000
-        rawIn = BufferedInputStream(socket.getInputStream(), 65_536)
-        rawOut = socket.getOutputStream()
+    fun handshake(timeoutMs: Int = 10_000) {
+        when (connectionType) {
+            ConnectionType.TCP -> handshakeTcp(timeoutMs)
+            ConnectionType.STREAM -> handshakeStream()
+        }
+    }
 
+    /**
+     * TCP连接握手
+     */
+    private fun handshakeTcp(timeoutMs: Int) {
+        Log.i(TAG, "handshakeTcp(): tcp connect -> $host:$port (timeout=${timeoutMs}ms)")
+        val tcpSocket = socket ?: throw IllegalStateException("TCP socket is null")
+        
+        tcpSocket.connect(InetSocketAddress(host, port), timeoutMs)
+        tcpSocket.tcpNoDelay = true
+        tcpSocket.keepAlive = true
+        tcpSocket.soTimeout = 60_000
+        // 增大Socket缓冲区，减少高码率视频传输时的阻塞和卡顿
+        tcpSocket.receiveBufferSize = 1_048_576  // 1MB
+        tcpSocket.sendBufferSize = 1_048_576     // 1MB
+        rawIn = BufferedInputStream(tcpSocket.getInputStream(), 262_144)
+        rawOut = tcpSocket.getOutputStream()
+
+        performAdbHandshake()
+
+        tcpSocket.soTimeout = 0
+        readerThread = thread(isDaemon = true, name = "adb-reader-$host:$port") { readLoop() }
+    }
+
+    /**
+     * 流式连接握手（用于USB等非TCP场景）
+     */
+    private fun handshakeStream() {
+        Log.i(TAG, "handshakeStream(): stream connect -> $host")
+        
+        val inputStream = injectedInputStream 
+            ?: throw IllegalStateException("Injected InputStream is null")
+        val outputStream = injectedOutputStream 
+            ?: throw IllegalStateException("Injected OutputStream is null")
+        
+        rawIn = BufferedInputStream(inputStream, 262_144)
+        rawOut = outputStream
+
+        performAdbHandshake()
+
+        readerThread = thread(isDaemon = true, name = "adb-reader-$host") { readLoop() }
+    }
+
+    /**
+     * 执行ADB协议握手（TCP和流式连接共用）
+     *
+     * 处理CNXN、STLS、AUTH等消息
+     */
+    private fun performAdbHandshake() {
         sendMsg(A_CNXN, VERSION, MAX_PAYLOAD, "host::\u0000".toByteArray(Charsets.UTF_8))
 
         var first = recvMsg()
@@ -644,22 +786,33 @@ internal class DirectAdbConnection(
 
             else -> throw IOException("ADB: unexpected initial message 0x${first.command.toString(16)}")
         }
-
-        socket.soTimeout = 0
-        readerThread = thread(isDaemon = true, name = "adb-reader-$host:$port") { readLoop() }
     }
 
+    /**
+     * 升级到TLS连接
+     *
+     * 注意：USB连接不支持TLS升级，因为USB隧道已经提供了安全传输
+     */
     private fun upgradeToTls() {
-        val pairingKey = AdbPairingKey(
-            privateKey = privateKey,
-            alias = keyName,
-        )
-        val sslSocket = pairingKey.sslContext.socketFactory
-            .createSocket(socket, host, port, true) as SSLSocket
-        sslSocket.startHandshake()
-        tlsSocket = sslSocket
-        rawIn = BufferedInputStream(sslSocket.inputStream, 65_536)
-        rawOut = sslSocket.outputStream
+        when (connectionType) {
+            ConnectionType.TCP -> {
+                val tcpSocket = socket ?: throw IllegalStateException("TCP socket is null")
+                val pairingKey = AdbPairingKey(
+                    privateKey = privateKey,
+                    alias = keyName,
+                )
+                val sslSocket = pairingKey.sslContext.socketFactory
+                    .createSocket(tcpSocket, host, port, true) as SSLSocket
+                sslSocket.startHandshake()
+                tlsSocket = sslSocket
+                rawIn = BufferedInputStream(sslSocket.inputStream, 65_536)
+                rawOut = sslSocket.outputStream
+            }
+            ConnectionType.STREAM -> {
+                // USB连接不支持TLS升级，跳过
+                Log.w(TAG, "upgradeToTls(): TLS upgrade not supported for stream connections")
+            }
+        }
     }
 
     /**
@@ -691,6 +844,19 @@ internal class DirectAdbConnection(
 
     fun shell(command: String): String =
         openStream("shell:$command")
+            .use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
+
+    /**
+     * 通过ADB协议层启用TCP/IP模式
+     *
+     * 直接发送 `tcpip:PORT` 服务命令，不依赖shell，不需要root权限。
+     * 这是ADB原生支持的命令，比通过shell执行 `setprop service.adb.tcp.port` 更可靠。
+     *
+     * @param port TCP端口号，通常为5555
+     * @return 服务端响应
+     */
+    fun tcpip(port: Int): String =
+        openStream("tcpip:$port")
             .use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
 
     /**
@@ -798,11 +964,32 @@ internal class DirectAdbConnection(
             }
     }
 
+    /**
+     * 检查连接是否存活
+     *
+     * TCP连接：检查socket状态
+     * 流式连接：检查closed标志和流是否可用
+     */
     fun isAlive(): Boolean {
-        val isClosed = socket.isClosed
-        val isConnected = socket.isConnected
-        Log.d(TAG, "isClose: $isClosed, isConnected: $isConnected")
-        return !closed && !isClosed && isConnected
+        if (closed) return false
+        
+        return when (connectionType) {
+            ConnectionType.TCP -> {
+                val tcpSocket = socket ?: return false
+                val isClosed = tcpSocket.isClosed
+                val isConnected = tcpSocket.isConnected
+                Log.d(TAG, "isAlive() TCP: isClosed=$isClosed, isConnected=$isConnected")
+                !isClosed && isConnected
+            }
+            ConnectionType.STREAM -> {
+                // 流式连接：检查流是否仍然可用
+                val inputStream = injectedInputStream
+                val outputStream = injectedOutputStream
+                val alive = inputStream != null && outputStream != null
+                Log.d(TAG, "isAlive() STREAM: alive=$alive")
+                alive
+            }
+        }
     }
 
     override fun close() {
@@ -811,7 +998,20 @@ internal class DirectAdbConnection(
             streams.values.forEach { runCatching { it.forceClose() } }
             streams.clear()
             runCatching { tlsSocket?.close() }
-            runCatching { socket.close() }
+            
+            // 根据连接类型关闭相应的资源
+            when (connectionType) {
+                ConnectionType.TCP -> {
+                    runCatching { socket?.close() }
+                }
+                ConnectionType.STREAM -> {
+                    // 流式连接：关闭注入的流（但不关闭原始流，因为它们可能由调用者管理）
+                    // 注入的流通常由USB隧道管理，这里只清除引用
+                    injectedInputStream = null
+                    injectedOutputStream = null
+                }
+            }
+            
             runCatching { readerThread?.interrupt() }
         }
     }
@@ -881,6 +1081,10 @@ internal class DirectAdbConnection(
         val dataLen = buf.int
         buf.int
         buf.int
+        // ADB协议限制：MAX_PAYLOAD = 256KB，拒绝异常大的数据长度
+        if (dataLen < 0 || dataLen > MAX_PAYLOAD) {
+            throw IOException("ADB: corrupted message, invalid dataLen=$dataLen (max=$MAX_PAYLOAD)")
+        }
         val data =
             if (dataLen > 0) ByteArray(dataLen).also { rawIn.readExact(it) } else ByteArray(0)
         return AdbMsg(command, arg0, arg1, data)

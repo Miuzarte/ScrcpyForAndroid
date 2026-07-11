@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
@@ -33,6 +33,12 @@ object NativeAdbService {
 
     @Volatile
     private var connectedPort: Int? = null
+
+    /**
+     * 当前正在连接中的socket，用于取消连接时强制关闭
+     */
+    @Volatile
+    private var pendingSocket: java.net.Socket? = null
 
     var keyName: String
         get() = transport.keyName
@@ -83,6 +89,8 @@ object NativeAdbService {
      * Connect to a remote ADB endpoint. If an existing connection points to the
      * same host:port it is reused; otherwise the previous connection is closed
      * before attempting the new connect.
+     *
+     * @param timeout 连接超时时间，默认10秒。传入 Duration.INFINITE 表示不超时。
      */
     suspend fun connect(
         host: String,
@@ -90,7 +98,7 @@ object NativeAdbService {
         timeout: Duration = Duration.INFINITE,
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
-            Log.i(TAG, "connect(): host=$host port=$port")
+            Log.i(TAG, "connect(): host=$host port=$port timeout=$timeout")
 
             if (connection != null
                 && connection!!.isAlive()
@@ -99,10 +107,35 @@ object NativeAdbService {
             ) {
                 return@withLock
             }
+            
+            // 保护现有USB连接不被TCP连接请求断开
+            if (connection != null 
+                && connection!!.isAlive() 
+                && connection!!.connectionType == DirectAdbConnection.ConnectionType.STREAM
+            ) {
+                Log.w(TAG, "connect(): refusing to disconnect active USB connection for TCP request to $host:$port")
+                throw IllegalStateException("Cannot establish TCP connection while USB is connected. Disconnect USB first.")
+            }
+            
             disconnectInternal()
 
             try {
-                val conn = withTimeout(timeout) { transport.connect(host, port) }
+                val timeoutMs = if (timeout.isInfinite()) 10_000 else timeout.inWholeMilliseconds.toInt()
+                // 先创建连接对象获取socket引用，用于后续取消时强制关闭
+                val conn = DirectAdbConnection(
+                    host,
+                    port,
+                    transport.privateKey,
+                    transport.publicKeyX509,
+                    transport.keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+                    tcpMarker = true
+                )
+                pendingSocket = conn.socket
+                try {
+                    conn.handshake(timeoutMs)
+                } finally {
+                    pendingSocket = null
+                }
                 connection = conn
                 connectedHost = host
                 connectedPort = port
@@ -111,6 +144,59 @@ object NativeAdbService {
                 val detail = e.message ?: "${e.javaClass.simpleName} (no message)"
                 throw IllegalStateException("ADB connect failed to $host:$port -> $detail", e)
             }
+        }
+    }
+
+    /**
+     * 通过USB流连接ADB设备
+     *
+     * @param inputStream USB输入流
+     * @param outputStream USB输出流
+     * @param deviceId USB设备ID
+     */
+    suspend fun connectUsb(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        deviceId: Int? = null
+    ) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            Log.i(TAG, "connectUsb(): deviceId=$deviceId")
+            
+            // 断开现有连接
+            disconnectInternal()
+            
+            try {
+                // 通过USB流创建连接
+                val conn = DirectAdbConnection(
+                    inputStream,
+                    outputStream,
+                    transport.privateKey,
+                    transport.publicKeyX509,
+                    transport.keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+                    deviceId
+                )
+                conn.handshake()
+                
+                connection = conn
+                connectedHost = "usb:$deviceId"
+                connectedPort = 0
+            } catch (e: Exception) {
+                Log.e(TAG, "connectUsb(): failed deviceId=$deviceId", e)
+                val detail = e.message ?: "${e.javaClass.simpleName} (no message)"
+                throw IllegalStateException("ADB USB connect failed for device $deviceId -> $detail", e)
+            }
+        }
+    }
+
+    /**
+     * 强制中断当前正在进行的连接。
+     * 通过关闭pendingSocket来让阻塞中的socket.connect()立即抛出异常。
+     */
+    fun cancelPendingConnect() {
+        val socket = pendingSocket
+        if (socket != null) {
+            Log.i(TAG, "cancelPendingConnect(): 强制关闭pendingSocket以中断连接")
+            runCatching { socket.close() }
         }
     }
 
@@ -134,6 +220,22 @@ object NativeAdbService {
         val conn = snapshotConnection()
         val response = conn.shell(command)
         Log.d(TAG, "command: $command, response: $response")
+        return response
+    }
+
+    /**
+     * 通过ADB协议层启用TCP/IP模式
+     *
+     * 直接发送 `tcpip:PORT` 服务命令，不依赖shell，不需要root权限。
+     * 这是ADB原生支持的命令，比通过shell执行 `setprop service.adb.tcp.port` 更可靠。
+     *
+     * @param port TCP端口号，通常为5555
+     * @return 服务端响应
+     */
+    suspend fun tcpip(port: Int): String {
+        val conn = snapshotConnection()
+        val response = conn.tcpip(port)
+        Log.d(TAG, "tcpip: port=$port, response: $response")
         return response
     }
 

@@ -1,13 +1,31 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
+import android.util.Log
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import java.io.Closeable
+
+private const val TAG = "DeviceAdbAutoReconnectManager"
 
 internal class DeviceAdbAutoReconnectManager(
     private val controller: ConnectionController,
     private val stateStore: ConnectionStateStore,
     private val backgroundRunner: DeviceAdbBackgroundRunner = DeviceAdbBackgroundRunner(),
 ): Closeable {
+    
+    /**
+     * 判断是否应该自动重连
+     *
+     * @param connectionType 连接类型
+     * @return 是否应该自动重连
+     */
+    fun shouldAutoReconnect(connectionType: DeviceConnectionType): Boolean {
+        return when (connectionType) {
+            DeviceConnectionType.LAN -> true  // 无线连接支持自动重连
+            DeviceConnectionType.USB -> false  // USB连接跳过自动重连
+        }
+    }
+    
     suspend fun runKeepAliveLoop(
         isForeground: () -> Boolean,
         intervalMs: Long,
@@ -16,6 +34,16 @@ internal class DeviceAdbAutoReconnectManager(
         onReconnectSuccess: suspend (host: String, port: Int) -> Unit,
         onReconnectFailure: suspend (Throwable) -> Unit,
     ) {
+        // 启动前记录连接类型，后续不再依赖 stateStore
+        val initialTarget = stateStore.state.value.adbSession.currentTarget
+        val connectionType = initialTarget?.connectionType ?: DeviceConnectionType.LAN
+
+        // USB连接不做keepalive重连，直接返回
+        if (connectionType == DeviceConnectionType.USB) {
+            Log.i(TAG, "runKeepAliveLoop(): USB connection, skipping keepalive loop")
+            return
+        }
+
         backgroundRunner.runKeepAliveLoop(
             sessionState = { stateStore.state.value.adbSession },
             isForeground = isForeground,
@@ -30,8 +58,9 @@ internal class DeviceAdbAutoReconnectManager(
             },
             onReconnectFailure = onReconnectFailure,
             shouldAutoReconnect = {
+                shouldAutoReconnect(connectionType) &&
                 stateStore.state.value.disconnectCause != DisconnectCause.User &&
-                        stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
+                stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
             },
         )
     }
