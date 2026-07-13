@@ -255,14 +255,7 @@ internal class VideoDecoderController(
         }
 
         val surface = renderer.getDecoderSurface()
-        val mime = when (session.codec) {
-            Codec.H264 -> "video/avc"
-            Codec.H265 -> "video/hevc"
-            Codec.AV1 -> "video/av01"
-            Codec.VP8 -> "video/x-vnd.on2.vp8"
-            Codec.VP9 -> "video/x-vnd.on2.vp9"
-            else -> "video/avc"
-        }
+        val mime = session.codec?.mime ?: "video/avc"
         Log.i(
             TAG,
             "createOrReplaceDecoder(): codec=${session.codec?.string ?: "null"}, " +

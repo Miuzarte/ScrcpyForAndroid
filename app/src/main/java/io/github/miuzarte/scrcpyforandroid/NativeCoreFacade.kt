@@ -210,7 +210,7 @@ object NativeCoreFacade {
                 val info = scrcpy.currentSessionState.value ?: return@withLock
                 if (info.width <= 0 || info.height <= 0) return@withLock
 
-                val mime = mimeForCodec(info.codec)
+                val mime = info.codec?.mime ?: "video/avc"
                 if (!DecoderCapabilities.isSizeSupported(mime, info.width, info.height)) {
                     Log.w(
                         TAG,
@@ -321,15 +321,6 @@ object NativeCoreFacade {
         runCatching { scrcpy.stop(Scrcpy.StopReason.USER) }
         Log.i(TAG, "restartSessionWith(): starting new session with max_size=${options.maxSize}")
         runCatching { scrcpy.start(options) }
-    }
-
-    private fun mimeForCodec(codec: Codec?): String = when (codec) {
-        Codec.H264 -> "video/avc"
-        Codec.H265 -> "video/hevc"
-        Codec.AV1 -> "video/av01"
-        Codec.VP8 -> "video/x-vnd.on2.vp8"
-        Codec.VP9 -> "video/x-vnd.on2.vp9"
-        else -> "video/avc"
     }
 
     private const val TAG = "NativeCoreFacade"

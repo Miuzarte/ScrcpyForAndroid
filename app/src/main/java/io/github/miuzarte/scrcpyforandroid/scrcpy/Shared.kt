@@ -82,20 +82,21 @@ class Shared {
     enum class Codec(
         val string: String,
         val displayName: String,
+        val mime: String,
         val type: Type,
         val id: Int,
         val isLossless: Boolean,
     ) {
-        H264("h264", "H.264", Type.VIDEO, 0x68323634, false), // default, ignore when passing
-        H265("h265", "H.265", Type.VIDEO, 0x68323635, false),
-        AV1("av1", "AV1", Type.VIDEO, 0x00617631, false),
-        VP8("vp8", "VP8", Type.VIDEO, 0x00767038, false),
-        VP9("vp9", "VP9", Type.VIDEO, 0x00767039, false),
+        H264("h264", "H.264", "video/avc", Type.VIDEO, 0x68323634, false), // default, ignore when passing
+        H265("h265", "H.265", "video/hevc", Type.VIDEO, 0x68323635, false),
+        AV1("av1", "AV1", "video/av01", Type.VIDEO, 0x00617631, false),
+        VP8("vp8", "VP8", "video/x-vnd.on2.vp8", Type.VIDEO, 0x00767038, false),
+        VP9("vp9", "VP9", "video/x-vnd.on2.vp9", Type.VIDEO, 0x00767039, false),
 
-        OPUS("opus", "Opus", Type.AUDIO, 0x6f707573, false), // default, ignore when passing
-        AAC("aac", "AAC", Type.AUDIO, 0x00616163, false),
-        FLAC("flac", "FLAC", Type.AUDIO, 0x666c6163, true),
-        RAW("raw", "RAW", Type.AUDIO, 0x00726177, true); // wav raw
+        OPUS("opus", "Opus", "audio/opus", Type.AUDIO, 0x6f707573, false), // default, ignore when passing
+        AAC("aac", "AAC", "audio/mp4a-latm", Type.AUDIO, 0x00616163, false),
+        FLAC("flac", "FLAC", "audio/flac", Type.AUDIO, 0x666c6163, true),
+        RAW("raw", "RAW", "audio/raw", Type.AUDIO, 0x00726177, true); // wav raw
 
         enum class Type { VIDEO, AUDIO }
 
