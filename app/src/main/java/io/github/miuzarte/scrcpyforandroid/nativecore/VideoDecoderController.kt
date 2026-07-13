@@ -13,7 +13,7 @@ import java.util.ArrayDeque
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * Owns the video [AnnexBDecoder] lifecycle and all state surrounding it:
+ * Owns the video [MediaCodecVideoDecoder] lifecycle and all state surrounding it:
  *
  * - Creating / rebuilding / releasing the decoder bound to the persistent renderer surface.
  * - Caching and replaying bootstrap packets (config + keyframe + following frames) so a
@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  * - All public methods are safe to call from any thread; mutations are guarded by
  *   [controllerLock] for synchronous methods and by the facade's session mutex for
  *   suspend methods.
- * - The decoder itself is single-threaded (AnnexBDecoder is @Synchronized).
+ * - The decoder itself is single-threaded (MediaCodecVideoDecoder is @Synchronized).
  *
  * This class does **not** decide session restart policy; it reports errors and lets
  * [NativeCoreFacade] decide whether to restart the scrcpy session.
@@ -38,7 +38,7 @@ internal class VideoDecoderController(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val controllerLock = Any()
-    private var decoder: AnnexBDecoder? = null
+    private var decoder: MediaCodecVideoDecoder? = null
 
     @Volatile
     private var currentSessionInfo: Scrcpy.Session.SessionInfo? = null
@@ -239,7 +239,7 @@ internal class VideoDecoderController(
     }
 
     /**
-     * Core method: construct a new [AnnexBDecoder] and replay bootstrap packets into it.
+     * Core method: construct a new [MediaCodecVideoDecoder] and replay bootstrap packets into it.
      *
      * Caller must have already released the old decoder (if any) and, when needed, recreated
      * the persistent surface. Must be called while holding [controllerLock].
@@ -259,6 +259,8 @@ internal class VideoDecoderController(
             Codec.H264 -> "video/avc"
             Codec.H265 -> "video/hevc"
             Codec.AV1 -> "video/av01"
+            Codec.VP8 -> "video/x-vnd.on2.vp8"
+            Codec.VP9 -> "video/x-vnd.on2.vp9"
             else -> "video/avc"
         }
         Log.i(
@@ -269,7 +271,7 @@ internal class VideoDecoderController(
                     "persistent=true",
         )
         val newDecoder = try {
-            AnnexBDecoder(
+            MediaCodecVideoDecoder(
                 width = session.width,
                 height = session.height,
                 outputSurface = surface,
@@ -277,7 +279,7 @@ internal class VideoDecoderController(
                 onOutputSizeChanged = { width, height ->
                     val current = currentSessionInfo
                     if (current == null || (current.width == width && current.height == height)) {
-                        return@AnnexBDecoder
+                        return@MediaCodecVideoDecoder
                     }
                     Log.i(
                         TAG,
@@ -340,7 +342,7 @@ internal class VideoDecoderController(
 
     // ---------- Bootstrap packet cache ----------
 
-    private fun replayBootstrapPackets(decoder: AnnexBDecoder) {
+    private fun replayBootstrapPackets(decoder: MediaCodecVideoDecoder) {
         val snapshot = synchronized(bootstrapLock) { bootstrapPackets.toList() }
         if (snapshot.isEmpty()) {
             return

@@ -212,6 +212,12 @@ data class ClientOptions(
 
     // --flex-display
     var flexDisplay: Boolean = false, // to server
+
+    // --ignore-video-encoder-constraints
+    var ignoreVideoEncoderConstraints: Boolean = false, // to server
+
+    // --no-terminal-title
+    // var updateTerminalTitle: Boolean = true,
 ) {
     enum class KeyInjectMode(val string: String) {
         MIXED("mixed"),
@@ -633,6 +639,7 @@ data class ClientOptions(
             vdSystemDecorations = vdSystemDecorations,
             keepActive = keepActive,
             flexDisplay = flexDisplay,
+            ignoreVideoEncoderConstraints = ignoreVideoEncoderConstraints,
             list = list,
         )
     }

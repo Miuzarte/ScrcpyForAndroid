@@ -86,6 +86,7 @@ data class ServerParams(
     val vdSystemDecorations: Boolean,
     val keepActive: Boolean,
     val flexDisplay: Boolean,
+    val ignoreVideoEncoderConstraints: Boolean,
 
     val list: ListOptions,
 ) {
@@ -267,6 +268,9 @@ data class ServerParams(
         }
         if (flexDisplay) {
             cmd.add("flex_display=true")
+        }
+        if (ignoreVideoEncoderConstraints) {
+            cmd.add("ignore_video_encoder_constraints=true")
         }
         if (displayImePolicy != DisplayImePolicy.UNDEFINED) {
             cmd.add("display_ime_policy=${displayImePolicy.string}")

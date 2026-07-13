@@ -89,6 +89,8 @@ class Shared {
         H264("h264", "H.264", Type.VIDEO, 0x68323634, false), // default, ignore when passing
         H265("h265", "H.265", Type.VIDEO, 0x68323635, false),
         AV1("av1", "AV1", Type.VIDEO, 0x00617631, false),
+        VP8("vp8", "VP8", Type.VIDEO, 0x00767038, false),
+        VP9("vp9", "VP9", Type.VIDEO, 0x00767039, false),
 
         OPUS("opus", "Opus", Type.AUDIO, 0x6f707573, false), // default, ignore when passing
         AAC("aac", "AAC", Type.AUDIO, 0x00616163, false),

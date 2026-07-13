@@ -116,9 +116,9 @@ class Scrcpy(
     companion object {
         private const val TAG = "Scrcpy"
 
-        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v4.0"
-        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v4.0"
-        const val DEFAULT_SERVER_VERSION = "4.0"
+        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v4.1"
+        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v4.1"
+        const val DEFAULT_SERVER_VERSION = "4.1"
         const val DEFAULT_REMOTE_PATH = "/data/local/tmp/scrcpy-server.jar"
 
         // Regex patterns for parsing server output
@@ -387,6 +387,10 @@ class Scrcpy(
 
     suspend fun setClipboard(text: String, paste: Boolean) = withContext(Dispatchers.IO) {
         session.setClipboard(text, paste)
+    }
+
+    suspend fun scanFile(path: String) = withContext(Dispatchers.IO) {
+        session.scanFile(path)
     }
 
     suspend fun injectTouch(
@@ -1317,6 +1321,10 @@ class Scrcpy(
             withControlWriter("setClipboard") { setClipboard(text, paste) }
         }
 
+        suspend fun scanFile(path: String) = mutex.withLock {
+            withControlWriter("scanFile") { scanFile(path) }
+        }
+
         suspend fun injectTouch(
             action: Int,
             pointerId: Long,
@@ -1775,6 +1783,16 @@ class Scrcpy(
                 output.flush()
             }
 
+            @Synchronized
+            fun scanFile(path: String) {
+                val bytes = path.toByteArray(Charsets.UTF_8)
+                require(bytes.size <= 255) { "scan file path is too long (max 255 bytes)" }
+                output.writeByte(TYPE_SCAN_FILE)
+                output.writeInt(bytes.size)
+                output.write(bytes)
+                output.flush()
+            }
+
             private fun writePosition(x: Int, y: Int, screenWidth: Int, screenHeight: Int) {
                 output.writeInt(x)
                 output.writeInt(y)
@@ -1836,6 +1854,7 @@ class Scrcpy(
             private const val TYPE_CAMERA_ZOOM_IN = 19
             private const val TYPE_CAMERA_ZOOM_OUT = 20
             private const val TYPE_RESIZE_DISPLAY = 21
+            private const val TYPE_SCAN_FILE = 22
 
             private const val SEQUENCE_INVALID = 0L
 

@@ -283,6 +283,10 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
             booleanPreferencesKey("flex_display"),
             false,
         )
+        val IGNORE_VIDEO_ENCODER_CONSTRAINTS = Pair(
+            booleanPreferencesKey("ignore_video_encoder_constraints"),
+            false,
+        )
 
         fun defaultBundle() = Bundle(
             crop = CROP.defaultValue,
@@ -351,6 +355,7 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
             cameraTorch = CAMERA_TORCH.defaultValue,
             keepActive = KEEP_ACTIVE.defaultValue,
             flexDisplay = FLEX_DISPLAY.defaultValue,
+            ignoreVideoEncoderConstraints = IGNORE_VIDEO_ENCODER_CONSTRAINTS.defaultValue,
         )
     }
 
@@ -422,6 +427,7 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
         val cameraTorch: Boolean,
         val keepActive: Boolean,
         val flexDisplay: Boolean,
+        val ignoreVideoEncoderConstraints: Boolean,
     ): Parcelable {
     }
 
@@ -491,6 +497,7 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
         bundleField(CAMERA_TORCH) { it.cameraTorch },
         bundleField(KEEP_ACTIVE) { it.keepActive },
         bundleField(FLEX_DISPLAY) { it.flexDisplay },
+        bundleField(IGNORE_VIDEO_ENCODER_CONSTRAINTS) { it.ignoreVideoEncoderConstraints },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)
@@ -562,6 +569,7 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
         cameraTorch = preferences.read(CAMERA_TORCH),
         keepActive = preferences.read(KEEP_ACTIVE),
         flexDisplay = preferences.read(FLEX_DISPLAY),
+        ignoreVideoEncoderConstraints = preferences.read(IGNORE_VIDEO_ENCODER_CONSTRAINTS),
     )
 
     suspend fun loadBundle() = loadBundle(::bundleFromPreferences)
@@ -645,6 +653,7 @@ class ScrcpyOptions(context: Context): Settings(context, "ScrcpyOptions") {
         cameraTorch = bundle.cameraTorch,
         keepActive = bundle.keepActive,
         flexDisplay = bundle.flexDisplay,
+        ignoreVideoEncoderConstraints = bundle.ignoreVideoEncoderConstraints,
     )
 }
 
@@ -716,6 +725,7 @@ internal fun encodeBundleToJson(bundle: ScrcpyOptions.Bundle): JSONObject =
         .put("cameraTorch", bundle.cameraTorch)
         .put("keepActive", bundle.keepActive)
         .put("flexDisplay", bundle.flexDisplay)
+        .put("ignoreVideoEncoderConstraints", bundle.ignoreVideoEncoderConstraints)
 
 internal fun decodeBundleFromJson(bundleJson: JSONObject?): ScrcpyOptions.Bundle {
     val json = bundleJson ?: return ScrcpyOptions.defaultBundle()
@@ -983,6 +993,10 @@ internal fun decodeBundleFromJson(bundleJson: JSONObject?): ScrcpyOptions.Bundle
         flexDisplay = json.optBooleanOrDefault(
             "flexDisplay",
             ScrcpyOptions.FLEX_DISPLAY.defaultValue,
+        ),
+        ignoreVideoEncoderConstraints = json.optBooleanOrDefault(
+            "ignoreVideoEncoderConstraints",
+            ScrcpyOptions.IGNORE_VIDEO_ENCODER_CONSTRAINTS.defaultValue,
         ),
     )
 }

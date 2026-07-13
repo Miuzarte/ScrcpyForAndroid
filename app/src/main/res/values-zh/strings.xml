@@ -536,6 +536,7 @@
     <string name="scrcpyopt_no_cleanup">禁用结束后清理</string>
     <string name="scrcpyopt_no_cleanup_desc">默认情况下，scrcpy 会从设备中移除服务器二进制文件，并在退出时恢复设备状态（显示触摸、保持唤醒和电源模式）\n此选项将禁用此清理操作</string>
     <string name="scrcpyopt_flex_display">自动调整尺寸以匹配界面</string>
+    <string name="scrcpyopt_ignore_video_encoder_constraints">忽略视频编码器约束</string>
     <string name="scrcpyopt_start_app">scrcpy 启动后打开应用</string>
     <string name="scrcpyopt_native">本机</string>
     <string name="scrcpyopt_log_level">日志等级</string>

@@ -327,6 +327,8 @@ object NativeCoreFacade {
         Codec.H264 -> "video/avc"
         Codec.H265 -> "video/hevc"
         Codec.AV1 -> "video/av01"
+        Codec.VP8 -> "video/x-vnd.on2.vp8"
+        Codec.VP9 -> "video/x-vnd.on2.vp9"
         else -> "video/avc"
     }
 
