@@ -2,7 +2,7 @@
 agp = "9.2.1"
 bcpkixJdk18on = "1.84"
 boringssl = "20251124"
-conscryptAndroid = "2.5.3"
+conscryptAndroid = "2.6.1"
 datastorePreferences = "1.2.1"
 kotlin = "2.4.0"
 kotlinx-serialization = "1.11.0"
