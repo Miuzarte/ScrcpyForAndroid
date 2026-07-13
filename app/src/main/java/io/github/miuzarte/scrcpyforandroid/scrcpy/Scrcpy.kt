@@ -1786,7 +1786,7 @@ class Scrcpy(
             @Synchronized
             fun scanFile(path: String) {
                 val bytes = path.toByteArray(Charsets.UTF_8)
-                require(bytes.size <= 255) { "scan file path is too long (max 255 bytes)" }
+                require(bytes.size <= 256) { "scan file path is too long (max 256 bytes)" }
                 output.writeByte(TYPE_SCAN_FILE)
                 output.writeInt(bytes.size)
                 output.write(bytes)
