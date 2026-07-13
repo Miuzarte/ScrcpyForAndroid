@@ -7,5 +7,15 @@
   "git-submodules": {
     "enabled": false
   },
-  "schedule": ["before 6am on Monday"]
+  "schedule": [
+    "before 6am on Monday"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "miuix"
+      ],
+      "enabled": false
+    }
+  ]
 }
