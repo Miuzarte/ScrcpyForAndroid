@@ -167,7 +167,7 @@ dependencies {
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.security.crypto)
-    implementation("com.github.promeg:tinypinyin:2.0.3")
+    implementation("com.github.promeg:tinypinyin:3.0.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
