@@ -82,7 +82,7 @@ jobs:
           ls -la out
 
       - name: Upload CI artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-ci-apks-${{ github.run_number }}
           path: out/*.apk
