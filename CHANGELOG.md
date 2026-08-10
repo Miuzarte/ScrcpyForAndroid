@@ -4,6 +4,7 @@
 
 - 修复: 特定设备上需要特地准备 Looper
   - [issues#63](https://github.com/Miuzarte/ScrcpyForAndroid/issues/63)
+- 修复: 本机输入法无法向被控端输入纯空格字符串
 
 ## 0.5.1
 
