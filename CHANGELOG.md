@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.5.3
+
+- 依赖: 更新 submodule/miuix
+
 ## 0.5.2
 
 - 修复: 特定设备上需要特地准备 Looper
