@@ -3,6 +3,10 @@
 ## 0.5.3
 
 - 依赖: 更新 submodule/miuix
+- 修复: 锁屏密码填充界面不跟随应用语言设置
+  - [pr#79](https://github.com/Miuzarte/ScrcpyForAndroid/pull/79)
+- 修复: 文件管理跳转路径/创建文件夹输入框光标错乱
+  - [pr#80](https://github.com/Miuzarte/ScrcpyForAndroid/pull/80)
 
 ## 0.5.2
 
