@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -595,6 +597,14 @@ private fun PathJumpDialog(
     onConfirm: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(path))
+    }
+    LaunchedEffect(path) {
+        if (textFieldValue.text != path) {
+            textFieldValue = TextFieldValue(path, TextRange(path.length))
+        }
+    }
 
     OverlayDialog(
         show = show,
@@ -604,8 +614,11 @@ private fun PathJumpDialog(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical)) {
             TextField(
-                value = path,
-                onValueChange = onPathChange,
+                value = textFieldValue,
+                onValueChange = {
+                    textFieldValue = it
+                    onPathChange(it.text)
+                },
                 // label = "/storage/emulated/0",
                 // useLabelAsPlaceholder = true,
             )
@@ -643,6 +656,14 @@ private fun CreateFolderDialog(
     onConfirm: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(folderName))
+    }
+    LaunchedEffect(folderName) {
+        if (textFieldValue.text != folderName) {
+            textFieldValue = TextFieldValue(folderName, TextRange(folderName.length))
+        }
+    }
 
     OverlayDialog(
         show = show,
@@ -652,8 +673,11 @@ private fun CreateFolderDialog(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical)) {
             TextField(
-                value = folderName,
-                onValueChange = onFolderNameChange,
+                value = textFieldValue,
+                onValueChange = {
+                    textFieldValue = it
+                    onFolderNameChange(it.text)
+                },
                 label = stringResource(R.string.fm_label_new_folder),
                 useLabelAsPlaceholder = true,
             )
