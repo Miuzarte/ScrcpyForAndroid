@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -42,6 +43,7 @@ import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.createThemeController
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import kotlinx.coroutines.*
+import java.util.Locale
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -58,6 +60,19 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 
 class LockscreenPasswordActivity: FragmentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        val languageTag = MainActivity.getAppLanguageTag(newBase)
+        val wrappedContext =
+            if (languageTag.isNotEmpty()) {
+                val config = Configuration(newBase.resources.configuration)
+                config.setLocale(Locale.forLanguageTag(languageTag))
+                newBase.createConfigurationContext(config)
+            } else {
+                newBase
+            }
+        super.attachBaseContext(wrappedContext)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
