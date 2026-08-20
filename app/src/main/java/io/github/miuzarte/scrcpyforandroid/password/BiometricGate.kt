@@ -2,11 +2,13 @@ package io.github.miuzarte.scrcpyforandroid.password
 
 import android.app.KeyguardManager
 import android.content.Context
+import android.os.Build
 import android.os.Looper
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicLong
@@ -18,11 +20,19 @@ object BiometricGate {
         BiometricManager.Authenticators.BIOMETRIC_STRONG or
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
+    private val allowedAuthenticators: Int
+        get() =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                ALLOWED_AUTHENTICATORS
+            } else {
+                BiometricManager.Authenticators.BIOMETRIC_STRONG
+            }
+
     private val sessionIds = AtomicLong(0L)
 
     fun canAuthenticate(): Boolean {
         return BiometricManager.from(AppRuntime.context)
-            .canAuthenticate(ALLOWED_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+            .canAuthenticate(allowedAuthenticators) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     fun isDeviceSecure(): Boolean {
@@ -76,9 +86,14 @@ object BiometricGate {
 
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setAllowedAuthenticators(ALLOWED_AUTHENTICATORS)
+                .setAllowedAuthenticators(allowedAuthenticators)
                 .setTitle(title)
                 .setSubtitle(subtitle)
+                .apply {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                        setNegativeButtonText(activity.getString(R.string.button_cancel))
+                    }
+                }
                 .build(),
         )
 
