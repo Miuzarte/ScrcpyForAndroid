@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.5.4
+
+- 修复: 在安卓 10 使用了不允许的认证方式组合
+  - [pr#81](https://github.com/Miuzarte/ScrcpyForAndroid/pull/81)
+- 修复: 在安卓 13 以下禁用悬浮底栏
+  - 悬浮底栏使用 `InteractiveHighlight` (miuix/animation), 其内部无条件构造 API 33+ 引入的 `android.graphics.RuntimeShader`
+  - [pr#82](https://github.com/Miuzarte/ScrcpyForAndroid/pull/82)
+
 ## 0.5.3
 
 - 依赖: 更新 submodule/miuix
