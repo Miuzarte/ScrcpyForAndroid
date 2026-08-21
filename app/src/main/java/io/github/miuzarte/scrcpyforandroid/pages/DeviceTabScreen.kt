@@ -446,7 +446,7 @@ internal fun DeviceTabPage(
                                     text = stringResource(R.string.button_cancel),
                                     onClick = {
                                         haptic.contextClick()
-                                        viewModel.disconnectUsbDevice()
+                                        viewModel.cancelUsbConnect()
                                     },
                                     colors = ButtonDefaults.textButtonColors(),
                                 )

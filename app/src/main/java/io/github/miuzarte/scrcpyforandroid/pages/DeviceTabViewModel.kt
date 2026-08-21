@@ -600,6 +600,16 @@ internal class DeviceTabViewModel(
     }
 
     /**
+     * 取消进行中的 USB 连接尝试：立即 abort 隧道解除握手阻塞（不取锁，与守卫同机制），
+     * 后续清理由 connectUsbDevice 的失败路径完成，避免状态流中途抖动
+     */
+    fun cancelUsbConnect() {
+        runCatching {
+            CoroutineScope(Dispatchers.IO).launch { UsbAdbSession.abortCurrentTunnel() }
+        }
+    }
+
+    /**
      * 主动断开 USB 连接：顺序与双击返回退出一致——
      * 先停投屏 → 再释放隧道 → 最后清理连接状态
      */

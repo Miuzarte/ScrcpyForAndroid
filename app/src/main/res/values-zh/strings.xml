@@ -593,8 +593,6 @@
     <string name="usb_connection">USB 连接</string>
     <string name="usb_device_detected">检测到 USB 设备</string>
     <string name="usb_device_disconnected">USB 设备已断开</string>
-    <string name="usb_card_tap_for_permission">点击允许APP访问 %1$s</string>
-    <string name="usb_card_tap_to_connect">点击卡片连接设备</string>
     <string name="usb_permission_request_hint">请在设备上授权USB调试权限</string>
 
     <string name="language_follow_system">跟随系统</string>
