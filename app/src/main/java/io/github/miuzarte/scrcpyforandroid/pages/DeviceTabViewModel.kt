@@ -8,8 +8,11 @@ import androidx.lifecycle.viewModelScope
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.StreamActivity
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcuts
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
@@ -98,9 +101,6 @@ internal class DeviceTabViewModel(
     private val sessionReconnectBlacklistHosts = mutableSetOf<String>()
     // 防止快速多次点击 USB 卡片（1 秒 debounce）
     private val lastUsbClickMs = java.util.concurrent.atomic.AtomicLong(0L)
-    // 当前活跃的 USB 隧道，重试时先关闭再重建
-    @Volatile
-    private var currentTunnel: io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel? = null
 
     val adbConnected: StateFlow<Boolean> = connectionState
         .map { it.adbSession.isConnected }
@@ -282,9 +282,17 @@ internal class DeviceTabViewModel(
     }
 
     override fun onCleared() {
+        // 显式停止健康检查循环（viewModelScope 取消亦可终止，这里同步复位标志）
+        stopConnectionHealthCheckLoop()
         runBlocking(Dispatchers.IO) {
             appSettings.saveBundle(_asBundle.value)
             quickDevices.saveBundle(_qdBundle.value)
+        }
+        // 异步兜底释放 USB 隧道（进程存活时生效）：
+        // 不可在主线程 runBlocking 等共用锁——可能恰逢隧道操作持锁导致 ANR；
+        // viewModelScope 已随 onCleared 取消，使用独立作用域
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { UsbAdbSession.disconnect() }
         }
     }
 
@@ -530,47 +538,87 @@ internal class DeviceTabViewModel(
      *
      * @param deviceInfo USB设备信息
      */
-    fun connectUsbDevice(deviceInfo: io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceInfo) {
+    fun connectUsbDevice(deviceInfo: UsbDeviceInfo) {
         // 1 秒 debounce：防止快速连点重复弹授权
         val now = System.currentTimeMillis()
         if (now - lastUsbClickMs.get() < 1000) return
         lastUsbClickMs.set(now)
 
+        // 以 VID/PID 作为动作标识，驱动条目上的转圈与取消
+        val vidPid = String.format(
+            "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
+        )
+
         viewModelScope.launch {
-            var tunnel: io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel? = null
+            _activeDeviceActionId.value = vidPid
             try {
                 if (!deviceInfo.hasPermission) {
                     logEvent("USB permission required for ${deviceInfo.getDisplayName()}")
                     return@launch
                 }
 
-                // 关旧隧道，释放 USB 接口
-                runCatching { currentTunnel?.close() }
-                currentTunnel = null
-
-                // 开新隧道
+                // 隧道由 App 级单例 UsbAdbSession 统一管理（关旧开新，幂等）。
+                // open() 含权限等待与 USB 枚举等阻塞操作，且持有连接共用锁，
+                // 必须切 IO 线程：否则阻塞主线程并锁死整个 ADB 子系统
                 val appContext = AppRuntime.context
-                tunnel = io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel(appContext, deviceInfo.device)
-                val (inputStream, outputStream) = tunnel.open()
-                currentTunnel = tunnel
+                val (inputStream, outputStream) = withContext(Dispatchers.IO) {
+                    UsbAdbSession.openTunnel(appContext, deviceInfo.device)
+                }
 
-                adbCoordinator.connectUsb(deviceInfo.device, inputStream, outputStream)
+                adbCoordinator.connectUsb(
+                    deviceInfo.device,
+                    inputStream,
+                    outputStream,
+                    abortHandshake = {
+                        // 握手超时守卫：强制关隧道解除 bulkTransfer 阻塞（不取锁）
+                        UsbAdbSession.abortCurrentTunnel()
+                    },
+                )
 
-                val vidPid = String.format("0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId)
                 handleAdbConnected(
                     host = vidPid, port = 0,
                     deviceId = deviceInfo.device.deviceId,
-                    connectionType = io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB
+                    connectionType = DeviceConnectionType.USB
                 )
 
                 logEvent("USB connected to ${deviceInfo.getDisplayName()}")
             } catch (e: Exception) {
-                runCatching { tunnel?.close() }
-                // 只关闭本协程的隧道，不覆盖新协程已创建的隧道引用
-                if (currentTunnel === tunnel) currentTunnel = null
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        UsbAdbSession.disconnect()
+                    }
+                }
                 // 重置 debounce，允许拔线后立即重试
                 lastUsbClickMs.set(0L)
                 logEvent("USB connection failed: ${e.message}")
+                // 与无线连接失败一致，给出可见提示（常见原因：被控端未确认 USB 调试授权）
+                AppRuntime.snackbar(R.string.usb_permission_request_hint)
+            } finally {
+                _activeDeviceActionId.value = null
+            }
+        }
+    }
+
+    /**
+     * 主动断开 USB 连接：顺序与双击返回退出一致——
+     * 先停投屏 → 再释放隧道 → 最后清理连接状态
+     */
+    fun disconnectUsbDevice() {
+        viewModelScope.launch {
+            runCatching { scrcpy.stop() }
+            // close() 是阻塞调用且可能等待共用锁，切 IO 线程
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    UsbAdbSession.disconnect()
+                }
+            }
+            runCatching {
+                disconnectAdbConnection(
+                    clearQuickOnlineForTarget = currentTarget.value,
+                    logMessage = "USB disconnected",
+                    cause = DisconnectCause.User,
+                    statusLine = "USB disconnected",
+                )
             }
         }
     }
@@ -592,7 +640,7 @@ internal class DeviceTabViewModel(
         autoEnterFullScreen: Boolean = false,
         scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
         deviceId: Int? = null,
-        connectionType: io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType = io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.LAN,
+        connectionType: DeviceConnectionType = DeviceConnectionType.LAN,
     ) {
         val connected = connectionController.handleAdbConnected(host, port, scrcpyProfileId, deviceId, connectionType)
         val info = connected.info
@@ -1135,12 +1183,18 @@ internal class DeviceTabViewModel(
                             val target = state.currentTarget
                             if (target != null) {
                                 // USB连接不做TCP重连，直接标记断开
-                                if (target.connectionType == io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB) {
+                                if (target.connectionType == DeviceConnectionType.USB) {
                                     connectionController.disconnectAdbConnection(
                                         clearQuickOnlineForTarget = target,
                                         cause = DisconnectCause.KeepAliveFailed,
                                         statusLine = "ADB connection lost",
                                     )
+                                    // 释放 USB 隧道资源（幂等），阻塞操作切 IO 线程
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            UsbAdbSession.disconnect()
+                                        }
+                                    }
                                     Log.w(TAG, "定时检测：USB连接已断开")
                                 } else {
                                     // LAN连接尝试自动重连

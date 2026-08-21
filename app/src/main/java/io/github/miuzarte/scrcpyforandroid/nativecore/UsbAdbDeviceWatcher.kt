@@ -39,7 +39,7 @@ class UsbAdbDeviceWatcher(
         private const val ADB_INTERFACE_CLASS = 0xFF
         
         // USB权限Action
-        private const val ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION"
+        private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
     }
 
     // USB管理器
@@ -326,8 +326,8 @@ class UsbPermissionReceiver : BroadcastReceiver() {
     }
     
     companion object {
-        private const val TAG = "UsbAdbDeviceWatcher"
-        private const val ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION"
+        private const val TAG = "UsbPermissionReceiver"
+        private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
     }
 }
 
@@ -337,7 +337,8 @@ class UsbPermissionReceiver : BroadcastReceiver() {
  * 用于将权限结果从静态BroadcastReceiver传递到UsbAdbDeviceWatcher实例
  */
 object UsbPermissionBus {
-    private val listeners = mutableListOf<(UsbDevice, Boolean) -> Unit>()
+    // Binder 线程的广播回调与主线程的 add/remove 并发，使用写时复制容器保证线程安全
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(UsbDevice, Boolean) -> Unit>()
     
     fun addListener(listener: (UsbDevice, Boolean) -> Unit) {
         listeners.add(listener)

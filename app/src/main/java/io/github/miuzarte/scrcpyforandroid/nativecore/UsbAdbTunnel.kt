@@ -50,7 +50,10 @@ class UsbAdbTunnel(
         private const val MAX_USB_PACKET_SIZE = 16384
         
         // USB权限Action
-        private const val ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION"
+        private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
+
+        /** bulkTransfer 连续返回 0 的重试上限 */
+        private const val MAX_ZERO_TRANSFER_RETRIES = 32
     }
 
     // USB管理器
@@ -95,40 +98,47 @@ class UsbAdbTunnel(
     fun open(): Pair<InputStream, OutputStream> {
         if (closed) throw IOException("Tunnel is closed")
         if (isConnected.get()) throw IOException("Tunnel is already connected")
-        
+
         Log.i(TAG, "open(): opening USB tunnel for device ${usbDevice.deviceName}")
-        
-        // 1. 检查USB权限
-        checkUsbPermission()
-        
-        // 2. 打开USB设备连接
-        usbConnection = usbManager.openDevice(usbDevice)
-            ?: throw IOException("Failed to open USB device: ${usbDevice.deviceName}")
-        
-        // 3. 查找ADB接口
-        adbInterface = findAdbInterface()
-            ?: throw IOException("No ADB interface found on device ${usbDevice.deviceName}")
-        
-        // 4. 声明接口
-        if (!usbConnection!!.claimInterface(adbInterface, true)) {
-            throw IOException("Failed to claim ADB interface")
+
+        try {
+            // 1. 检查USB权限
+            checkUsbPermission()
+
+            // 2. 打开USB设备连接
+            usbConnection = usbManager.openDevice(usbDevice)
+                ?: throw IOException("Failed to open USB device: ${usbDevice.deviceName}")
+
+            // 3. 查找ADB接口
+            adbInterface = findAdbInterface()
+                ?: throw IOException("No ADB interface found on device ${usbDevice.deviceName}")
+
+            // 4. 声明接口
+            if (!usbConnection!!.claimInterface(adbInterface, true)) {
+                throw IOException("Failed to claim ADB interface")
+            }
+
+            // 5. 查找Bulk端点
+            findBulkEndpoints()
+
+            // 6. 创建输入输出流
+            val inputStream = UsbInputStream()
+            val outputStream = UsbOutputStream()
+
+            isConnected.set(true)
+
+            // 注册物理拔出监听（拔下OTG线时自动断开连接）
+            registerDetachedReceiver()
+
+            Log.i(TAG, "open(): USB tunnel opened successfully")
+
+            return Pair(inputStream, outputStream)
+        } catch (e: Exception) {
+            // 失败路径统一清理（close 幂等）：注销已注册的权限 receiver、
+            // 关闭已打开的设备连接，避免 receiver/句柄泄漏
+            close()
+            throw e
         }
-        
-        // 5. 查找Bulk端点
-        findBulkEndpoints()
-        
-        // 6. 创建输入输出流
-        val inputStream = UsbInputStream()
-        val outputStream = UsbOutputStream()
-        
-        isConnected.set(true)
-        
-        // 注册物理拔出监听（拔下OTG线时自动断开连接）
-        registerDetachedReceiver()
-        
-        Log.i(TAG, "open(): USB tunnel opened successfully")
-        
-        return Pair(inputStream, outputStream)
     }
 
     /**
@@ -213,8 +223,8 @@ class UsbAdbTunnel(
                     val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                     if (device?.deviceName == usbDevice.deviceName) {
                         Log.i(TAG, "USB device detached: ${usbDevice.deviceName}, closing tunnel")
-                        closed = true
-                        isConnected.set(false)
+                        // 走完整 close()：释放接口、关闭连接并注销 receiver，避免资源泄漏
+                        close()
                     }
                 }
             }
@@ -410,10 +420,12 @@ class UsbAdbTunnel(
             // 分块写入（USB包大小限制）
             var offset = off
             var remaining = len
-            
+            // bulkTransfer 返回 0（未写入任何字节）极罕见；有限重试后报错，防死循环
+            var zeroWriteRetries = 0
+
             while (remaining > 0) {
                 val chunkSize = minOf(remaining, MAX_USB_PACKET_SIZE)
-                
+
                 val written = connection.bulkTransfer(
                     endpoint,
                     b,
@@ -421,11 +433,17 @@ class UsbAdbTunnel(
                     chunkSize,
                     USB_TRANSFER_TIMEOUT_MS
                 )
-                
-                if (written < 0) {
-                    throw IOException("USB write failed")
+
+                when {
+                    written < 0 -> throw IOException("USB write failed")
+                    written == 0 -> {
+                        if (++zeroWriteRetries > MAX_ZERO_TRANSFER_RETRIES) {
+                            throw IOException("USB write stalled (repeated zero-length transfers)")
+                        }
+                    }
+                    else -> zeroWriteRetries = 0
                 }
-                
+
                 offset += written
                 remaining -= written
             }

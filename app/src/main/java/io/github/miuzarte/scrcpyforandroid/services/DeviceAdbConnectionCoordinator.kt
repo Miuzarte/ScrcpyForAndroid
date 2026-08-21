@@ -10,7 +10,9 @@ import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.parcelize.Parcelize
+import kotlin.time.Duration.Companion.milliseconds
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
@@ -37,7 +39,7 @@ internal class DeviceAdbConnectionCoordinator(
             val resolved = resolveHost(host)
             // 不再使用withTimeout包裹，因为Java阻塞Socket无法被协程取消中断
             // 超时由socket.connect(address, timeoutMs)自身控制，取消由NativeAdbService.cancelPendingConnect()处理
-            adbService.connect(resolved, port)
+            adbService.connect(resolved, port, timeout = timeoutMs.milliseconds)
         }
     }
 
@@ -52,7 +54,8 @@ internal class DeviceAdbConnectionCoordinator(
     suspend fun connectUsb(
         usbDevice: UsbDevice,
         inputStream: InputStream,
-        outputStream: OutputStream
+        outputStream: OutputStream,
+        abortHandshake: (() -> Unit)? = null
     ): ConnectionTarget {
         return withContext(Dispatchers.IO) {
             // 创建USB连接目标
@@ -62,9 +65,9 @@ internal class DeviceAdbConnectionCoordinator(
                 deviceId = usbDevice.deviceId,
                 connectionType = DeviceConnectionType.USB
             )
-            
+
             // 通过USB流连接
-            adbService.connectUsb(inputStream, outputStream, usbDevice.deviceId)
+            adbService.connectUsb(inputStream, outputStream, usbDevice.deviceId, abortHandshake)
             
             target
         }
@@ -93,22 +96,10 @@ internal class DeviceAdbConnectionCoordinator(
     ): ConnectionTarget {
         val targets = addresses.mapNotNull { ConnectionTarget.unmarshalFrom(it) }
         
-        // 分离TCP和USB地址
+        // USB 走独立连接入口（connectUsbDevice），快捷方式中不会也不应包含 usb: 地址；
+        // 若因历史残留数据混入会被过滤跳过，最终报 No reachable address
         val tcpTargets = targets.filter { it.connectionType == DeviceConnectionType.LAN }
-        val usbTargets = targets.filter { it.connectionType == DeviceConnectionType.USB }
-        
-        // 优先尝试USB连接（如果有的话）
-        for (target in usbTargets) {
-            try {
-                // USB连接需要在调用前建立隧道，这里只返回目标
-                // 实际的USB连接由调用者通过connectUsb方法建立
-                return target
-            } catch (e: Exception) {
-                // USB连接失败，继续尝试下一个
-                continue
-            }
-        }
-        
+
         // 尝试TCP连接
         for (target in tcpTargets) {
             if (probeTcpReachable(target.host, target.port, probeTimeoutMs)) {
@@ -140,6 +131,19 @@ internal class DeviceAdbConnectionCoordinator(
             withTimeout(timeoutMs) {
                 adbService.isConnected()
             }
+        }
+    }
+
+    /**
+     * 真实链路探测：限时执行一次 no-op shell 往返。
+     * 标志位查询无法发现 TCP 半开（对端掉电不发 FIN）导致的假死连接；
+     * 探测超时/失败即判定断开，由 keepAlive 循环走既有断开+自动重连链路。
+     */
+    suspend fun probeConnection(timeoutMs: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            withTimeoutOrNull(timeoutMs) {
+                runCatching { adbService.shell(":") }.isSuccess
+            } ?: false
         }
     }
 
@@ -201,12 +205,6 @@ internal class DeviceAdbConnectionCoordinator(
                 displayId = displayId,
                 forceStop = forceStop,
             )
-        }
-    }
-
-    suspend fun executeShell(command: String): String {
-        return withContext(Dispatchers.IO) {
-            adbService.shell(command)
         }
     }
 }

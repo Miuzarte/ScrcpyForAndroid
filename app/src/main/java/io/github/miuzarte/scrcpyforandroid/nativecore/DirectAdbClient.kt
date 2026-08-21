@@ -661,6 +661,10 @@ internal class DirectAdbConnection(
 
     companion object {
         private const val TAG = "DirectAdbConnection"
+
+        /** 握手读阶段的 soTimeout 兜底下限：无限连接超时模式下防止无响应设备永久锁死连接锁 */
+        private const val HANDSHAKE_READ_SO_TIMEOUT_MS = 60_000
+
         private const val A_CNXN = 0x4e584e43
         private const val A_AUTH = 0x48545541
         private const val A_STLS = 0x534c5453
@@ -700,13 +704,16 @@ internal class DirectAdbConnection(
      * TCP连接握手
      */
     private fun handshakeTcp(timeoutMs: Int) {
-        Log.i(TAG, "handshakeTcp(): tcp connect -> $host:$port (timeout=${timeoutMs}ms)")
+        Log.i(TAG, "handshakeTcp(): tcp connect -> $host:$port (timeout=${if (timeoutMs == 0) "infinite" else "${timeoutMs}ms"})")
         val tcpSocket = socket ?: throw IllegalStateException("TCP socket is null")
-        
+
+        // timeoutMs 为 0 表示不超时
         tcpSocket.connect(InetSocketAddress(host, port), timeoutMs)
         tcpSocket.tcpNoDelay = true
         tcpSocket.keepAlive = true
-        tcpSocket.soTimeout = 60_000
+        // 握手读阶段兜底：至少 60s 上限，防止无响应设备在无限连接超时模式下永久锁死连接锁；
+        // 数据阶段的 soTimeout 在握手成功后清为无限（该行为不变）
+        tcpSocket.soTimeout = maxOf(timeoutMs, HANDSHAKE_READ_SO_TIMEOUT_MS)
         // 增大Socket缓冲区，减少高码率视频传输时的阻塞和卡顿
         tcpSocket.receiveBufferSize = 1_048_576  // 1MB
         tcpSocket.sendBufferSize = 1_048_576     // 1MB
@@ -844,19 +851,6 @@ internal class DirectAdbConnection(
 
     fun shell(command: String): String =
         openStream("shell:$command")
-            .use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
-
-    /**
-     * 通过ADB协议层启用TCP/IP模式
-     *
-     * 直接发送 `tcpip:PORT` 服务命令，不依赖shell，不需要root权限。
-     * 这是ADB原生支持的命令，比通过shell执行 `setprop service.adb.tcp.port` 更可靠。
-     *
-     * @param port TCP端口号，通常为5555
-     * @return 服务端响应
-     */
-    fun tcpip(port: Int): String =
-        openStream("tcpip:$port")
             .use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
 
     /**
@@ -1313,6 +1307,8 @@ private fun InputStream.readExact(buf: ByteArray) {
     while (off < buf.size) {
         val n = read(buf, off, buf.size - off)
         if (n < 0) throw EOFException("readExact: expected ${buf.size} bytes, got $off")
+        // len>0 时 read 合法返回值不含 0，出现即为异常流状态，防死循环
+        if (n == 0) throw IOException("readExact: stream returned 0 bytes at offset $off")
         off += n
     }
 }

@@ -50,6 +50,7 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -437,6 +438,16 @@ fun MainScreen() {
                     withContext(Dispatchers.IO) {
                         runCatching { scrcpy.stop() }
                         runCatching { NativeAdbService.disconnect() }
+                        // 释放 USB 隧道，避免进程存活期间 USB 设备被持续占用
+                        runCatching { io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession.disconnect() }
+                        // 清理连接状态（ConnectionStateStore / AppRuntime）
+                        runCatching {
+                            deviceConnectionServices.connectionController.disconnectAdbConnection(
+                                cause = DisconnectCause.User,
+                                statusLine = "Disconnected",
+                            )
+                            EventLogger.logEvent("App exit: connections released")
+                        }
                     }
                     if (asBundle.clearLogsOnExit) {
                         EventLogger.clearLogs()

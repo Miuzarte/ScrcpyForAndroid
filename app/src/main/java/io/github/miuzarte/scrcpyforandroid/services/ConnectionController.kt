@@ -97,7 +97,8 @@ internal class ConnectionController(
     }
 
     suspend fun keepAliveCheck(timeoutMs: Long): Boolean {
-        return adbCoordinator.isConnected(timeoutMs)
+        // 真实链路探测：标志位查询无法发现 TCP 半开假死连接
+        return adbCoordinator.probeConnection(timeoutMs)
     }
 
     suspend fun probeTcpReachable(host: String, port: Int, timeoutMs: Int): Boolean {

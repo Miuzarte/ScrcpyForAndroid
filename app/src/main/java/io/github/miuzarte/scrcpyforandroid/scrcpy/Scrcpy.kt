@@ -324,45 +324,50 @@ class Scrcpy(
         }
     }
 
+    // video/audio/control 三个 reader 可能并发触发停止，互斥保证只生效一次、只记一条日志
+    private val stopMutex = Mutex()
+
     suspend fun stop(reason: StopReason = StopReason.USER): Boolean = withContext(Dispatchers.IO) {
-        if (!isRunning) {
-            Log.w(TAG, "stop(): No active session to stop")
-            return@withContext false
-        }
-
-        lastStopReason = reason
-        Log.i(TAG, "stop(): Stopping scrcpy session (reason=$reason)")
-
-        return@withContext try {
-            session.clearVideoConsumer()
-            session.clearAudioConsumer()
-            mp4Recorder?.release()
-            mp4Recorder = null
-            wavRecorder?.release()
-            wavRecorder = null
-            aacRecorder?.release()
-            aacRecorder = null
-            NativeCoreFacade.onScrcpySessionStopped()
-            session.stop()
-            audioPlayer?.release()
-            audioPlayer = null
-            isRunning = false
-            flexDisplay = false
-            _currentSessionState.value = null
-            stopClipboardSync()
-            if (reason == StopReason.REMOTE_DISCONNECTED) {
-                logEvent(R.string.vm_session_disconnected, level = Log.WARN)
-                val now = android.os.SystemClock.elapsedRealtime()
-                if (now - lastRemoteDisconnectSnackbarAt > 500L) {
-                    lastRemoteDisconnectSnackbarAt = now
-                    AppRuntime.snackbar(R.string.vm_session_disconnected)
-                }
+        stopMutex.withLock {
+            if (!isRunning) {
+                Log.w(TAG, "stop(): No active session to stop")
+                return@withLock false
             }
-            Log.i(TAG, "stop(): Session stopped successfully")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "stop(): Failed to stop session", e)
-            false
+
+            lastStopReason = reason
+            Log.i(TAG, "stop(): Stopping scrcpy session (reason=$reason)")
+
+            return@withLock try {
+                session.clearVideoConsumer()
+                session.clearAudioConsumer()
+                mp4Recorder?.release()
+                mp4Recorder = null
+                wavRecorder?.release()
+                wavRecorder = null
+                aacRecorder?.release()
+                aacRecorder = null
+                NativeCoreFacade.onScrcpySessionStopped()
+                session.stop()
+                audioPlayer?.release()
+                audioPlayer = null
+                isRunning = false
+                flexDisplay = false
+                _currentSessionState.value = null
+                stopClipboardSync()
+                if (reason == StopReason.REMOTE_DISCONNECTED) {
+                    logEvent(R.string.vm_session_disconnected, level = Log.WARN)
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastRemoteDisconnectSnackbarAt > 500L) {
+                        lastRemoteDisconnectSnackbarAt = now
+                        AppRuntime.snackbar(R.string.vm_session_disconnected)
+                    }
+                }
+                Log.i(TAG, "stop(): Session stopped successfully")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "stop(): Failed to stop session", e)
+                false
+            }
         }
     }
 

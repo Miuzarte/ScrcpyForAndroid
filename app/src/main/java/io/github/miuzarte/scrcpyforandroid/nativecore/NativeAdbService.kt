@@ -1,7 +1,10 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -10,6 +13,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Higher-level ADB service that wraps `DirectAdbTransport` and provides
@@ -24,6 +28,9 @@ import kotlin.time.Duration
 object NativeAdbService {
     private val transport = DirectAdbTransport
     private val mutex = Mutex()
+
+    // USB 会话与本服务共用连接锁，保证连接/断开全程互斥
+    internal val connectionMutex: Mutex get() = mutex
 
     @Volatile
     private var connection: DirectAdbConnection? = null
@@ -90,12 +97,13 @@ object NativeAdbService {
      * same host:port it is reused; otherwise the previous connection is closed
      * before attempting the new connect.
      *
-     * @param timeout 连接超时时间，默认10秒。传入 Duration.INFINITE 表示不超时。
+     * @param timeout 连接超时时间，默认 10 秒。传入 Duration.INFINITE 表示不超时
+     *（此时握手读阶段仍保留 60s soTimeout 兜底，避免无响应设备永久锁死连接锁）。
      */
     suspend fun connect(
         host: String,
         port: Int,
-        timeout: Duration = Duration.INFINITE,
+        timeout: Duration = 10.seconds,
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             Log.i(TAG, "connect(): host=$host port=$port timeout=$timeout")
@@ -120,7 +128,10 @@ object NativeAdbService {
             disconnectInternal()
 
             try {
-                val timeoutMs = if (timeout.isInfinite()) 10_000 else timeout.inWholeMilliseconds.toInt()
+                // timeoutMs 为 0 表示不超时（Duration.INFINITE），交由底层 connect/soTimeout 使用无限等待
+                val timeoutMs =
+                    if (timeout.isInfinite()) 0
+                    else timeout.inWholeMilliseconds.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                 // 先创建连接对象获取socket引用，用于后续取消时强制关闭
                 val conn = DirectAdbConnection(
                     host,
@@ -157,14 +168,17 @@ object NativeAdbService {
     suspend fun connectUsb(
         inputStream: InputStream,
         outputStream: OutputStream,
-        deviceId: Int? = null
+        deviceId: Int? = null,
+        abortHandshake: (() -> Unit)? = null
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             Log.i(TAG, "connectUsb(): deviceId=$deviceId")
-            
+
             // 断开现有连接
             disconnectInternal()
-            
+
+            // 超时标志须跨线程可见：守卫协程(IO)写、主协程 catch 读（与 UsbAdbTunnel.closed 同款处理）
+            val handshakeTimedOut = java.util.concurrent.atomic.AtomicBoolean(false)
             try {
                 // 通过USB流创建连接
                 val conn = DirectAdbConnection(
@@ -175,14 +189,33 @@ object NativeAdbService {
                     transport.keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
                     deviceId
                 )
-                conn.handshake()
-                
+                // USB 流无 soTimeout 机制，recvMsg 可能永久阻塞；
+                // 协程取消无法打断 bulkTransfer 阻塞循环，须由独立守卫到点后
+                // 强制关闭隧道（closed 标志使 read 循环 ≤5s 内抛出），解除阻塞并释放锁
+                val timeoutGuard = CoroutineScope(Dispatchers.IO).launch {
+                    delay(USB_HANDSHAKE_TIMEOUT_MS)
+                    handshakeTimedOut.set(true)
+                    Log.w(TAG, "connectUsb(): handshake timeout, aborting tunnel")
+                    // 兜底：即使调用方未传回调，也强制关当前隧道解除阻塞（幂等、不取锁）
+                    runCatching { UsbAdbSession.abortCurrentTunnel() }
+                    abortHandshake?.invoke()
+                }
+                try {
+                    conn.handshake()
+                } finally {
+                    timeoutGuard.cancel()
+                }
+
                 connection = conn
                 connectedHost = "usb:$deviceId"
                 connectedPort = 0
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "connectUsb(): failed deviceId=$deviceId", e)
-                val detail = e.message ?: "${e.javaClass.simpleName} (no message)"
+                val detail =
+                    if (handshakeTimedOut.get()) "handshake timeout (device unresponsive)"
+                    else e.message ?: "${e.javaClass.simpleName} (no message)"
                 throw IllegalStateException("ADB USB connect failed for device $deviceId -> $detail", e)
             }
         }
@@ -220,22 +253,6 @@ object NativeAdbService {
         val conn = snapshotConnection()
         val response = conn.shell(command)
         Log.d(TAG, "command: $command, response: $response")
-        return response
-    }
-
-    /**
-     * 通过ADB协议层启用TCP/IP模式
-     *
-     * 直接发送 `tcpip:PORT` 服务命令，不依赖shell，不需要root权限。
-     * 这是ADB原生支持的命令，比通过shell执行 `setprop service.adb.tcp.port` 更可靠。
-     *
-     * @param port TCP端口号，通常为5555
-     * @return 服务端响应
-     */
-    suspend fun tcpip(port: Int): String {
-        val conn = snapshotConnection()
-        val response = conn.tcpip(port)
-        Log.d(TAG, "tcpip: port=$port, response: $response")
         return response
     }
 
@@ -374,4 +391,7 @@ object NativeAdbService {
     }
 
     private const val TAG = "NativeAdbService"
+
+    /** USB 握手超时：USB 流无 soTimeout 机制，recvMsg 无响应时靠它解除阻塞并释放连接锁 */
+    private const val USB_HANDSHAKE_TIMEOUT_MS = 10_000L
 }

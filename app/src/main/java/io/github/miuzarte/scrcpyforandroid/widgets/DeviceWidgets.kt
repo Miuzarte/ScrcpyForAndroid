@@ -31,7 +31,6 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -88,7 +87,6 @@ internal fun StatusCard(
     sessionInfo: Scrcpy.Session.SessionInfo?,
     busyLabel: String?,
     connectedDeviceLabel: String,
-    connectionType: io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType = io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.LAN,
 ) {
     val appSettings = Storage.appSettings
     val appSettingsBundle by appSettings.bundleState.collectAsState()
@@ -140,36 +138,25 @@ internal fun StatusCard(
             )
         }
 
-        adbConnected -> {
-            // 根据连接类型区分显示
-            val isUsb = connectionType == io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType.USB
-            val connectionSubtitle = connectedDeviceLabel
-            val iconPainter = if (isUsb) {
-                painterResource(io.github.miuzarte.scrcpyforandroid.R.drawable.ic_usb)
-            } else {
-                null
-            }
-            StatusCardSpec(
-                big = StatusBigCardSpec(
-                    title = stringResource(R.string.device_status_adb_connected),
-                    subtitle = connectionSubtitle,
-                    containerColor = colorScheme.primaryContainer,
-                    titleColor = colorScheme.onPrimaryContainer,
-                    subtitleColor = colorScheme.onPrimaryContainer,
-                    icon = Icons.Rounded.Wifi,
-                    iconTint = colorScheme.primary.copy(alpha = 0.6f),
-                    iconPainter = iconPainter,
-                ),
-                firstSmall = StatusSmallCardSpec(
-                    stringResource(R.string.device_status_current),
-                    connectedDeviceLabel,
-                ),
-                secondSmall = StatusSmallCardSpec(
-                    stringResource(R.string.label_status),
-                    stringResource(R.string.device_status_idle),
-                ),
-            )
-        }
+        adbConnected -> StatusCardSpec(
+            big = StatusBigCardSpec(
+                title = stringResource(R.string.device_status_adb_connected),
+                subtitle = connectedDeviceLabel,
+                containerColor = colorScheme.primaryContainer,
+                titleColor = colorScheme.onPrimaryContainer,
+                subtitleColor = colorScheme.onPrimaryContainer,
+                icon = Icons.Rounded.Wifi,
+                iconTint = colorScheme.primary.copy(alpha = 0.6f),
+            ),
+            firstSmall = StatusSmallCardSpec(
+                stringResource(R.string.device_status_current),
+                connectedDeviceLabel,
+            ),
+            secondSmall = StatusSmallCardSpec(
+                stringResource(R.string.label_status),
+                stringResource(R.string.device_status_idle),
+            ),
+        )
 
         else -> StatusCardSpec(
             big = StatusBigCardSpec(
@@ -477,7 +464,7 @@ internal fun ConfigPanel(
     onStart: () -> Unit,
     onStop: () -> Unit,
     sessionInfo: Scrcpy.Session.SessionInfo?,
-    onDisconnect: () -> Unit = {},
+    onDisconnect: (() -> Unit)? = null,
     showFullscreenAction: Boolean = false,
     onOpenFullscreen: () -> Unit = {},
     reverseSideActions: Boolean = false,
@@ -722,11 +709,11 @@ internal fun ConfigPanel(
 
             @Composable
             fun DisconnectButton() {
-                if (isQuickConnected) TextButton(
+                if (isQuickConnected && onDisconnect != null) TextButton(
                     text = stringResource(R.string.button_disconnect),
                     onClick = {
                         haptic.contextClick()
-                        onDisconnect()
+                        onDisconnect?.invoke()
                     },
                     modifier = Modifier.weight(sideButtonWeight),
                     enabled = !busy,

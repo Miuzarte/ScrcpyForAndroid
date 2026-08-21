@@ -47,6 +47,7 @@
     <string name="button_done">完成</string>
     <string name="button_connect">连接</string>
     <string name="button_disconnect">断开</string>
+    <string name="button_authorize">授权</string>
     <string name="button_start">启动</string>
     <string name="button_stop">停止</string>
     <string name="button_fullscreen">全屏</string>
@@ -592,9 +593,6 @@
     <string name="usb_connection">USB 连接</string>
     <string name="usb_device_detected">检测到 USB 设备</string>
     <string name="usb_device_disconnected">USB 设备已断开</string>
-    <string name="usb_card_not_connected">未连接</string>
-    <string name="usb_card_hint_subtitle">使用 OTG 线连接设备</string>
-    <string name="usb_card_device_detected">检测到设备</string>
     <string name="usb_card_tap_for_permission">点击允许APP访问 %1$s</string>
     <string name="usb_card_tap_to_connect">点击卡片连接设备</string>
     <string name="usb_permission_request_hint">请在设备上授权USB调试权限</string>

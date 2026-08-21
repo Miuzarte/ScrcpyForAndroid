@@ -10,19 +10,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.USB_PERMISSION" />
 
     <!-- USB Host特性声明（可选，不强制要求） -->
     <uses-feature
         android:name="android.hardware.usb.host"
         android:required="false" />
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-        </intent>
-    </queries>
 
     <application
         android:allowBackup="true"
@@ -75,7 +67,7 @@
             android:name=".nativecore.UsbPermissionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.android.example.USB_PERMISSION" />
+                <action android:name="io.github.miuzarte.scrcpyforandroid.USB_PERMISSION" />
             </intent-filter>
         </receiver>
 

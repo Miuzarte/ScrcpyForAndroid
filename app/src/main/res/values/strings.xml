@@ -47,6 +47,7 @@
     <string name="button_done">Done</string>
     <string name="button_connect">Connect</string>
     <string name="button_disconnect">Disconnect</string>
+    <string name="button_authorize">Authorize</string>
     <string name="button_start">Start</string>
     <string name="button_stop">Stop</string>
     <string name="button_fullscreen">Fullscreen</string>
@@ -593,9 +594,6 @@
     <string name="usb_connection">USB Connection</string>
     <string name="usb_device_detected">USB device detected</string>
     <string name="usb_device_disconnected">USB device disconnected</string>
-    <string name="usb_card_not_connected">Not connected</string>
-    <string name="usb_card_hint_subtitle">Connect device via OTG cable</string>
-    <string name="usb_card_device_detected">Device detected</string>
     <string name="usb_card_tap_for_permission">Tap to allow app access to %1$s</string>
     <string name="usb_card_tap_to_connect">Tap card to connect device</string>
     <string name="usb_permission_request_hint">Please authorize USB debugging on the device</string>

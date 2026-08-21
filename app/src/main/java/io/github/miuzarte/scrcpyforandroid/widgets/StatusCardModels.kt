@@ -6,7 +6,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +30,6 @@ internal data class StatusBigCardSpec(
     val subtitleColor: Color,
     val icon: ImageVector,
     val iconTint: Color,
-    val iconPainter: Painter? = null,  // 可选的Painter图标（用于自定义drawable）
 )
 
 @Immutable
@@ -51,7 +49,6 @@ internal data class StatusCardSpec(
 internal fun StatusCardLayout(
     spec: StatusCardSpec,
     busyLabel: String?,
-    onFirstSmallCardClick: (() -> Unit)? = null,
 ) {
     val haptic = LocalHapticFeedback.current
 
@@ -77,21 +74,12 @@ internal fun StatusCardLayout(
                         .offset(38.dp, 45.dp),
                     contentAlignment = Alignment.BottomEnd,
                 ) {
-                    if (spec.big.iconPainter != null) {
-                        Icon(
-                            painter = spec.big.iconPainter,
-                            contentDescription = null,
-                            modifier = Modifier.size(170.dp),
-                            tint = spec.big.iconTint,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = spec.big.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(170.dp),
-                            tint = spec.big.iconTint,
-                        )
-                    }
+                    Icon(
+                        imageVector = spec.big.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(170.dp),
+                        tint = spec.big.iconTint,
+                    )
                 }
                 Column(
                     modifier = Modifier
@@ -135,7 +123,6 @@ internal fun StatusCardLayout(
                     .fillMaxWidth()
                     .weight(1f),
                 spec = spec.firstSmall,
-                onClick = onFirstSmallCardClick,
             )
             Spacer(Modifier.height(UiSpacing.PageItem))
             StatusMetricCard(
@@ -152,7 +139,6 @@ internal fun StatusCardLayout(
 private fun StatusMetricCard(
     modifier: Modifier,
     spec: StatusSmallCardSpec,
-    onClick: (() -> Unit)? = null,
 ) {
     val haptic = LocalHapticFeedback.current
 
@@ -160,7 +146,7 @@ private fun StatusMetricCard(
         modifier = modifier,
         insideMargin = PaddingValues(UiSpacing.Large),
         pressFeedbackType = PressFeedbackType.Tilt,
-        onClick = onClick ?: haptic::contextClick,
+        onClick = haptic::contextClick,
     ) {
         Text(
             text = spec.title,
