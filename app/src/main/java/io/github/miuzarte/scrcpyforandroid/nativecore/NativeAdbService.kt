@@ -177,39 +177,39 @@ object NativeAdbService {
             // 断开现有连接
             disconnectInternal()
 
-                // 超时标志须跨线程可见：守卫协程(IO)写、主协程 catch 读（与 UsbAdbTunnel.closed 同款处理）
-                val handshakeTimedOut = java.util.concurrent.atomic.AtomicBoolean(false)
-                // 握手完成标志：防止守卫在 10s 边界与握手完成竞态时误关已就绪的隧道
-                val handshakeDone = java.util.concurrent.atomic.AtomicBoolean(false)
+            // 超时标志须跨线程可见：守卫协程(IO)写、主协程 catch 读（与 UsbAdbTunnel.closed 同款处理）
+            val handshakeTimedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+            // 握手完成标志：防止守卫在 10s 边界与握手完成竞态时误关已就绪的隧道
+            val handshakeDone = java.util.concurrent.atomic.AtomicBoolean(false)
+            try {
+                // 通过USB流创建连接
+                val conn = DirectAdbConnection(
+                    inputStream,
+                    outputStream,
+                    transport.privateKey,
+                    transport.publicKeyX509,
+                    transport.keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
+                    deviceId
+                )
+                // USB 流无 soTimeout 机制，recvMsg 可能永久阻塞；
+                // 协程取消无法打断 bulkTransfer 阻塞循环，须由独立守卫到点后
+                // 强制关闭隧道（closed 标志使 read 循环 ≤5s 内抛出），解除阻塞并释放锁
+                val timeoutGuard = CoroutineScope(Dispatchers.IO).launch {
+                    delay(USB_HANDSHAKE_TIMEOUT_MS)
+                    // 握手已完成则不 abort，避免误关就绪连接
+                    if (handshakeDone.get()) return@launch
+                    handshakeTimedOut.set(true)
+                    Log.w(TAG, "connectUsb(): handshake timeout, aborting tunnel")
+                    // 兜底：即使调用方未传回调，也强制关当前隧道解除阻塞（幂等、不取锁）
+                    runCatching { UsbAdbSession.abortCurrentTunnel() }
+                    abortHandshake?.invoke()
+                }
                 try {
-                    // 通过USB流创建连接
-                    val conn = DirectAdbConnection(
-                        inputStream,
-                        outputStream,
-                        transport.privateKey,
-                        transport.publicKeyX509,
-                        transport.keyName.ifBlank { AppSettings.ADB_KEY_NAME.defaultValue },
-                        deviceId
-                    )
-                    // USB 流无 soTimeout 机制，recvMsg 可能永久阻塞；
-                    // 协程取消无法打断 bulkTransfer 阻塞循环，须由独立守卫到点后
-                    // 强制关闭隧道（closed 标志使 read 循环 ≤5s 内抛出），解除阻塞并释放锁
-                    val timeoutGuard = CoroutineScope(Dispatchers.IO).launch {
-                        delay(USB_HANDSHAKE_TIMEOUT_MS)
-                        // 握手已完成则不 abort，避免误关就绪连接
-                        if (handshakeDone.get()) return@launch
-                        handshakeTimedOut.set(true)
-                        Log.w(TAG, "connectUsb(): handshake timeout, aborting tunnel")
-                        // 兜底：即使调用方未传回调，也强制关当前隧道解除阻塞（幂等、不取锁）
-                        runCatching { UsbAdbSession.abortCurrentTunnel() }
-                        abortHandshake?.invoke()
-                    }
-                    try {
-                        conn.handshake()
-                    } finally {
-                        handshakeDone.set(true)
-                        timeoutGuard.cancel()
-                    }
+                    conn.handshake()
+                } finally {
+                    handshakeDone.set(true)
+                    timeoutGuard.cancel()
+                }
 
                 connection = conn
                 connectedHost = "usb:$deviceId"
