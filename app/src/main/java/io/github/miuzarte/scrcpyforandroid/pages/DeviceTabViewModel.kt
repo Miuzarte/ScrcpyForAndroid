@@ -1147,6 +1147,19 @@ internal class DeviceTabViewModel(
         // 连接已断开，尝试自动重连
         val target = state.currentTarget
         if (target != null) {
+            // USB 断开不走 TCP 重连：直接清理状态并释放隧道，提示重新连接
+            if (target.connectionType == DeviceConnectionType.USB) {
+                Log.w(TAG, "USB连接已断开，直接清理状态")
+                connectionController.disconnectAdbConnection(
+                    clearQuickOnlineForTarget = target,
+                    cause = DisconnectCause.KeepAliveFailed,
+                    statusLine = "ADB connection lost",
+                )
+                runCatching {
+                    withContext(Dispatchers.IO) { UsbAdbSession.disconnect() }
+                }
+                throw IllegalStateException("USB连接已断开，请重新连接设备")
+            }
             Log.w(TAG, "ADB连接已断开，尝试自动重连到 ${target.host}:${target.port}")
             try {
                 connectionController.connectWithTimeout(target.host, target.port, ADB_CONNECT_TIMEOUT_MS)
@@ -1184,8 +1197,9 @@ internal class DeviceTabViewModel(
                 try {
                     val state = connectionState.value.adbSession
                     if (state.isConnected) {
+                        // 真实链路探测（shell 往返）：标志位查询无法发现 TCP 半开/USB 假死
                         val isActuallyConnected = runCatching {
-                            adbCoordinator.isConnected(ADB_KEEPALIVE_TIMEOUT_MS)
+                            connectionController.keepAliveCheck(ADB_KEEPALIVE_TIMEOUT_MS)
                         }.getOrDefault(false)
 
                         if (!isActuallyConnected) {

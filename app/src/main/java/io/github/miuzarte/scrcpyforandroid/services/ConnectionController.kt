@@ -2,6 +2,7 @@ package io.github.miuzarte.scrcpyforandroid.services
 
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 
@@ -39,6 +40,8 @@ internal class ConnectionController(
         AppRuntime.currentConnectionProfileId.value = "global"
         runCatching { scrcpy.stop() }
         runCatching { adbCoordinator.disconnect() }
+        // 兜底释放 USB 隧道（无隧道时为 no-op，幂等）
+        runCatching { UsbAdbSession.disconnect() }
         AppScreenOn.release()
         return ConnectionDisconnectResult(clearedTarget = clearQuickOnlineForTarget)
     }
