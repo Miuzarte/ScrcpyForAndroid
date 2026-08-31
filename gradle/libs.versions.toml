@@ -20,7 +20,7 @@ backdrop = "2.0.0"
 material = "1.14.0"
 reorderable = "3.1.0"
 runtime = "1.11.4"
-androidxCorePip = "1.0.0-alpha03"
+androidxCorePip = "1.0.0-alpha04"
 androidxBiometric = "1.4.0-alpha07"
 androidxSecurityCrypto = "1.1.0"
 
