@@ -1,13 +1,16 @@
 package io.github.miuzarte.scrcpyforandroid
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.pages.MainScreen
@@ -61,6 +64,9 @@ class MainActivity: FragmentActivity() {
             }
         }
 
+        // 请求附近设备/局域网 mDNS 发现所需的运行时权限
+        requestNearbyDevicePermissions()
+
         enableEdgeToEdge()
 
         setContent {
@@ -77,6 +83,59 @@ class MainActivity: FragmentActivity() {
     override fun onDestroy() {
         AppScreenOn.unregister(window)
         super.onDestroy()
+    }
+
+    /**
+     * 请求附近设备 / 局域网 mDNS 设备发现所需的运行时权限。
+     * 授权后应用才会出现在系统"附近的设备"设置中，且 NsdManager 才能正常扫描局域网 ADB 设备。
+     */
+    private fun requestNearbyDevicePermissions() {
+        val permissions = buildList {
+            if (Build.VERSION.SDK_INT >= 37) {
+                // Android 17+: 本地网络访问权限（门控局域网 mDNS 发现和局域网连接，默认阻止）
+                add(Manifest.permission.ACCESS_LOCAL_NETWORK)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && Build.VERSION.SDK_INT < 37
+            ) {
+                // Android 13-16: 附近 WiFi 设备发现（替代位置权限）
+                add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            }
+            if (Build.VERSION.SDK_INT in Build.VERSION_CODES.S..Build.VERSION_CODES.S_V2) {
+                // Android 12: NsdManager mDNS 发现需要精确位置权限
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }.toTypedArray()
+
+        if (permissions.isEmpty()) return
+
+        val needRequest = permissions.any {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (needRequest) {
+            requestPermissions(permissions, REQUEST_CODE_NEARBY_PERMISSIONS)
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE_NEARBY_PERMISSIONS) {
+            val granted = permissions.filterIndexed { i, _ ->
+                grantResults.getOrNull(i) == PackageManager.PERMISSION_GRANTED
+            }
+            val denied = permissions.toList() - granted.toSet()
+            if (denied.isNotEmpty()) {
+                android.util.Log.w(
+                    "MainActivity",
+                    "附近设备权限被拒绝: $denied, 局域网设备发现可能不可用"
+                )
+            }
+        }
     }
 
     private fun applyMainOrientationPolicy() {
@@ -103,6 +162,7 @@ class MainActivity: FragmentActivity() {
 
     internal companion object {
         private const val PHONE_LANDSCAPE_LOCK_ASPECT_RATIO = 16f / 9f
+        private const val REQUEST_CODE_NEARBY_PERMISSIONS = 1001
 
         private const val LOCALE_PREFS = "locale_cache"
         private const val KEY_LANGUAGE_TAG = "language_tag"
