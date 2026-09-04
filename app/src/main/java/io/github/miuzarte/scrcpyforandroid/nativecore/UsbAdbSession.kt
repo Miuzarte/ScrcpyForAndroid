@@ -2,7 +2,9 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.content.Context
 import android.hardware.usb.UsbDevice
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -12,6 +14,9 @@ import java.io.OutputStream
  * 统一管理 [UsbAdbTunnel] 的生命周期：与 [NativeAdbService] 共用连接锁，
  * 保证连接/断开全程互斥且幂等，避免隧道只在下次连接时才被释放，
  * 导致进程存活期间 USB 设备被持续占用。
+ *
+ * 阻塞的 USB/binder 操作（close/open/权限等待）统一切 IO 线程执行，
+ * 调用方无需关心自身调度器——直接在主协程调 openTunnel/disconnect 也安全。
  */
 object UsbAdbSession {
     private var tunnel: UsbAdbTunnel? = null
@@ -24,28 +29,32 @@ object UsbAdbSession {
     suspend fun openTunnel(
         context: Context,
         usbDevice: UsbDevice,
-    ): Pair<InputStream, OutputStream> = NativeAdbService.connectionMutex.withLock {
-        runCatching { tunnel?.close() }
-        tunnel = null
+    ): Pair<InputStream, OutputStream> = withContext(Dispatchers.IO) {
+        NativeAdbService.connectionMutex.withLock {
+            runCatching { tunnel?.close() }
+            tunnel = null
 
-        val newTunnel = UsbAdbTunnel(context, usbDevice)
-        val streams = try {
-            newTunnel.open()
-        } catch (e: Exception) {
-            // open 失败的实例自行回收（open 内部已兜底，此处双保险）
-            runCatching { newTunnel.close() }
-            throw e
+            val newTunnel = UsbAdbTunnel(context, usbDevice)
+            val streams = try {
+                newTunnel.open()
+            } catch (e: Exception) {
+                // open 失败的实例自行回收（open 内部已兜底，此处双保险）
+                runCatching { newTunnel.close() }
+                throw e
+            }
+            tunnel = newTunnel
+            streams
         }
-        tunnel = newTunnel
-        streams
     }
 
     /**
      * 关闭当前隧道并释放 USB 资源（接口、端点、receiver）
      */
-    suspend fun disconnect() = NativeAdbService.connectionMutex.withLock {
-        runCatching { tunnel?.close() }
-        tunnel = null
+    suspend fun disconnect() = withContext(Dispatchers.IO) {
+        NativeAdbService.connectionMutex.withLock {
+            runCatching { tunnel?.close() }
+            tunnel = null
+        }
     }
 
     /**

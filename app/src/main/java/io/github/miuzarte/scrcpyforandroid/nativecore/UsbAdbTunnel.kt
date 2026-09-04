@@ -283,45 +283,48 @@ class UsbAdbTunnel(
      * 关闭USB隧道
      */
     override fun close() {
-        if (closed) return
-        
-        closed = true
-        isConnected.set(false)
-        
-        Log.i(TAG, "close(): closing USB tunnel")
-        
-        // 注销权限接收器
-        permissionReceiver?.let {
-            try {
-                context.unregisterReceiver(it)
-            } catch (e: Exception) {
-                Log.w(TAG, "close(): failed to unregister permission receiver", e)
+        // DETACHED 主线程回调与 abort/断开路径的 IO 线程可能并发进入：
+        // synchronized 使 check-then-act 原子, 清理只执行一次
+        // （closed 置位后重入直接返回; 同线程重入由 monitor 可重入保证）
+        synchronized(this) {
+            if (closed) return
+
+            closed = true
+            isConnected.set(false)
+
+            Log.i(TAG, "close(): closing USB tunnel")
+
+            // 注销权限接收器
+            permissionReceiver?.let {
+                try {
+                    context.unregisterReceiver(it)
+                } catch (e: Exception) {
+                    Log.w(TAG, "close(): failed to unregister permission receiver", e)
+                }
             }
-        }
-        permissionReceiver = null
-        
-        // 注销USB拔出接收器
-        detachedReceiver?.let {
-            try {
-                context.unregisterReceiver(it)
-            } catch (e: Exception) {
-                Log.w(TAG, "close(): failed to unregister detached receiver", e)
+            permissionReceiver = null
+
+            // 注销USB拔出接收器
+            detachedReceiver?.let {
+                try {
+                    context.unregisterReceiver(it)
+                } catch (e: Exception) {
+                    Log.w(TAG, "close(): failed to unregister detached receiver", e)
+                }
             }
+            detachedReceiver = null
+
+            // 释放接口/关闭连接：接口可能已被系统释放或连接已失效, 异常兜底
+            runCatching {
+                adbInterface?.let { usbConnection?.releaseInterface(it) }
+            }
+            adbInterface = null
+            runCatching { usbConnection?.close() }
+            usbConnection = null
+
+            bulkInEndpoint = null
+            bulkOutEndpoint = null
         }
-        detachedReceiver = null
-        
-        // 释放接口
-        adbInterface?.let {
-            usbConnection?.releaseInterface(it)
-        }
-        adbInterface = null
-        
-        // 关闭连接
-        usbConnection?.close()
-        usbConnection = null
-        
-        bulkInEndpoint = null
-        bulkOutEndpoint = null
     }
 
     /**
