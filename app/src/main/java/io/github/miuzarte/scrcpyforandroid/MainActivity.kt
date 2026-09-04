@@ -1,13 +1,18 @@
 package io.github.miuzarte.scrcpyforandroid
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.pages.MainScreen
@@ -61,6 +66,9 @@ class MainActivity: FragmentActivity() {
             }
         }
 
+        // 请求附近设备/局域网 mDNS 发现所需的运行时权限
+        requestNearbyDevicePermissions()
+
         enableEdgeToEdge()
 
         setContent {
@@ -77,6 +85,29 @@ class MainActivity: FragmentActivity() {
     override fun onDestroy() {
         AppScreenOn.unregister(window)
         super.onDestroy()
+    }
+
+    private val localNetworkPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                Log.w(
+                    "MainActivity",
+                    "本地网络权限被拒绝，局域网设备发现可能不可用",
+                )
+            }
+        }
+
+    /**
+     * 请求 Android 17+ 本地网络访问运行时权限
+     * 授权后 NsdManager 才能正常扫描局域网 ADB 设备
+     */
+    private fun requestNearbyDevicePermissions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return
+
+        val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) return
+
+        localNetworkPermissionLauncher.launch(permission)
     }
 
     private fun applyMainOrientationPolicy() {

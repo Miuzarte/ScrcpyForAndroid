@@ -135,6 +135,9 @@ data class ClientOptions(
 
     var keyInjectMode: KeyInjectMode = KeyInjectMode.MIXED,
 
+    // --gamepad=uhid
+    var gamepad: Boolean = true,
+
     // var windowBorderless: Boolean,
     // var mipmaps: Boolean,
 
@@ -485,7 +488,7 @@ data class ClientOptions(
             }
 
             /*
-            // 录制用的不是 muxer，以下判断无意义
+            // 录制用的不是 muxer, 以下判断无意义
             if (recordFormat == RecordFormat.OPUS && audioCodec != Codec.OPUS) {
                 throw IllegalArgumentException(
                     "Recording to OPUS file requires an OPUS audio stream " +
@@ -549,6 +552,8 @@ data class ClientOptions(
          */
 
         if (!control) {
+            gamepad = false
+
             if (turnScreenOff) {
                 throw IllegalArgumentException(
                     "Cannot request to turn screen off if control is disabled",
