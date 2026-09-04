@@ -225,15 +225,15 @@ internal fun DeviceTabPage(
     val navigator = LocalRootNavigator.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // USB 设备监听：页面级常驻。若放在 LazyColumn item 内，滚动出屏会 dispose 并
-    // 反复注册/注销系统广播，导致插拔事件丢失与状态不一致
+    // USB 设备监听: 页面级常驻. 若放在 LazyColumn item 内, 滚动出屏会 dispose 并
+    // 反复注册/注销系统广播, 导致插拔事件丢失与状态不一致
     val usbWatcher = remember { UsbAdbDeviceWatcher(context) }
     val usbDevices by usbWatcher.devicesFlow.collectAsState()
     val usbEvents by usbWatcher.eventsFlow.collectAsState()
     LaunchedEffect(Unit) { usbWatcher.startWatching() }
     DisposableEffect(Unit) { onDispose { usbWatcher.stopWatching() } }
 
-    // 设备插拔 Snackbar 提示（OTG 两段枚举会触发多次广播，按事件+设备 500ms 去重）
+    // 设备插拔 Snackbar 提示 (OTG 两段枚举会触发多次广播, 按事件+设备 500ms 去重)
     val lastUsbEventSnackbarKey = remember { mutableStateOf<Pair<String, Long>?>(null) }
     LaunchedEffect(usbEvents) {
         val evt = usbEvents ?: return@LaunchedEffect
@@ -357,12 +357,12 @@ internal fun DeviceTabPage(
 
     @Composable
     fun UsbDevicesSection() {
-        // watcher 与插拔 Snackbar 响应提升至 DeviceTabPage 页面级，此处只消费状态
+        // watcher 与插拔 Snackbar 响应提升至 DeviceTabPage 页面级, 此处只消费状态
 
-        // 已断开的设备不显示条目：无设备时整个区块不渲染
+        // 已断开的设备不显示条目: 无设备时整个区块不渲染
         if (usbDevices.isEmpty()) return
 
-        // 与无线 DeviceTileList 相同的容器样式，USB 条目置顶、视觉连续
+        // 与无线 DeviceTileList 相同的容器样式, USB 条目置顶, 视觉连续
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
@@ -372,11 +372,11 @@ internal fun DeviceTabPage(
                     "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
                 )
                 val connectedToThis = adbConnected &&
-                    currentTarget?.connectionType == DeviceConnectionType.USB &&
-                    currentTarget?.host == vidPid
+                        currentTarget?.connectionType == DeviceConnectionType.USB &&
+                        currentTarget?.host == vidPid
                 val actionInProgress = adbConnecting && activeDeviceActionId == vidPid
 
-                // 卡片样式需与 DeviceTile 保持一致（灰白系底色 + Sink 反馈），改无线样式时同步此处
+                // 卡片样式需与 DeviceTile 保持一致 (灰白系底色 + Sink 反馈), 改无线样式时同步此处
                 Card(
                     colors = CardDefaults.defaultColors(
                         color =
@@ -397,6 +397,7 @@ internal fun DeviceTabPage(
                                             AppRuntime.snackbar(R.string.usb_permission_request_hint)
                                             usbWatcher.requestUsbPermission(deviceInfo.device)
                                         }
+
                                         else -> viewModel.connectUsbDevice(deviceInfo)
                                     }
                                 },
@@ -408,7 +409,7 @@ internal fun DeviceTabPage(
                             modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // status dot（与无线卡片同一套逻辑）
+                            // status dot (与无线卡片同一套逻辑)
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
@@ -457,7 +458,7 @@ internal fun DeviceTabPage(
                                             connectedToThis -> R.string.button_disconnect
                                             !deviceInfo.hasPermission -> R.string.button_authorize
                                             else -> R.string.button_connect
-                                        }
+                                        },
                                     ),
                                     onClick = {
                                         haptic.contextClick()
@@ -467,6 +468,7 @@ internal fun DeviceTabPage(
                                                 AppRuntime.snackbar(R.string.usb_permission_request_hint)
                                                 usbWatcher.requestUsbPermission(deviceInfo.device)
                                             }
+
                                             else -> viewModel.connectUsbDevice(deviceInfo)
                                         }
                                     },
@@ -483,7 +485,7 @@ internal fun DeviceTabPage(
 
     @Composable
     fun DeviceListSection() {
-        // USB 设备条目置顶，与无线设备构成同一列表
+        // USB 设备条目置顶, 与无线设备构成同一列表
         UsbDevicesSection()
         DeviceTileList(
             devices = savedShortcuts,
@@ -615,7 +617,7 @@ internal fun DeviceTabPage(
             onStart = viewModel::startScrcpy,
             onStop = viewModel::stopScrcpy,
             sessionInfo = sessionInfo,
-            // USB 连接时底部不显示"断开"（断开入口在设备列表条目上），对齐无线行为
+            // USB 连接时底部不显示"断开" (断开入口在设备列表条目上), 对齐无线行为
             onDisconnect = if (currentTarget?.connectionType == DeviceConnectionType.USB) null
             else {
                 { viewModel.onDisconnectCurrent(currentTarget) }
@@ -729,7 +731,7 @@ internal fun DeviceTabPage(
             onStart = viewModel::startScrcpy,
             onStop = viewModel::stopScrcpy,
             sessionInfo = sessionInfo,
-            // USB 连接时底部不显示"断开"（断开入口在设备列表条目上），对齐无线行为
+            // USB 连接时底部不显示"断开" (断开入口在设备列表条目上), 对齐无线行为
             onDisconnect = if (currentTarget?.connectionType == DeviceConnectionType.USB) null
             else {
                 { viewModel.onDisconnectCurrent(currentTarget) }
@@ -794,7 +796,7 @@ internal fun DeviceTabPage(
                 val newProfileId = profileIds.getOrNull(index) ?: return@TabRow
                 if (newProfileId == connectedScrcpyProfileId) return@TabRow
                 haptic.contextClick()
-                // 脱离快捷设备：直接写入 session 级状态
+                // 脱离快捷设备: 直接写入 session 级状态
                 AppRuntime.currentConnectionProfileId.value = newProfileId
                 val device = currentTarget?.let { ct ->
                     savedShortcuts.firstOrNull { it.matchesAddress(ct) }

@@ -1248,7 +1248,7 @@ internal fun DeviceTile(
                     TextButton(
                         text = stringResource(
                             if (!isConnected) R.string.button_connect
-                            else R.string.button_disconnect
+                            else R.string.button_disconnect,
                         ),
                         onClick = onAction,
                         enabled = actionEnabled,

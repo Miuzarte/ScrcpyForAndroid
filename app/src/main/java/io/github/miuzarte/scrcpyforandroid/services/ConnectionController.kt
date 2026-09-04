@@ -40,7 +40,7 @@ internal class ConnectionController(
         AppRuntime.currentConnectionProfileId.value = "global"
         runCatching { scrcpy.stop() }
         runCatching { adbCoordinator.disconnect() }
-        // 兜底释放 USB 隧道（无隧道时为 no-op，幂等）
+        // 兜底释放 USB 隧道 (无隧道时为 no-op, 幂等)
         runCatching { UsbAdbSession.disconnect() }
         AppScreenOn.release()
         return ConnectionDisconnectResult(clearedTarget = clearQuickOnlineForTarget)
@@ -100,7 +100,7 @@ internal class ConnectionController(
     }
 
     suspend fun keepAliveCheck(timeoutMs: Long): Boolean {
-        // 真实链路探测：标志位查询无法发现 TCP 半开假死连接
+        // 真实链路探测: 标志位查询无法发现 TCP 半开假死连接
         return adbCoordinator.probeConnection(timeoutMs)
     }
 

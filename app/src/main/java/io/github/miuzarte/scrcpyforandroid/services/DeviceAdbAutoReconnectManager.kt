@@ -12,7 +12,7 @@ internal class DeviceAdbAutoReconnectManager(
     private val stateStore: ConnectionStateStore,
     private val backgroundRunner: DeviceAdbBackgroundRunner = DeviceAdbBackgroundRunner(),
 ): Closeable {
-    
+
     /**
      * 判断是否应该自动重连
      *
@@ -22,10 +22,10 @@ internal class DeviceAdbAutoReconnectManager(
     fun shouldAutoReconnect(connectionType: DeviceConnectionType): Boolean {
         return when (connectionType) {
             DeviceConnectionType.LAN -> true  // 无线连接支持自动重连
-            DeviceConnectionType.USB -> false  // USB连接跳过自动重连
+            DeviceConnectionType.USB -> false  // USB 连接跳过自动重连
         }
     }
-    
+
     suspend fun runKeepAliveLoop(
         isForeground: () -> Boolean,
         intervalMs: Long,
@@ -34,11 +34,11 @@ internal class DeviceAdbAutoReconnectManager(
         onReconnectSuccess: suspend (host: String, port: Int) -> Unit,
         onReconnectFailure: suspend (Throwable) -> Unit,
     ) {
-        // 启动前记录连接类型，后续不再依赖 stateStore
+        // 启动前记录连接类型, 后续不再依赖 stateStore
         val initialTarget = stateStore.state.value.adbSession.currentTarget
         val connectionType = initialTarget?.connectionType ?: DeviceConnectionType.LAN
 
-        // USB连接不做keepalive重连，直接返回
+        // USB 连接不做 keepalive 重连, 直接返回
         if (connectionType == DeviceConnectionType.USB) {
             Log.i(TAG, "runKeepAliveLoop(): USB connection, skipping keepalive loop")
             return
@@ -59,8 +59,8 @@ internal class DeviceAdbAutoReconnectManager(
             onReconnectFailure = onReconnectFailure,
             shouldAutoReconnect = {
                 shouldAutoReconnect(connectionType) &&
-                stateStore.state.value.disconnectCause != DisconnectCause.User &&
-                stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
+                        stateStore.state.value.disconnectCause != DisconnectCause.User &&
+                        stateStore.state.value.disconnectCause != DisconnectCause.KillAdbOnClose
             },
         )
     }

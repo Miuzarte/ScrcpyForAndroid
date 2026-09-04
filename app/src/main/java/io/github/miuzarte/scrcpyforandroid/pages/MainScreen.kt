@@ -438,9 +438,9 @@ fun MainScreen() {
                     withContext(Dispatchers.IO) {
                         runCatching { scrcpy.stop() }
                         runCatching { NativeAdbService.disconnect() }
-                        // 释放 USB 隧道，避免进程存活期间 USB 设备被持续占用
+                        // 释放 USB 隧道, 避免进程存活期间 USB 设备被持续占用
                         runCatching { io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession.disconnect() }
-                        // 清理连接状态（ConnectionStateStore / AppRuntime）
+                        // 清理连接状态 (ConnectionStateStore/AppRuntime)
                         runCatching {
                             deviceConnectionServices.connectionController.disconnectAdbConnection(
                                 cause = DisconnectCause.User,

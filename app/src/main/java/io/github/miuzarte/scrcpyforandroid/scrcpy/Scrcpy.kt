@@ -324,7 +324,7 @@ class Scrcpy(
         }
     }
 
-    // video/audio/control 三个 reader 可能并发触发停止，互斥保证只生效一次、只记一条日志
+    // video/audio/control 三个 reader 可能并发触发停止, 互斥保证只生效一次, 只记一条日志
     private val stopMutex = Mutex()
 
     suspend fun stop(reason: StopReason = StopReason.USER): Boolean = withContext(Dispatchers.IO) {

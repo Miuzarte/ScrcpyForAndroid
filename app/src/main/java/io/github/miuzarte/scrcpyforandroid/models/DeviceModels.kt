@@ -11,9 +11,10 @@ import kotlinx.serialization.json.Json
  * 设备连接类型枚举
  */
 enum class DeviceConnectionType {
-    /** 无线LAN连接 */
+    /** 无线 LAN 连接 */
     LAN,
-    /** 有线USB连接 */
+
+    /** 有线 USB 连接 */
     USB
 }
 
@@ -160,7 +161,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
                         // 根据连接类型生成正确的地址格式
                         when (parsed.connectionType) {
                             DeviceConnectionType.LAN -> "${parsed.host}:$newPort"
-                            DeviceConnectionType.USB -> parsed.toString()  // USB地址保持不变
+                            DeviceConnectionType.USB -> parsed.toString()  // USB 地址保持不变
                         }
                     } else addr
                 }
@@ -286,22 +287,23 @@ data class DeviceShortcut(
 data class ConnectionTarget(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
-    val deviceId: Int? = null,  // USB设备ID，LAN连接时为null
-    val connectionType: DeviceConnectionType = DeviceConnectionType.LAN
+    val deviceId: Int? = null,  // USB 设备 ID, LAN 连接时为 null
+    val connectionType: DeviceConnectionType = DeviceConnectionType.LAN,
 ): Parcelable {
     /**
      * 输出连接目标的字符串表示
-     * LAN格式：host:port 或 [host]:port
-     * USB格式：usb:0x{VID}/0x{PID}#{deviceId}
+     * LAN 格式: host:port 或 [host]:port
+     * USB 格式: usb:0x{VID}/0x{PID}#{deviceId}
      */
     override fun toString(): String = when (connectionType) {
         DeviceConnectionType.LAN -> {
             if (':' in host) "[$host]:$port"
             else "$host:$port"
         }
+
         DeviceConnectionType.USB -> {
-            // USB格式：usb:0x{VID}/0x{PID}#{deviceId}
-            // host存储VID:PID格式，deviceId单独存储
+            // USB 格式: usb:0x{VID}/0x{PID}#{deviceId}
+            // host 存储 VID:PID 格式, deviceId 单独存储
             val devicePart = if (deviceId != null) "#$deviceId" else ""
             "usb:$host$devicePart"
         }
@@ -310,35 +312,35 @@ data class ConnectionTarget(
     companion object {
         /**
          * 从字符串解析连接目标
-         * 支持格式：
+         * 支持格式:
          * - LAN: host:port, [host]:port
          * - USB: usb:0x{VID}/0x{PID}#{deviceId}
          */
         fun unmarshalFrom(s: String): ConnectionTarget? {
             val input = s.trim()
-            
-            // 检测USB格式
+
+            // 检测 USB 格式
             if (input.startsWith("usb:", ignoreCase = true)) {
                 return parseUsbTarget(input)
             }
-            
-            // 解析LAN格式
+
+            // 解析 LAN 格式
             return parseLanTarget(input)
         }
-        
+
         /**
-         * 解析USB连接目标
-         * 格式：usb:0x{VID}/0x{PID}#{deviceId}
+         * 解析 USB 连接目标
+         * 格式: usb:0x{VID}/0x{PID}#{deviceId}
          */
         private fun parseUsbTarget(input: String): ConnectionTarget? {
             // 移除 "usb:" 前缀
             val usbPart = input.substring(4)
-            
-            // 分离 deviceId 部分（#后面的部分）
+
+            // 分离 deviceId 部分 (#后面的部分)
             val hashIndex = usbPart.indexOf('#')
             val vidPidPart: String
             val deviceId: Int?
-            
+
             if (hashIndex >= 0) {
                 vidPidPart = usbPart.substring(0, hashIndex)
                 deviceId = usbPart.substring(hashIndex + 1).toIntOrNull()
@@ -346,28 +348,28 @@ data class ConnectionTarget(
                 vidPidPart = usbPart
                 deviceId = null
             }
-            
-            // 验证VID/PID格式（0x{VID}/0x{PID}）
+
+            // 验证 VID/PID 格式 (0x{VID}/0x{PID})
             if (!vidPidPart.matches(Regex("^0x[0-9A-Fa-f]{4}/0x[0-9A-Fa-f]{4}$"))) {
                 return null
             }
-            
+
             return ConnectionTarget(
-                host = vidPidPart,  // 存储VID:PID格式
-                port = 0,  // USB连接不使用端口
+                host = vidPidPart,  // 存储 VID:PID 格式
+                port = 0,  // USB 连接不使用端口
                 deviceId = deviceId,
-                connectionType = DeviceConnectionType.USB
+                connectionType = DeviceConnectionType.USB,
             )
         }
-        
+
         /**
-         * 解析LAN连接目标
-         * 格式：host:port, [host]:port
+         * 解析 LAN 连接目标
+         * 格式: host:port, [host]:port
          */
         private fun parseLanTarget(input: String): ConnectionTarget? {
             val host: String
             val port: Int
-            
+
             if (input.startsWith('[')) {
                 val closeBracket = input.indexOf(']')
                 if (closeBracket < 1) return null
@@ -390,12 +392,12 @@ data class ConnectionTarget(
                         Defaults.ADB_PORT
                 }
             }
-            
+
             return ConnectionTarget(
                 host = host,
                 port = port,
                 deviceId = null,
-                connectionType = DeviceConnectionType.LAN
+                connectionType = DeviceConnectionType.LAN,
             )
         }
     }

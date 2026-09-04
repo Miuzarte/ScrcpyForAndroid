@@ -99,8 +99,10 @@ internal class DeviceTabViewModel(
     val isAppInForeground: StateFlow<Boolean> = _isAppInForeground.asStateFlow()
 
     private val sessionReconnectBlacklistHosts = mutableSetOf<String>()
+
     // 防止快速多次点击 USB 卡片 (1 秒 debounce)
     private val lastUsbClickMs = java.util.concurrent.atomic.AtomicLong(0L)
+
     // 用户主动取消 USB 连接尝试 (cancelUsbConnect 置位): 失败路径据此静默, 不弹误导提示
     @Volatile
     private var usbConnectCancelled = false
@@ -285,15 +287,15 @@ internal class DeviceTabViewModel(
     }
 
     override fun onCleared() {
-        // 显式停止健康检查循环（viewModelScope 取消亦可终止，这里同步复位标志）
+        // 显式停止健康检查循环 (viewModelScope 取消亦可终止, 这里同步复位标志)
         stopConnectionHealthCheckLoop()
         runBlocking(Dispatchers.IO) {
             appSettings.saveBundle(_asBundle.value)
             quickDevices.saveBundle(_qdBundle.value)
         }
-        // 异步兜底释放 USB 隧道（进程存活时生效）：
-        // 不可在主线程 runBlocking 等共用锁——可能恰逢隧道操作持锁导致 ANR；
-        // viewModelScope 已随 onCleared 取消，使用独立作用域
+        // 异步兜底释放 USB 隧道 (进程存活时生效):
+        // 不可在主线程 runBlocking 等共用锁, 可能恰逢隧道操作持锁导致 ANR;
+        // viewModelScope 已随 onCleared 取消, 使用独立作用域
         CoroutineScope(Dispatchers.IO).launch {
             runCatching { UsbAdbSession.disconnect() }
         }
@@ -405,7 +407,7 @@ internal class DeviceTabViewModel(
     }
 
     fun startScrcpy() = runBusy(EventLogMessage.Resource(R.string.vm_start_scrcpy)) {
-        // 启动前检查ADB连接状态，如已断开则尝试重连
+        // 启动前检查 ADB 连接状态, 如已断开则尝试重连
         ensureAdbConnectedBeforeAction()
         startScrcpySession()
     }
@@ -461,10 +463,10 @@ internal class DeviceTabViewModel(
     private var _adbConnectJob: Job? = null
 
     /**
-     * 取消当前正在进行的ADB连接
-     * 先通过coordinator强制关闭pendingSocket中断阻塞的socket.connect()，
-     * 再取消协程Job。USB 连接在途时同时置取消标志并 abort 隧道
-     * （解除 bulkTransfer 阻塞，不取锁），使取消在 openTunnel/握手各阶段都生效。
+     * 取消当前正在进行的 ADB 连接
+     * 先通过 coordinator 强制关闭 pendingSocket 中断阻塞的 socket.connect(),
+     * 再取消协程 Job, USB 连接在途时同时置取消标志并 abort 隧道
+     * (解除 bulkTransfer 阻塞, 不取锁), 使取消在 openTunnel/握手各阶段都生效
      */
     fun cancelAdbConnect() {
         // 置位取消标志: connectUsbDevice 失败路径据此静默, 不弹误导的授权提示
@@ -544,9 +546,9 @@ internal class DeviceTabViewModel(
     }
 
     /**
-     * 连接USB设备
+     * 连接 USB 设备
      *
-     * @param deviceInfo USB设备信息
+     * @param deviceInfo USB 设备信息
      */
     fun connectUsbDevice(deviceInfo: UsbDeviceInfo) {
         // 1 秒 debounce: 防止快速连点重复弹授权
@@ -580,9 +582,9 @@ internal class DeviceTabViewModel(
                 // (界面假连接 / 触发对旧目标的意外自动回连)
                 disconnectCurrentTargetBeforeConnecting(vidPid, 0)
 
-                // 隧道由 App 级单例 UsbAdbSession 统一管理（关旧开新，幂等）。
-                // open() 含权限等待与 USB 枚举等阻塞操作，且持有连接共用锁，
-                // 必须切 IO 线程：否则阻塞主线程并锁死整个 ADB 子系统
+                // 隧道由 App 级单例 UsbAdbSession 统一管理 (关旧开新, 幂等)
+                // open() 含权限等待与 USB 枚举等阻塞操作, 且持有连接共用锁,
+                // 必须切 IO 线程: 否则阻塞主线程并锁死整个 ADB 子系统
                 val appContext = AppRuntime.context
                 val (inputStream, outputStream) = withContext(Dispatchers.IO) {
                     UsbAdbSession.openTunnel(appContext, deviceInfo.device)
@@ -593,7 +595,7 @@ internal class DeviceTabViewModel(
                     inputStream,
                     outputStream,
                     abortHandshake = {
-                        // 握手超时守卫：强制关隧道解除 bulkTransfer 阻塞（不取锁）
+                        // 握手超时守卫: 强制关隧道解除 bulkTransfer 阻塞 (不取锁)
                         UsbAdbSession.abortCurrentTunnel()
                     },
                 )
@@ -601,7 +603,7 @@ internal class DeviceTabViewModel(
                 handleAdbConnected(
                     host = vidPid, port = 0,
                     deviceId = deviceInfo.device.deviceId,
-                    connectionType = DeviceConnectionType.USB
+                    connectionType = DeviceConnectionType.USB,
                 )
 
                 logEvent("USB connected to ${deviceInfo.getDisplayName()}")
@@ -647,22 +649,22 @@ internal class DeviceTabViewModel(
     }
 
     /**
-     * 取消进行中的 USB 连接尝试：与统一取消入口 cancelAdbConnect 等价
-     * （置取消标志 + abort 隧道 + 取消协程），后续清理由 connectUsbDevice
-     * 的失败路径完成，避免状态流中途抖动
+     * 取消进行中的 USB 连接尝试: 与统一取消入口 cancelAdbConnect 等价
+     * (置取消标志 + abort 隧道 + 取消协程), 后续清理由 connectUsbDevice
+     * 的失败路径完成, 避免状态流中途抖动
      */
     fun cancelUsbConnect() {
         cancelAdbConnect()
     }
 
     /**
-     * 主动断开 USB 连接：顺序与双击返回退出一致——
+     * 主动断开 USB 连接: 顺序与双击返回退出一致
      * 先停投屏 → 再释放隧道 → 最后清理连接状态
      */
     fun disconnectUsbDevice() {
         viewModelScope.launch {
             runCatching { scrcpy.stop() }
-            // close() 是阻塞调用且可能等待共用锁，切 IO 线程
+            // close() 是阻塞调用且可能等待共用锁, 切 IO 线程
             runCatching {
                 withContext(Dispatchers.IO) {
                     UsbAdbSession.disconnect()
@@ -705,7 +707,7 @@ internal class DeviceTabViewModel(
 
         applyConnectedDeviceCapabilities(info.sdkInt)
 
-        // USB 的 host 是 VID/PID；快捷方式地址本身带 usb: 前缀（解析后 host 即 VID/PID），
+        // USB 的 host 是 VID/PID; 快捷方式地址本身带 usb: 前缀 (解析后 host 即 VID/PID),
         // 这里必须用原始 host 查找才能命中并更新名称
         _savedShortcuts.update {
             it.update(
@@ -1177,7 +1179,7 @@ internal class DeviceTabViewModel(
     }
 
     /**
-     * 在执行ADB操作前检查连接状态，如果已断开则尝试自动重连
+     * 在执行 ADB 操作前检查连接状态, 如果已断开则尝试自动重连
      * @throws IllegalStateException 如果无法重连
      */
     private suspend fun ensureAdbConnectedBeforeAction() {
@@ -1192,10 +1194,10 @@ internal class DeviceTabViewModel(
 
         if (isActuallyConnected) return
 
-        // 连接已断开，尝试自动重连
+        // 连接已断开, 尝试自动重连
         val target = state.currentTarget
         if (target != null) {
-            // USB 断开不走 TCP 重连：直接清理状态并释放隧道，提示重新连接
+            // USB 断开不走 TCP 重连: 直接清理状态并释放隧道, 提示重新连接
             if (target.connectionType == DeviceConnectionType.USB) {
                 Log.w(TAG, "USB连接已断开，直接清理状态")
                 connectionController.disconnectAdbConnection(
@@ -1215,7 +1217,7 @@ internal class DeviceTabViewModel(
                 Log.i(TAG, "ADB自动重连成功")
                 AppRuntime.snackbar(R.string.vm_auto_reconnect_succeeded)
             } catch (e: Exception) {
-                // 重连失败，更新状态为断开
+                // 重连失败, 更新状态为断开
                 connectionController.disconnectAdbConnection(
                     clearQuickOnlineForTarget = target,
                     cause = DisconnectCause.KeepAliveFailed,
@@ -1225,7 +1227,7 @@ internal class DeviceTabViewModel(
                 throw IllegalStateException("ADB连接已断开且自动重连失败，请手动重新连接", e)
             }
         } else {
-            // 没有保存的目标，直接断开状态
+            // 没有保存的目标, 直接断开状态
             connectionController.disconnectAdbConnection(
                 cause = DisconnectCause.KeepAliveFailed,
                 statusLine = "ADB connection lost",
@@ -1235,14 +1237,14 @@ internal class DeviceTabViewModel(
     }
 
     /**
-     * 启动定时连接状态检测循环，每3秒检测一次实际连接状态
+     * 启动定时连接状态检测循环, 每 3 秒检测一次实际连接状态
      */
     fun startConnectionHealthCheckLoop() {
         if (_connectionHealthCheckStarted) return
         _connectionHealthCheckStarted = true
         viewModelScope.launch {
             while (_connectionHealthCheckStarted) {
-                // 有连接动作在途 (USB/LAN 连接、断开等) 时跳过本轮探测:
+                // 有连接动作在途 (USB/LAN 连接, 断开等) 时跳过本轮探测:
                 // 这些动作持有 ADB 全局连接锁, 探测等锁超时会误判"已断开",
                 // 进而触发断开清理, 破坏正在进行的握手 (如 USB 切换时的慢握手/授权弹窗)
                 val connectionActionInFlight =
@@ -1251,7 +1253,7 @@ internal class DeviceTabViewModel(
                     try {
                         val state = connectionState.value.adbSession
                         if (state.isConnected) {
-                            // 真实链路探测（shell 往返）：标志位查询无法发现 TCP 半开/USB 假死
+                            // 真实链路探测 (shell 往返): 标志位查询无法发现 TCP 半开/USB 假死
                             val isActuallyConnected = runCatching {
                                 connectionController.keepAliveCheck(ADB_KEEPALIVE_TIMEOUT_MS)
                             }.getOrDefault(false)
@@ -1260,14 +1262,14 @@ internal class DeviceTabViewModel(
                                 // 检测到连接已断开
                                 val target = state.currentTarget
                                 if (target != null) {
-                                    // USB连接不做TCP重连，直接标记断开
+                                    // USB 连接不做 TCP 重连, 直接标记断开
                                     if (target.connectionType == DeviceConnectionType.USB) {
                                         connectionController.disconnectAdbConnection(
                                             clearQuickOnlineForTarget = target,
                                             cause = DisconnectCause.KeepAliveFailed,
                                             statusLine = "ADB connection lost",
                                         )
-                                        // 释放 USB 隧道资源（幂等），阻塞操作切 IO 线程
+                                        // 释放 USB 隧道资源 (幂等), 阻塞操作切 IO 线程
                                         runCatching {
                                             withContext(Dispatchers.IO) {
                                                 UsbAdbSession.disconnect()
@@ -1275,7 +1277,7 @@ internal class DeviceTabViewModel(
                                         }
                                         Log.w(TAG, "定时检测：USB连接已断开")
                                     } else {
-                                        // LAN连接尝试自动重连
+                                        // LAN 连接尝试自动重连
                                         try {
                                             connectionController.connectWithTimeout(
                                                 target.host,
@@ -1288,7 +1290,7 @@ internal class DeviceTabViewModel(
                                                 state.connectedScrcpyProfileId,
                                             )
                                             Log.i(TAG, "定时检测：ADB自动重连成功")
-                                            // ADB重连成功后，智能处理scrcpy session
+                                            // ADB 重连成功后, 智能处理 scrcpy session
                                             restartScrcpySessionIfNeeded()
                                         } catch (e: Exception) {
                                             connectionController.disconnectAdbConnection(
@@ -1323,9 +1325,9 @@ internal class DeviceTabViewModel(
     private var _connectionHealthCheckStarted = false
 
     /**
-     * ADB重连成功后，智能处理scrcpy session
-     * - 如果scrcpy session还在运行（控制通道已失效），自动重启session
-     * - 如果session已停止，仅提示用户手动重新投屏
+     * ADB 重连成功后, 智能处理 scrcpy session
+     * - 如果 scrcpy session 还在运行 (控制通道已失效), 自动重启 session
+     * - 如果 session 已停止, 仅提示用户手动重新投屏
      */
     private fun restartScrcpySessionIfNeeded() {
         viewModelScope.launch {
@@ -1333,7 +1335,8 @@ internal class DeviceTabViewModel(
                 Log.i(TAG, "ADB重连后重启scrcpy session")
                 try {
                     scrcpy.stop()
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
                 delay(300)
                 try {
                     startScrcpySession()

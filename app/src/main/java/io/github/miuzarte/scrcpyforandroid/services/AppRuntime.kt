@@ -30,7 +30,7 @@ object AppRuntime {
     var currentConnectionTarget: ConnectionTarget? = null
     var currentConnectedDevice: ConnectedDeviceInfo? = null
 
-    // 当前设备使用的 profile ID（session 级，脱离快捷设备独立运作）
+    // 当前设备使用的 profile ID (session 级, 脱离快捷设备独立运作)
     val currentConnectionProfileId = MutableStateFlow("global")
 
     private val snackbarHostStateLock = Any()

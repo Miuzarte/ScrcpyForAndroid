@@ -73,7 +73,7 @@ internal fun ScrcpyAllOptionsScreen(
     val soBundleShared by scrcpyOptions.bundleState.collectAsState()
     val scrcpyProfilesState by scrcpyProfiles.state.collectAsState()
     val initialSelectedProfileId = remember {
-        // 直接读 session 级状态，不依赖快捷设备
+        // 直接读 session 级状态, 不依赖快捷设备
         AppRuntime.currentConnectionProfileId.value
     }
     val selectedProfileIdState = rememberSaveable(initialSelectedProfileId) {
@@ -105,7 +105,7 @@ internal fun ScrcpyAllOptionsScreen(
         val currentTarget = AppRuntime.currentConnectionTarget
         if (currentTarget == null) null
         else {
-            // 优先使用连接信息中的真实设备型号（USB 连接的 host 是 VID/PID，不适合展示）
+            // 优先使用连接信息中的真实设备型号 (USB 连接的 host 是 VID/PID, 不适合展示)
             val info = AppRuntime.currentConnectedDevice
             info?.let {
                 if (info.serial.isNotBlank()) "${info.model} (${info.serial})" else info.model

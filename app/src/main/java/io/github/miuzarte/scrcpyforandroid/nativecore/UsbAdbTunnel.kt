@@ -20,16 +20,16 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * USB ADB隧道类
+ * USB ADB 隧道类
  *
- * 负责USB设备的连接管理和数据传输：
- * 1. 打开USB设备连接
- * 2. 查找ADB接口（接口类0xFF）
- * 3. 配置Bulk IN/OUT端点
- * 4. 封装为InputStream/OutputStream
- * 5. 处理USB权限申请
+ * 负责 USB 设备的连接管理和数据传输:
+ * 1. 打开 USB 设备连接
+ * 2. 查找 ADB 接口 (接口类 0xFF)
+ * 3. 配置 Bulk IN/OUT 端点
+ * 4. 封装为 InputStream/OutputStream
+ * 5. 处理 USB 权限申请
  *
- * 注意：此类不做ADB协议握手，握手由DirectAdbConnection处理
+ * 注意: 此类不做 ADB 协议握手, 握手由 DirectAdbConnection 处理
  */
 class UsbAdbTunnel(
     private val context: Context,
@@ -39,38 +39,38 @@ class UsbAdbTunnel(
     companion object {
         private const val TAG = "UsbAdbTunnel"
         
-        // ADB接口类（Android Debug Bridge）
+        // ADB 接口类 (Android Debug Bridge)
         private const val ADB_INTERFACE_CLASS = 0xFF
         
-        // USB传输超时（毫秒）
+        // USB 传输超时 (毫秒)
         private const val USB_TRANSFER_TIMEOUT_MS = 5000
         
-        // 最大USB包大小（字节）
-        // 注意：受Linux USB驱动限制，最大payload为16KB
+        // 最大 USB 包大小 (字节)
+        // 注意: 受 Linux USB 驱动限制, 最大 payload 为 16KB
         private const val MAX_USB_PACKET_SIZE = 16384
         
-        // USB权限Action
+        // USB 权限 Action
         private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
 
         /** bulkTransfer 连续返回 0 的重试上限 */
         private const val MAX_ZERO_TRANSFER_RETRIES = 32
     }
 
-    // USB管理器
+    // USB 管理器
     private val usbManager: UsbManager by lazy {
         context.getSystemService(Context.USB_SERVICE) as UsbManager
     }
 
-    // USB设备连接
+    // USB 设备连接
     private var usbConnection: UsbDeviceConnection? = null
     
-    // ADB接口
+    // ADB 接口
     private var adbInterface: UsbInterface? = null
     
-    // Bulk IN端点（设备->主机）
+    // Bulk IN 端点 (设备->主机)
     private var bulkInEndpoint: UsbEndpoint? = null
     
-    // Bulk OUT端点（主机->设备）
+    // Bulk OUT 端点 (主机->设备)
     private var bulkOutEndpoint: UsbEndpoint? = null
     
     // 连接状态
@@ -80,17 +80,17 @@ class UsbAdbTunnel(
     @Volatile
     private var closed = false
     
-    // USB权限接收器
+    // USB 权限接收器
     private var permissionReceiver: BroadcastReceiver? = null
     
-    // USB拔出接收器（物理拔出检测）
+    // USB 拔出接收器 (物理拔出检测)
     private var detachedReceiver: BroadcastReceiver? = null
     
     // 权限等待队列
     private val permissionQueue = LinkedBlockingQueue<Boolean>()
 
     /**
-     * 打开USB隧道
+     * 打开 USB 隧道
      *
      * @return Pair<InputStream, OutputStream> 输入输出流
      * @throws IOException 如果连接失败
@@ -102,14 +102,14 @@ class UsbAdbTunnel(
         Log.i(TAG, "open(): opening USB tunnel for device ${usbDevice.deviceName}")
 
         try {
-            // 1. 检查USB权限
+            // 1. 检查 USB 权限
             checkUsbPermission()
 
-            // 2. 打开USB设备连接
+            // 2. 打开 USB 设备连接
             usbConnection = usbManager.openDevice(usbDevice)
                 ?: throw IOException("Failed to open USB device: ${usbDevice.deviceName}")
 
-            // 3. 查找ADB接口
+            // 3. 查找 ADB 接口
             adbInterface = findAdbInterface()
                 ?: throw IOException("No ADB interface found on device ${usbDevice.deviceName}")
 
@@ -118,7 +118,7 @@ class UsbAdbTunnel(
                 throw IOException("Failed to claim ADB interface")
             }
 
-            // 5. 查找Bulk端点
+            // 5. 查找 Bulk 端点
             findBulkEndpoints()
 
             // 6. 创建输入输出流
@@ -127,22 +127,22 @@ class UsbAdbTunnel(
 
             isConnected.set(true)
 
-            // 注册物理拔出监听（拔下OTG线时自动断开连接）
+            // 注册物理拔出监听 (拔下 OTG 线时自动断开连接)
             registerDetachedReceiver()
 
             Log.i(TAG, "open(): USB tunnel opened successfully")
 
             return Pair(inputStream, outputStream)
         } catch (e: Exception) {
-            // 失败路径统一清理（close 幂等）：注销已注册的权限 receiver、
-            // 关闭已打开的设备连接，避免 receiver/句柄泄漏
+            // 失败路径统一清理 (close 幂等): 注销已注册的权限 receiver,
+            // 关闭已打开的设备连接, 避免 receiver/句柄泄漏
             close()
             throw e
         }
     }
 
     /**
-     * 检查USB权限
+     * 检查 USB 权限
      */
     private fun checkUsbPermission() {
         if (usbManager.hasPermission(usbDevice)) {
@@ -208,11 +208,11 @@ class UsbAdbTunnel(
     }
 
     /**
-     * 注册USB物理拔出接收器
+     * 注册 USB 物理拔出接收器
      *
-     * 当用户拔下OTG线时，系统发送ACTION_USB_DEVICE_DETACHED广播。
-     * 此接收器检测到后立即设置closed = true，使read循环抛出异常，
-     * 从而触发完整的ADB断连流程。
+     * 当用户拔下 OTG 线时, 系统发送 ACTION_USB_DEVICE_DETACHED 广播
+     * 此接收器检测到后立即设置 closed = true, 使 read 循环抛出异常,
+     * 从而触发完整的 ADB 断连流程
      */
     private fun registerDetachedReceiver() {
         if (detachedReceiver != null) return
@@ -223,7 +223,7 @@ class UsbAdbTunnel(
                     val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                     if (device?.deviceName == usbDevice.deviceName) {
                         Log.i(TAG, "USB device detached: ${usbDevice.deviceName}, closing tunnel")
-                        // 走完整 close()：释放接口、关闭连接并注销 receiver，避免资源泄漏
+                        // 走完整 close(): 释放接口, 关闭连接并注销 receiver, 避免资源泄漏
                         close()
                     }
                 }
@@ -239,9 +239,9 @@ class UsbAdbTunnel(
     }
 
     /**
-     * 查找ADB接口
+     * 查找 ADB 接口
      *
-     * ADB接口的class为0xFF（Vendor Specific）
+     * ADB 接口的 class 为 0xFF(Vendor Specific)
      */
     private fun findAdbInterface(): UsbInterface? {
         for (i in 0 until usbDevice.interfaceCount) {
@@ -255,7 +255,7 @@ class UsbAdbTunnel(
     }
 
     /**
-     * 查找Bulk IN/OUT端点
+     * 查找 Bulk IN/OUT 端点
      */
     private fun findBulkEndpoints() {
         val iface = adbInterface ?: throw IllegalStateException("ADB interface not found")
@@ -280,12 +280,12 @@ class UsbAdbTunnel(
     }
 
     /**
-     * 关闭USB隧道
+     * 关闭 USB 隧道
      */
     override fun close() {
-        // DETACHED 主线程回调与 abort/断开路径的 IO 线程可能并发进入：
+        // DETACHED 主线程回调与 abort/断开路径的 IO 线程可能并发进入:
         // synchronized 使 check-then-act 原子, 清理只执行一次
-        // （closed 置位后重入直接返回; 同线程重入由 monitor 可重入保证）
+        // (closed 置位后重入直接返回; 同线程重入由 monitor 可重入保证)
         synchronized(this) {
             if (closed) return
 
@@ -304,7 +304,7 @@ class UsbAdbTunnel(
             }
             permissionReceiver = null
 
-            // 注销USB拔出接收器
+            // 注销 USB 拔出接收器
             detachedReceiver?.let {
                 try {
                     context.unregisterReceiver(it)
@@ -314,7 +314,7 @@ class UsbAdbTunnel(
             }
             detachedReceiver = null
 
-            // 释放接口/关闭连接：接口可能已被系统释放或连接已失效, 异常兜底
+            // 释放接口/关闭连接: 接口可能已被系统释放或连接已失效, 异常兜底
             runCatching {
                 adbInterface?.let { usbConnection?.releaseInterface(it) }
             }
@@ -333,9 +333,9 @@ class UsbAdbTunnel(
     fun isConnected(): Boolean = isConnected.get() && !closed
 
     /**
-     * USB输入流实现
+     * USB 输入流实现
      *
-     * 从USB Bulk IN端点读取数据
+     * 从 USB Bulk IN 端点读取数据
      */
     private inner class UsbInputStream : InputStream() {
         private val buffer = ByteArray(MAX_USB_PACKET_SIZE)
@@ -348,7 +348,7 @@ class UsbAdbTunnel(
         }
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
-            // 如果缓冲区有数据，直接返回（不需要检查连接状态，缓冲数据仍有效）
+            // 如果缓冲区有数据, 直接返回 (不需要检查连接状态, 缓冲数据仍有效)
             if (bufferPos < bufferLen) {
                 val copyLen = minOf(len, bufferLen - bufferPos)
                 System.arraycopy(buffer, bufferPos, b, off, copyLen)
@@ -356,9 +356,9 @@ class UsbAdbTunnel(
                 return copyLen
             }
 
-            // 循环读取，处理bulkTransfer超时（-1）
-            // TCP Socket的read()可以无限期阻塞等待数据，而USB bulkTransfer有固定超时
-            // 空闲时bulkTransfer超时返回-1，不代表连接断开，应继续等待
+            // 循环读取, 处理 bulkTransfer 超时 (-1)
+            // TCP Socket 的 read() 可以无限期阻塞等待数据, 而 USB bulkTransfer 有固定超时
+            // 空闲时 bulkTransfer 超时返回-1, 不代表连接断开, 应继续等待
             while (true) {
                 if (closed) throw IOException("Tunnel is closed")
                 if (!isConnected.get()) throw IOException("Tunnel is not connected")
@@ -378,7 +378,7 @@ class UsbAdbTunnel(
                         // 正常读取到数据
                         val copyLen = minOf(len, readLen)
                         System.arraycopy(buffer, 0, b, off, copyLen)
-                        // 如果读取的数据比请求的多，保存剩余部分
+                        // 如果读取的数据比请求的多, 保存剩余部分
                         if (readLen > copyLen) {
                             bufferPos = copyLen
                             bufferLen = readLen
@@ -386,10 +386,10 @@ class UsbAdbTunnel(
                         return copyLen
                     }
                     else -> {
-                        // bulkTransfer 超时（-1）或零长度传输（0，如 ZLP）都表示本次无数据可取。
-                        // 注意不能把 0 作为读取结果返回：InputStream.read 契约在 len>0 时不允许返回 0，
-                        // 上层 readExact 会把 0 当作异常流状态抛错（防死循环），导致误判连接断开。
-                        // 检查隧道是否仍然存活；存活则继续等待（模拟 TCP 无限阻塞行为）
+                        // bulkTransfer 超时 (-1) 或零长度传输 (0, 如 ZLP) 都表示本次无数据可取
+                        // 注意不能把 0 作为读取结果返回: InputStream.read 契约在 len>0 时不允许返回 0,
+                        // 上层 readExact 会把 0 当作异常流状态抛错 (防死循环), 导致误判连接断开
+                        // 检查隧道是否仍然存活; 存活则继续等待 (模拟 TCP 无限阻塞行为)
                         if (closed || !isConnected.get()) {
                             throw IOException("USB read failed: tunnel disconnected")
                         }
@@ -402,14 +402,14 @@ class UsbAdbTunnel(
         override fun available(): Int = bufferLen - bufferPos
 
         override fun close() {
-            // 不关闭隧道，只关闭流
+            // 不关闭隧道, 只关闭流
         }
     }
 
     /**
-     * USB输出流实现
+     * USB 输出流实现
      *
-     * 向USB Bulk OUT端点写入数据
+     * 向 USB Bulk OUT 端点写入数据
      */
     private inner class UsbOutputStream : OutputStream() {
         override fun write(b: Int) = write(byteArrayOf(b.toByte()))
@@ -421,10 +421,10 @@ class UsbAdbTunnel(
             val endpoint = bulkOutEndpoint ?: throw IOException("Bulk OUT endpoint not available")
             val connection = usbConnection ?: throw IOException("USB connection not available")
             
-            // 分块写入（USB包大小限制）
+            // 分块写入 (USB 包大小限制)
             var offset = off
             var remaining = len
-            // bulkTransfer 返回 0（未写入任何字节）极罕见；有限重试后报错，防死循环
+            // bulkTransfer 返回 0 (未写入任何字节) 极罕见; 有限重试后报错, 防死循环
             var zeroWriteRetries = 0
 
             while (remaining > 0) {
@@ -454,19 +454,19 @@ class UsbAdbTunnel(
         }
 
         override fun flush() {
-            // USB传输是同步的，不需要flush
+            // USB 传输是同步的, 不需要 flush
         }
 
         override fun close() {
-            // 不关闭隧道，只关闭流
+            // 不关闭隧道, 只关闭流
         }
     }
 }
 
 /**
- * USB设备信息
+ * USB 设备信息
  *
- * 用于UI显示和设备管理
+ * 用于 UI 显示和设备管理
  */
 data class UsbDeviceInfo(
     val device: UsbDevice,
@@ -482,23 +482,23 @@ data class UsbDeviceInfo(
     }
 
     /**
-     * 获取设备VID
+     * 获取设备 VID
      */
     fun getVendorId(): Int = device.vendorId
 
     /**
-     * 获取设备PID
+     * 获取设备 PID
      */
     fun getProductId(): Int = device.productId
 
     /**
-     * 获取设备ID
+     * 获取设备 ID
      */
     fun getDeviceId(): Int = device.deviceId
 
     /**
-     * 获取USB地址字符串
-     * 格式：usb:0x{VID}/0x{PID}#{deviceId}
+     * 获取 USB 地址字符串
+     * 格式: usb:0x{VID}/0x{PID}#{deviceId}
      */
     fun getUsbAddress(): String {
         val vid = String.format("0x%04X", device.vendorId)
