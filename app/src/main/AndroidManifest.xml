@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Android 17+: 本地网络访问权限 (门控局域网 mDNS 发现和局域网连接, 部分设备默认阻止) -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
