@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.6.0
+
+- 新增: 有线 ADB
+  - [pr#85](https://github.com/Miuzarte/ScrcpyForAndroid/pull/85)
+
 ## 0.5.6
 
 - 新增: 手柄支持
