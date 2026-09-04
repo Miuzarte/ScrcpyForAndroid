@@ -36,6 +36,7 @@ import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadInputHandler
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
@@ -641,6 +642,7 @@ fun FullscreenControlPage(
     var nextPointerLabel by remember { mutableIntStateOf(1) }
     var activeTouchCount by remember { mutableIntStateOf(0) }
     var activeTouchDebug by remember { mutableStateOf("") }
+    var gamepadDebug by remember { mutableStateOf("") }
 
     val touchEventHandler = remember(session, touchAreaSize) {
         TouchEventHandler(
@@ -659,6 +661,27 @@ fun FullscreenControlPage(
             onActiveTouchDebugChanged = { activeTouchDebug = it },
             onNextPointerLabelChanged = { nextPointerLabel = it },
         )
+    }
+
+    val gamepadHandler = remember(session.gamepadEnabled, scrcpy) {
+        if (session.gamepadEnabled) {
+            GamepadInputHandler(
+                scope = coroutineScope,
+                onUhidCreate = { id, vendorId, productId, name, reportDesc ->
+                    scrcpy.uhidCreate(id, vendorId, productId, name, reportDesc)
+                },
+                onUhidInput = { id, data -> scrcpy.uhidInput(id, data) },
+                onUhidDestroy = { id -> scrcpy.uhidDestroy(id) },
+                onDebugChanged = { gamepadDebug = it },
+            )
+        } else null
+    }
+
+    DisposableEffect(gamepadHandler) {
+        onDispose {
+            gamepadHandler?.destroy()
+            gamepadDebug = ""
+        }
     }
 
     val resizeDebouncer = remember {
@@ -748,6 +771,13 @@ fun FullscreenControlPage(
                         forwardKeyRepeat = session.forwardKeyRepeat,
                     )
                 },
+                gamepadCaptureEnabled = session.gamepadEnabled,
+                onGamepadKeyEvent = gamepadHandler?.let { handler ->
+                    { event -> handler.handleKeyEvent(event) }
+                },
+                onGamepadMotionEvent = gamepadHandler?.let { handler ->
+                    { event -> handler.handleGenericMotionEvent(event) }
+                },
             )
         }
 
@@ -787,6 +817,11 @@ fun FullscreenControlPage(
                 )
                 if (activeTouchDebug.isNotEmpty()) Text(
                     text = activeTouchDebug,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                )
+                if (gamepadDebug.isNotEmpty()) Text(
+                    text = gamepadDebug,
                     color = Color.White,
                     fontSize = 13.sp,
                 )

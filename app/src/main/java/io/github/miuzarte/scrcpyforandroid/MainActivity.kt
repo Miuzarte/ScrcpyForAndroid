@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,16 +90,16 @@ class MainActivity: FragmentActivity() {
     private val localNetworkPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (!granted) {
-                android.util.Log.w(
+                Log.w(
                     "MainActivity",
-                    "本地网络权限被拒绝，局域网设备发现可能不可用"
+                    "本地网络权限被拒绝，局域网设备发现可能不可用",
                 )
             }
         }
 
     /**
-     * 请求 Android 17+ 本地网络访问运行时权限。
-     * 授权后 NsdManager 才能正常扫描局域网 ADB 设备。
+     * 请求 Android 17+ 本地网络访问运行时权限
+     * 授权后 NsdManager 才能正常扫描局域网 ADB 设备
      */
     private fun requestNearbyDevicePermissions() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return

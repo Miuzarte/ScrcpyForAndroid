@@ -54,7 +54,7 @@ abstract class Settings(
         }
 
     /**
-     * 设置项委托类，自动提供 get/set/observe/asState/asMutableState 方法
+     * 设置项委托类, 自动提供 get/set/observe/asState/asMutableState 方法
      */
     inner class SettingProperty<T>(
         val pair: Pair<T>,
@@ -90,7 +90,7 @@ abstract class Settings(
 
     protected fun getAllProperties(): Map<String, SettingProperty<*>> = propertyRegistry.toMap()
 
-    // 为 Context 添加扩展委托属性，确保 DataStore 单例
+    // 为 Context 添加扩展委托属性, 确保 DataStore 单例
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
         name = this.name,
         corruptionHandler = corruptionHandler,

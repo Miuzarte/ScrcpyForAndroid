@@ -1754,6 +1754,16 @@ internal fun ScrcpyAllOptionsPage(
                     },
                 )
                 SwitchPreference(
+                    title = stringResource(R.string.scrcpyopt_gamepad),
+                    summary = "--gamepad=uhid",
+                    checked = soBundle.gamepad,
+                    onCheckedChange = {
+                        soBundle = soBundle.copy(
+                            gamepad = it,
+                        )
+                    },
+                )
+                SwitchPreference(
                     title = stringResource(R.string.scrcpyopt_no_cleanup),
                     summary = "--no-cleanup",
                     checked = !soBundle.cleanup,

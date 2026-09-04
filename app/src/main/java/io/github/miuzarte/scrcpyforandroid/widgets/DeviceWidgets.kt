@@ -953,6 +953,9 @@ fun ScrcpyVideoSurface(
     onImeCommitText: (suspend (String) -> Unit)? = null,
     onImeDeleteSurroundingText: (suspend (beforeLength: Int, afterLength: Int) -> Unit)? = null,
     onImeKeyEvent: (suspend (KeyEvent) -> Boolean)? = null,
+    gamepadCaptureEnabled: Boolean = false,
+    onGamepadKeyEvent: ((KeyEvent) -> Boolean)? = null,
+    onGamepadMotionEvent: ((MotionEvent) -> Boolean)? = null,
 ) {
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
@@ -986,6 +989,10 @@ fun ScrcpyVideoSurface(
         val surfaceView = currentSurfaceView ?: return@LaunchedEffect
         surfaceView.setCommitTextEnabled(true)
         LocalInputService.showSoftKeyboard(surfaceView)
+    }
+
+    LaunchedEffect(gamepadCaptureEnabled, currentSurfaceView) {
+        currentSurfaceView?.setGamepadCaptureEnabled(gamepadCaptureEnabled)
     }
 
     DisposableEffect(lifecycleOwner, session, currentSurface) {
@@ -1032,6 +1039,8 @@ fun ScrcpyVideoSurface(
         factory = { context ->
             ScrcpyInputSurfaceView(context).apply {
                 currentSurfaceView = this
+                this.onGamepadKeyEvent = onGamepadKeyEvent
+                this.onGamepadMotionEvent = onGamepadMotionEvent
                 inputCallbacks = object: ScrcpyInputSurfaceView.InputCallbacks {
                     override fun handleKeyEvent(event: KeyEvent): Boolean {
                         val handler = onImeKeyEvent ?: return false

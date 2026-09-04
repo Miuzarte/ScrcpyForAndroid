@@ -196,6 +196,7 @@ class Scrcpy(
                 audioPlayback = options.audioPlayback,
                 keyInjectMode = options.keyInjectMode,
                 forwardKeyRepeat = options.forwardKeyRepeat,
+                gamepadEnabled = options.gamepad,
             )
             isRunning = true
             flexDisplay = options.flexDisplay
@@ -441,6 +442,26 @@ class Scrcpy(
     suspend fun pressBackOrTurnScreenOn(action: Int = KeyEvent.ACTION_DOWN) =
         withContext(Dispatchers.IO) {
             session.pressBackOrTurnScreenOn(action)
+        }
+
+    suspend fun uhidCreate(
+        id: Int,
+        vendorId: Int,
+        productId: Int,
+        name: String,
+        reportDesc: ByteArray,
+    ) = withContext(Dispatchers.IO) {
+        session.uhidCreate(id, vendorId, productId, name, reportDesc)
+    }
+
+    suspend fun uhidInput(id: Int, data: ByteArray) =
+        withContext(Dispatchers.IO) {
+            session.uhidInput(id, data)
+        }
+
+    suspend fun uhidDestroy(id: Int) =
+        withContext(Dispatchers.IO) {
+            session.uhidDestroy(id)
         }
 
     fun updateCurrentSessionSize(width: Int, height: Int) {
@@ -1383,6 +1404,26 @@ class Scrcpy(
             withControlWriter("pressBackOrTurnScreenOn") { pressBackOrTurnScreenOn(action) }
         }
 
+        suspend fun uhidCreate(
+            id: Int,
+            vendorId: Int,
+            productId: Int,
+            name: String,
+            reportDesc: ByteArray,
+        ) = mutex.withLock {
+            withControlWriter("uhidCreate") {
+                uhidCreate(id, vendorId, productId, name, reportDesc)
+            }
+        }
+
+        suspend fun uhidInput(id: Int, data: ByteArray) = mutex.withLock {
+            withControlWriter("uhidInput") { uhidInput(id, data) }
+        }
+
+        suspend fun uhidDestroy(id: Int) = mutex.withLock {
+            withControlWriter("uhidDestroy") { uhidDestroy(id) }
+        }
+
         suspend fun setDisplayPower(on: Boolean) = mutex.withLock {
             withControlWriter("setDisplayPower") { setDisplayPower(on) }
         }
@@ -1600,6 +1641,7 @@ class Scrcpy(
             val audioPlayback: Boolean = true,
             val keyInjectMode: ClientOptions.KeyInjectMode = ClientOptions.KeyInjectMode.MIXED,
             val forwardKeyRepeat: Boolean = true,
+            val gamepadEnabled: Boolean = true,
             val host: String = "",
             val port: Int = Defaults.ADB_PORT,
         )
@@ -1801,6 +1843,48 @@ class Scrcpy(
                 output.writeByte(TYPE_SCAN_FILE)
                 output.writeInt(bytes.size)
                 output.write(bytes)
+                output.flush()
+            }
+
+            @Synchronized
+            fun uhidCreate(
+                id: Int,
+                vendorId: Int,
+                productId: Int,
+                name: String,
+                reportDesc: ByteArray,
+            ) {
+                require(id in 0..0xFFFF) { "uhid id must be in 0..65535" }
+                val nameBytes = name.toByteArray(Charsets.UTF_8)
+                require(nameBytes.size <= 0xFF) { "uhid name is too long (max 255 bytes)" }
+                require(reportDesc.size <= 0xFFFF) { "uhid report desc is too long" }
+                output.writeByte(TYPE_UHID_CREATE)
+                output.writeShort(id)
+                output.writeShort(vendorId)
+                output.writeShort(productId)
+                output.writeByte(nameBytes.size)
+                output.write(nameBytes)
+                output.writeShort(reportDesc.size)
+                output.write(reportDesc)
+                output.flush()
+            }
+
+            @Synchronized
+            fun uhidInput(id: Int, data: ByteArray) {
+                require(id in 0..0xFFFF) { "uhid id must be in 0..65535" }
+                require(data.size <= 0xFFFF) { "uhid input data is too big" }
+                output.writeByte(TYPE_UHID_INPUT)
+                output.writeShort(id)
+                output.writeShort(data.size)
+                output.write(data)
+                output.flush()
+            }
+
+            @Synchronized
+            fun uhidDestroy(id: Int) {
+                require(id in 0..0xFFFF) { "uhid id must be in 0..65535" }
+                output.writeByte(TYPE_UHID_DESTROY)
+                output.writeShort(id)
                 output.flush()
             }
 

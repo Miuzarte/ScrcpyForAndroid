@@ -113,15 +113,15 @@ object AppRuntime {
         dismissNewest = dismissNewest,
     )
 
-    // 应用内语言设置只包裹了 Activity 的 base context，
-    // 这里用同样的方式包装 application context，使 snackbar 等全局文案跟随应用内语言
+    // 应用内语言设置只包裹了 Activity 的 base context,
+    // 这里用同样的方式包装 application context, 使 snackbar 等全局文案跟随应用内语言
     private fun localizedContext(): Context {
         val languageTag = MainActivity.getAppLanguageTag(appContext)
         return if (languageTag.isEmpty()) appContext
         else appContext.createConfigurationContext(
             Configuration(appContext.resources.configuration).apply {
                 setLocale(Locale.forLanguageTag(languageTag))
-            }
+            },
         )
     }
 

@@ -39,6 +39,9 @@
   <img src="https://github.com/user-attachments/assets/558bd1b1-15d2-47f8-bdc5-aac9cca689f5" height="180" alt="PiP" />
   <img src="https://github.com/user-attachments/assets/1b52a662-108d-49cb-a86e-eccc8ac12d64" height="180" alt="Gaming" />
 </p>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2fa8447d-d590-4612-92c6-1b34b899e045" height="180" alt="Gamepad" />
+</p>
 
 ## Features
 

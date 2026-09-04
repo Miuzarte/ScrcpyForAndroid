@@ -425,8 +425,8 @@ fun SettingsPage(
                         )
                     },
                 )
-                // 悬浮底栏依赖 InteractiveHighlight，其内部构造 android.graphics.RuntimeShader（API 33+ 引入），
-                // 低版本开启会闪退，故仅 Android 13+ 显示该开关
+                // 悬浮底栏依赖 InteractiveHighlight, 其内部构造 android.graphics.RuntimeShader（API 33+ 引入）,
+                // 低版本开启会闪退, 故仅 Android 13+ 显示该开关
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && asBundle.floatingBottomBar) {
                     asBundle = asBundle.copy(floatingBottomBar = false, floatingBottomBarBlur = false)
                 }
