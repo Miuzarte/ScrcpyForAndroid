@@ -99,8 +99,11 @@ internal class DeviceTabViewModel(
     val isAppInForeground: StateFlow<Boolean> = _isAppInForeground.asStateFlow()
 
     private val sessionReconnectBlacklistHosts = mutableSetOf<String>()
-    // 防止快速多次点击 USB 卡片（1 秒 debounce）
+    // 防止快速多次点击 USB 卡片 (1 秒 debounce)
     private val lastUsbClickMs = java.util.concurrent.atomic.AtomicLong(0L)
+    // 用户主动取消 USB 连接尝试 (cancelUsbConnect 置位): 失败路径据此静默, 不弹误导提示
+    @Volatile
+    private var usbConnectCancelled = false
 
     val adbConnected: StateFlow<Boolean> = connectionState
         .map { it.adbSession.isConnected }
@@ -539,17 +542,18 @@ internal class DeviceTabViewModel(
      * @param deviceInfo USB设备信息
      */
     fun connectUsbDevice(deviceInfo: UsbDeviceInfo) {
-        // 1 秒 debounce：防止快速连点重复弹授权
+        // 1 秒 debounce: 防止快速连点重复弹授权
         val now = System.currentTimeMillis()
         if (now - lastUsbClickMs.get() < 1000) return
         lastUsbClickMs.set(now)
 
-        // 以 VID/PID 作为动作标识，驱动条目上的转圈与取消
+        // 以 VID/PID 作为动作标识, 驱动条目上的转圈与取消
         val vidPid = String.format(
             "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
         )
 
         viewModelScope.launch {
+            usbConnectCancelled = false
             _activeDeviceActionId.value = vidPid
             try {
                 if (!deviceInfo.hasPermission) {
@@ -588,12 +592,21 @@ internal class DeviceTabViewModel(
                         UsbAdbSession.disconnect()
                     }
                 }
-                // 重置 debounce，允许拔线后立即重试
+                // 重置 debounce, 允许拔线后立即重试
                 lastUsbClickMs.set(0L)
-                logEvent("USB connection failed: ${e.message}")
-                // 与无线连接失败一致，给出可见提示（常见原因：被控端未确认 USB 调试授权）
-                AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                val detail = e.message ?: e.javaClass.simpleName
+                logEvent("USB connection failed: $detail")
+                when {
+                    // 用户主动取消: abort 隧道导致的 "Tunnel is closed" 类异常, 静默即可
+                    usbConnectCancelled -> Unit
+                    // 握手超时 (10s 无响应): 常见于设备端 USB 调试授权未确认或设备无响应
+                    detail.contains("handshake timeout", ignoreCase = true) ->
+                        AppRuntime.snackbar(R.string.usb_connection_no_response)
+                    // 其余失败 (权限被拒/授权未确认等) 统一提示去设备端确认
+                    else -> AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                }
             } finally {
+                usbConnectCancelled = false
                 _activeDeviceActionId.value = null
             }
         }
@@ -604,6 +617,8 @@ internal class DeviceTabViewModel(
      * 后续清理由 connectUsbDevice 的失败路径完成，避免状态流中途抖动
      */
     fun cancelUsbConnect() {
+        // 置位取消标志: connectUsbDevice 的失败路径据此静默, 不弹误导的授权提示
+        usbConnectCancelled = true
         runCatching {
             CoroutineScope(Dispatchers.IO).launch { UsbAdbSession.abortCurrentTunnel() }
         }
@@ -1138,8 +1153,10 @@ internal class DeviceTabViewModel(
         val state = connectionState.value.adbSession
         if (!state.isConnected) return
 
+        // 真实链路探测 (shell 往返): 标志位查询无法发现 TCP 半开/USB 假死,
+        // 与 health check 保持一致, 避免操作直接打在假死连接上
         val isActuallyConnected = runCatching {
-            adbCoordinator.isConnected(ADB_KEEPALIVE_TIMEOUT_MS)
+            connectionController.keepAliveCheck(ADB_KEEPALIVE_TIMEOUT_MS)
         }.getOrDefault(false)
 
         if (isActuallyConnected) return

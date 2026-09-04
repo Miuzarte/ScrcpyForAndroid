@@ -595,6 +595,7 @@
     <string name="usb_device_detected">USB device detected</string>
     <string name="usb_device_disconnected">USB device disconnected</string>
     <string name="usb_permission_request_hint">Please authorize USB debugging on the device</string>
+    <string name="usb_connection_no_response">Device not responding. Check the USB connection and confirm USB debugging authorization on the device</string>
 
     <string name="language_follow_system">Follow system</string>
     <string name="language_english">English</string>

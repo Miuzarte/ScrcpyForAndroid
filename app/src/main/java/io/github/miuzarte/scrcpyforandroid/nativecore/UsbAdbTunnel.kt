@@ -382,13 +382,14 @@ class UsbAdbTunnel(
                         }
                         return copyLen
                     }
-                    readLen == 0 -> return 0
                     else -> {
-                        // bulkTransfer超时返回-1，检查隧道是否仍然存活
+                        // bulkTransfer 超时（-1）或零长度传输（0，如 ZLP）都表示本次无数据可取。
+                        // 注意不能把 0 作为读取结果返回：InputStream.read 契约在 len>0 时不允许返回 0，
+                        // 上层 readExact 会把 0 当作异常流状态抛错（防死循环），导致误判连接断开。
+                        // 检查隧道是否仍然存活；存活则继续等待（模拟 TCP 无限阻塞行为）
                         if (closed || !isConnected.get()) {
                             throw IOException("USB read failed: tunnel disconnected")
                         }
-                        // 隧道仍存活，超时只是因为空闲无数据，继续等待（模拟TCP无限阻塞行为）
                         continue
                     }
                 }
