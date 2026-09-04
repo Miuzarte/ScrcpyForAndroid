@@ -47,6 +47,7 @@
     <string name="button_done">完成</string>
     <string name="button_connect">连接</string>
     <string name="button_disconnect">断开</string>
+    <string name="button_authorize">授权</string>
     <string name="button_start">启动</string>
     <string name="button_stop">停止</string>
     <string name="button_fullscreen">全屏</string>
@@ -554,6 +555,8 @@
     <string name="vm_pairing_failed">配对失败</string>
     <string name="vm_auto_reconnect_succeeded">ADB 自动重连成功</string>
     <string name="vm_auto_reconnect_failed">ADB 自动重连失败</string>
+    <string name="vm_auto_reconnect_restart_scrcpy">ADB 已重连，正在重启投屏</string>
+    <string name="vm_auto_reconnect_restart_scrcpy_failed">ADB 已重连，但重启投屏失败</string>
     <string name="vm_start_scrcpy">启动 scrcpy</string>
     <string name="vm_stop_scrcpy">停止 scrcpy</string>
     <string name="vm_launch_app">启动应用</string>
@@ -562,6 +565,7 @@
     <string name="vm_execute_pairing">执行配对</string>
     <string name="vm_send_action">发送 %1$s</string>
     <string name="vm_label_timeout">%1$s 超时</string>
+    <string name="vm_label_cancelled">%1$s 已取消</string>
     <string name="vm_label_param_error">%1$s 参数错误：%2$s</string>
     <string name="vm_label_failed">%1$s 失败：%2$s</string>
     <string name="vm_app_started_on_display">已在当前显示启动应用：%1$s</string>
@@ -586,6 +590,12 @@
     <string name="vm_mdns_updated">mDNS 发现新端口，已更新快速设备：%1$s:%2$s -> %1$s:%3$s</string>
     <string name="vm_quick_probe_success">ADB 快速探测连接成功：%1$s:%2$s</string>
     <string name="vm_device_switched_profile">当前连接设备已切换为配置：%1$s</string>
+
+    <string name="usb_connection">USB 连接</string>
+    <string name="usb_device_detected">检测到 USB 设备</string>
+    <string name="usb_device_disconnected">USB 设备已断开</string>
+    <string name="usb_permission_request_hint">请在设备上授权USB调试权限</string>
+    <string name="usb_connection_no_response">设备无响应，请检查 USB 连接并确认设备上的 USB 调试授权</string>
 
     <string name="language_follow_system">跟随系统</string>
     <string name="language_english">英语</string>

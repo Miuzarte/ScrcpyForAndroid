@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import kotlinx.coroutines.*
 import java.io.Closeable
@@ -87,6 +88,8 @@ internal class DeviceAdbBackgroundRunner: Closeable {
                     for (addr in device.addresses) {
                         if (isConnected() || isAdbConnecting()) break
                         val target = ConnectionTarget.unmarshalFrom(addr) ?: continue
+                        // 跳过 USB 地址 (自动重连不支持 USB 设备的 TCP 连接)
+                        if (target.connectionType == DeviceConnectionType.USB) continue
                         if (isBlacklisted(target.host)) continue
                         val targetKey = "${target.host}:${target.port}"
                         if (quickConnectTriedOnce.contains(targetKey)) continue

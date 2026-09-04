@@ -1,13 +1,20 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
+import android.hardware.usb.UsbDevice
 import android.os.Parcelable
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.parcelize.Parcelize
+import kotlin.time.Duration.Companion.milliseconds
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -30,56 +37,78 @@ internal class DeviceAdbConnectionCoordinator(
     suspend fun connectWithTimeout(host: String, port: Int, timeoutMs: Long) {
         withContext(Dispatchers.IO) {
             val resolved = resolveHost(host)
-            withTimeout(timeoutMs) {
-                adbService.connect(resolved, port)
-            }
+            // 不再使用 withTimeout 包裹, 因为 Java 阻塞 Socket 无法被协程取消中断
+            // 超时由 socket.connect(address, timeoutMs) 自身控制, 取消由 NativeAdbService.cancelPendingConnect() 处理
+            adbService.connect(resolved, port, timeout = timeoutMs.milliseconds)
         }
     }
 
+    /**
+     * 通过 USB 连接 ADB 设备
+     *
+     * @param usbDevice USB 设备
+     * @param inputStream USB 输入流
+     * @param outputStream USB 输出流
+     * @return ConnectionTarget 连接目标
+     */
+    suspend fun connectUsb(
+        usbDevice: UsbDevice,
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        abortHandshake: (() -> Unit)? = null,
+    ): ConnectionTarget {
+        return withContext(Dispatchers.IO) {
+            // 创建 USB 连接目标
+            val target = ConnectionTarget(
+                host = String.format("0x%04X/0x%04X", usbDevice.vendorId, usbDevice.productId),
+                port = 0,
+                deviceId = usbDevice.deviceId,
+                connectionType = DeviceConnectionType.USB,
+            )
+
+            // 通过 USB 流连接
+            adbService.connectUsb(inputStream, outputStream, usbDevice.deviceId, abortHandshake)
+
+            target
+        }
+    }
+
+    fun cancelPendingConnect() {
+        adbService.cancelPendingConnect()
+    }
+
+    /**
+     * 连接第一个可达的地址
+     *
+     * 支持 TCP 和 USB 连接:
+     * - TCP 连接: 先探测可达性, 再建立连接
+     * - USB 连接: 直接使用 USB 隧道连接 (需要在调用前建立 USB 隧道)
+     *
+     * @param addresses 地址列表
+     * @param connectTimeoutMs TCP 连接超时时间
+     * @param probeTimeoutMs TCP 探测超时时间
+     * @return ConnectionTarget 连接目标
+     */
     suspend fun connectFirstReachable(
         addresses: List<String>,
-        timeoutMs: Long,
+        connectTimeoutMs: Long,
         probeTimeoutMs: Int,
     ): ConnectionTarget {
-        var lastError: Throwable? = null
-        return withContext(Dispatchers.IO) {
-            if (addresses.size == 1) {
-                val target = ConnectionTarget.unmarshalFrom(addresses[0])
-                    ?: throw IllegalStateException("Invalid address: ${addresses[0]}")
-                val resolved = resolveHost(target.host)
-                withTimeout(timeoutMs) {
-                    adbService.connect(resolved, target.port)
-                }
-                return@withContext target
-            }
+        val targets = addresses.mapNotNull { ConnectionTarget.unmarshalFrom(it) }
 
-            val candidates = addresses.mapNotNull { addr ->
-                val target = ConnectionTarget.unmarshalFrom(addr) ?: return@mapNotNull null
-                val resolved = resolveHost(target.host)
-                val latencyNs = runCatching {
-                    val startNs = System.nanoTime()
-                    Socket().use { socket ->
-                        socket.connect(InetSocketAddress(resolved, target.port), probeTimeoutMs)
-                    }
-                    System.nanoTime() - startNs
-                }.getOrElse { e ->
-                    lastError = e
-                    return@mapNotNull null
-                }
-                Triple(latencyNs, target, resolved)
-            }.sortedBy { it.first }
-            for ((_, target, resolved) in candidates) {
-                try {
-                    withTimeout(timeoutMs) {
-                        adbService.connect(resolved, target.port)
-                    }
-                    return@withContext target
-                } catch (e: Exception) {
-                    lastError = e
-                }
+        // USB 走独立连接入口 (connectUsbDevice), 快捷方式中不会也不应包含 usb: 地址;
+        // 若因历史残留数据混入会被过滤跳过, 最终报 No reachable address
+        val tcpTargets = targets.filter { it.connectionType == DeviceConnectionType.LAN }
+
+        // 尝试 TCP 连接
+        for (target in tcpTargets) {
+            if (probeTcpReachable(target.host, target.port, probeTimeoutMs)) {
+                connectWithTimeout(target.host, target.port, connectTimeoutMs)
+                return target
             }
-            throw (lastError ?: IllegalStateException("All addresses unreachable: $addresses"))
         }
+
+        throw NoSuchElementException("No reachable address found among: $addresses")
     }
 
     suspend fun disconnect() {
@@ -102,6 +131,19 @@ internal class DeviceAdbConnectionCoordinator(
             withTimeout(timeoutMs) {
                 adbService.isConnected()
             }
+        }
+    }
+
+    /**
+     * 真实链路探测: 限时执行一次 no-op shell 往返
+     * 标志位查询无法发现 TCP 半开 (对端掉电不发 FIN) 导致的假死连接;
+     * 探测超时/失败即判定断开, 由 keepAlive 循环走既有断开+自动重连链路
+     */
+    suspend fun probeConnection(timeoutMs: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            withTimeoutOrNull(timeoutMs) {
+                runCatching { adbService.shell(":") }.isSuccess
+            } ?: false
         }
     }
 

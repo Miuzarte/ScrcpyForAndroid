@@ -1,8 +1,12 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.os.SystemClock
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -16,8 +20,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
@@ -26,7 +33,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbDeviceWatcher
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceEvent
 import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
@@ -43,6 +53,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
@@ -214,6 +225,33 @@ internal fun DeviceTabPage(
     val navigator = LocalRootNavigator.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // USB 设备监听: 页面级常驻. 若放在 LazyColumn item 内, 滚动出屏会 dispose 并
+    // 反复注册/注销系统广播, 导致插拔事件丢失与状态不一致
+    val usbWatcher = remember { UsbAdbDeviceWatcher(context) }
+    val usbDevices by usbWatcher.devicesFlow.collectAsState()
+    val usbEvents by usbWatcher.eventsFlow.collectAsState()
+    LaunchedEffect(Unit) { usbWatcher.startWatching() }
+    DisposableEffect(Unit) { onDispose { usbWatcher.stopWatching() } }
+
+    // 设备插拔 Snackbar 提示 (OTG 两段枚举会触发多次广播, 按事件+设备 500ms 去重)
+    val lastUsbEventSnackbarKey = remember { mutableStateOf<Pair<String, Long>?>(null) }
+    LaunchedEffect(usbEvents) {
+        val evt = usbEvents ?: return@LaunchedEffect
+        val dev = when (evt) {
+            is UsbDeviceEvent.Attached -> evt.device
+            is UsbDeviceEvent.Detached -> evt.device
+            else -> return@LaunchedEffect
+        }
+        val key = "${evt::class.simpleName}:${dev.vendorId}:${dev.productId}:${dev.deviceId}"
+        val now = SystemClock.elapsedRealtime()
+        val last = lastUsbEventSnackbarKey.value
+        if (last?.first != key || now - last.second > 500L) {
+            lastUsbEventSnackbarKey.value = key to now
+            if (evt is UsbDeviceEvent.Attached) AppRuntime.snackbar(R.string.usb_device_detected)
+            else AppRuntime.snackbar(R.string.usb_device_disconnected)
+        }
+    }
+
     val apps = remember(listingsRefreshVersion) { viewModel.scrcpyListings.apps }
     val recentTasks = remember(listingsRefreshVersion) { viewModel.scrcpyListings.recentTasks }
 
@@ -230,6 +268,7 @@ internal fun DeviceTabPage(
     LaunchedEffect(Unit) { viewModel.startAutoReconnectLoop() }
     LaunchedEffect(Unit) { viewModel.startProfileIdSync() }
     LaunchedEffect(Unit) { viewModel.startRecentTasksAutoRefresh() }
+    LaunchedEffect(Unit) { viewModel.startConnectionHealthCheckLoop() }
 
     fun openFullscreenControl() {
         if (viewModel.shouldOpenFullscreenCompat())
@@ -305,6 +344,7 @@ internal fun DeviceTabPage(
 
     @Composable
     fun StatusSection() {
+
         StatusCard(
             statusLine = statusLine,
             adbConnected = adbConnected,
@@ -316,7 +356,137 @@ internal fun DeviceTabPage(
     }
 
     @Composable
+    fun UsbDevicesSection() {
+        // watcher 与插拔 Snackbar 响应提升至 DeviceTabPage 页面级, 此处只消费状态
+
+        // 已断开的设备不显示条目: 无设备时整个区块不渲染
+        if (usbDevices.isEmpty()) return
+
+        // 与无线 DeviceTileList 相同的容器样式, USB 条目置顶, 视觉连续
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+        ) {
+            usbDevices.forEach { deviceInfo ->
+                val vidPid = String.format(
+                    "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
+                )
+                val connectedToThis = adbConnected &&
+                        currentTarget?.connectionType == DeviceConnectionType.USB &&
+                        currentTarget?.host == vidPid
+                val actionInProgress = adbConnecting && activeDeviceActionId == vidPid
+
+                // 卡片样式需与 DeviceTile 保持一致 (灰白系底色 + Sink 反馈), 改无线样式时同步此处
+                Card(
+                    colors = CardDefaults.defaultColors(
+                        color =
+                            if (connectedToThis) colorScheme.surfaceContainer
+                            else colorScheme.surfaceContainer.copy(alpha = 0.6f),
+                    ),
+                    pressFeedbackType = PressFeedbackType.Sink,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = {
+                                    haptic.contextClick()
+                                    when {
+                                        connectedToThis -> Unit
+                                        !deviceInfo.hasPermission -> {
+                                            AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                                            usbWatcher.requestUsbPermission(deviceInfo.device)
+                                        }
+
+                                        else -> viewModel.connectUsbDevice(deviceInfo)
+                                    }
+                                },
+                            )
+                            .padding(UiSpacing.PageItem),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // status dot (与无线卡片同一套逻辑)
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(
+                                        color =
+                                            if (connectedToThis) Color(0xFF44C74F)
+                                            else colorScheme.outline,
+                                        shape = CircleShape,
+                                    ),
+                            )
+                            Spacer(modifier = Modifier.width(UiSpacing.PageItem))
+                            Column {
+                                Text(
+                                    deviceInfo.getDisplayName(),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = colorScheme.onSurface,
+                                )
+                                Text(
+                                    vidPid,
+                                    fontSize = 13.sp,
+                                    color = colorScheme.onSurfaceVariantSummary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (actionInProgress) {
+                                CircularProgressIndicator(progress = null)
+                                Spacer(Modifier.width(UiSpacing.Medium))
+                                TextButton(
+                                    text = stringResource(R.string.button_cancel),
+                                    onClick = {
+                                        haptic.contextClick()
+                                        viewModel.cancelUsbConnect()
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(),
+                                )
+                            } else {
+                                TextButton(
+                                    text = stringResource(
+                                        when {
+                                            connectedToThis -> R.string.button_disconnect
+                                            !deviceInfo.hasPermission -> R.string.button_authorize
+                                            else -> R.string.button_connect
+                                        },
+                                    ),
+                                    onClick = {
+                                        haptic.contextClick()
+                                        when {
+                                            connectedToThis -> viewModel.disconnectUsbDevice()
+                                            !deviceInfo.hasPermission -> {
+                                                AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                                                usbWatcher.requestUsbPermission(deviceInfo.device)
+                                            }
+
+                                            else -> viewModel.connectUsbDevice(deviceInfo)
+                                        }
+                                    },
+                                    enabled = (!busy && !adbConnecting) || connectedToThis,
+                                    colors = ButtonDefaults.textButtonColors(),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     fun DeviceListSection() {
+        // USB 设备条目置顶, 与无线设备构成同一列表
+        UsbDevicesSection()
         DeviceTileList(
             devices = savedShortcuts,
             currentTarget = currentTarget,
@@ -348,8 +518,19 @@ internal fun DeviceTabPage(
                 if (editingDeviceId == device.id) viewModel.setEditingDeviceId(null)
                 viewModel.onDeviceAction(device)
             },
-            onEditorSave = { _, updated ->
-                viewModel.upsertShortcut(updated)
+            onCancelAction = { device ->
+                viewModel.cancelAdbConnect()
+            },
+            onEditorSave = { device, updated ->
+                viewModel.updateShortcut(
+                    id = device.id,
+                    name = updated.name,
+                    host = updated.host,
+                    port = updated.port,
+                    startScrcpyOnConnect = updated.startScrcpyOnConnect,
+                    openFullscreenOnStart = updated.openFullscreenOnStart,
+                    scrcpyProfileId = updated.scrcpyProfileId,
+                )
             },
             onEditorDelete = { device ->
                 viewModel.removeShortcut(device.id)
@@ -366,6 +547,7 @@ internal fun DeviceTabPage(
             onValueChange = { viewModel.setQuickConnectInput(it) },
             onFocusLost = { viewModel.saveQuickConnectInput() },
             enabled = !adbConnecting,
+            connecting = adbConnecting,
             onAddDevice = {
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
@@ -376,6 +558,9 @@ internal fun DeviceTabPage(
                 val target = ConnectionTarget.unmarshalFrom(quickConnectInputTemp)
                     ?: return@QuickConnectCard
                 viewModel.onQuickConnect(target)
+            },
+            onCancelConnect = {
+                viewModel.cancelAdbConnect()
             },
         )
     }
@@ -391,6 +576,7 @@ internal fun DeviceTabPage(
         )
     }
 
+
     @Composable
     fun ScrcpyConfigSection() {
         ConfigPanel(
@@ -401,7 +587,7 @@ internal fun DeviceTabPage(
             audioForwardingSupported = connectionState.adbSession.audioForwardingSupported,
             cameraMirroringSupported = connectionState.adbSession.cameraMirroringSupported,
             adbConnecting = adbConnecting,
-            isQuickConnected = isQuickConnected,
+            isQuickConnected = isQuickConnected || (adbConnected && currentTarget?.connectionType == DeviceConnectionType.USB),
             advancedEndActionText = connectedScrcpyProfileName,
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
@@ -431,7 +617,11 @@ internal fun DeviceTabPage(
             onStart = viewModel::startScrcpy,
             onStop = viewModel::stopScrcpy,
             sessionInfo = sessionInfo,
-            onDisconnect = { viewModel.onDisconnectCurrent(currentTarget) },
+            // USB 连接时底部不显示"断开" (断开入口在设备列表条目上), 对齐无线行为
+            onDisconnect = if (currentTarget?.connectionType == DeviceConnectionType.USB) null
+            else {
+                { viewModel.onDisconnectCurrent(currentTarget) }
+            },
             showFullscreenAction = false,
             onOpenFullscreen = ::openFullscreenControl,
         )
@@ -511,7 +701,7 @@ internal fun DeviceTabPage(
             audioForwardingSupported = connectionState.adbSession.audioForwardingSupported,
             cameraMirroringSupported = connectionState.adbSession.cameraMirroringSupported,
             adbConnecting = adbConnecting,
-            isQuickConnected = isQuickConnected,
+            isQuickConnected = isQuickConnected || (adbConnected && currentTarget?.connectionType == DeviceConnectionType.USB),
             advancedEndActionText = connectedScrcpyProfileName,
             allAppsEndActionText = when {
                 listingsRefreshBusy -> "..."
@@ -541,7 +731,11 @@ internal fun DeviceTabPage(
             onStart = viewModel::startScrcpy,
             onStop = viewModel::stopScrcpy,
             sessionInfo = sessionInfo,
-            onDisconnect = { viewModel.onDisconnectCurrent(currentTarget) },
+            // USB 连接时底部不显示"断开" (断开入口在设备列表条目上), 对齐无线行为
+            onDisconnect = if (currentTarget?.connectionType == DeviceConnectionType.USB) null
+            else {
+                { viewModel.onDisconnectCurrent(currentTarget) }
+            },
             showFullscreenAction = canShowPreviewControls,
             onOpenFullscreen = ::openFullscreenControl,
             reverseSideActions = asBundle.deviceTwoPaneConfigOnRight,
@@ -602,6 +796,8 @@ internal fun DeviceTabPage(
                 val newProfileId = profileIds.getOrNull(index) ?: return@TabRow
                 if (newProfileId == connectedScrcpyProfileId) return@TabRow
                 haptic.contextClick()
+                // 脱离快捷设备: 直接写入 session 级状态
+                AppRuntime.currentConnectionProfileId.value = newProfileId
                 val device = currentTarget?.let { ct ->
                     savedShortcuts.firstOrNull { it.matchesAddress(ct) }
                 }

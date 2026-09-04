@@ -1,6 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
+import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 
@@ -35,8 +37,11 @@ internal class ConnectionController(
         stateStore.markDisconnected(cause = cause, statusLine = statusLine)
         AppRuntime.currentConnectionTarget = null
         AppRuntime.currentConnectedDevice = null
+        AppRuntime.currentConnectionProfileId.value = "global"
         runCatching { scrcpy.stop() }
         runCatching { adbCoordinator.disconnect() }
+        // 兜底释放 USB 隧道 (无隧道时为 no-op, 幂等)
+        runCatching { UsbAdbSession.disconnect() }
         AppScreenOn.release()
         return ConnectionDisconnectResult(clearedTarget = clearQuickOnlineForTarget)
     }
@@ -95,7 +100,8 @@ internal class ConnectionController(
     }
 
     suspend fun keepAliveCheck(timeoutMs: Long): Boolean {
-        return adbCoordinator.isConnected(timeoutMs)
+        // 真实链路探测: 标志位查询无法发现 TCP 半开假死连接
+        return adbCoordinator.probeConnection(timeoutMs)
     }
 
     suspend fun probeTcpReachable(host: String, port: Int, timeoutMs: Int): Boolean {
@@ -125,10 +131,13 @@ internal class ConnectionController(
         host: String,
         port: Int,
         scrcpyProfileId: String = ScrcpyOptions.GLOBAL_PROFILE_ID,
+        deviceId: Int? = null,
+        connectionType: DeviceConnectionType = DeviceConnectionType.LAN,
     ): ConnectedAdbResult {
-        val target = ConnectionTarget(host, port)
+        val target = ConnectionTarget(host, port, deviceId, connectionType)
         stateStore.markConnected(target = target, scrcpyProfileId = scrcpyProfileId)
         AppRuntime.currentConnectionTarget = target
+        AppRuntime.currentConnectionProfileId.value = scrcpyProfileId
 
         val info = adbCoordinator.fetchConnectedDeviceInfo(host, port)
         stateStore.updateSession {

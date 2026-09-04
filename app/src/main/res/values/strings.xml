@@ -47,6 +47,7 @@
     <string name="button_done">Done</string>
     <string name="button_connect">Connect</string>
     <string name="button_disconnect">Disconnect</string>
+    <string name="button_authorize">Authorize</string>
     <string name="button_start">Start</string>
     <string name="button_stop">Stop</string>
     <string name="button_fullscreen">Fullscreen</string>
@@ -555,6 +556,8 @@
     <string name="vm_pairing_failed">Pairing failed</string>
     <string name="vm_auto_reconnect_succeeded">ADB auto-reconnect succeeded</string>
     <string name="vm_auto_reconnect_failed">ADB auto-reconnect failed</string>
+    <string name="vm_auto_reconnect_restart_scrcpy">ADB reconnected, restarting scrcpy</string>
+    <string name="vm_auto_reconnect_restart_scrcpy_failed">ADB reconnected but failed to restart scrcpy</string>
     <string name="vm_start_scrcpy">Start scrcpy</string>
     <string name="vm_stop_scrcpy">Stop scrcpy</string>
     <string name="vm_launch_app">Launch app</string>
@@ -563,6 +566,7 @@
     <string name="vm_execute_pairing">Execute pairing</string>
     <string name="vm_send_action">Send %1$s</string>
     <string name="vm_label_timeout">%1$s timed out</string>
+    <string name="vm_label_cancelled">%1$s cancelled</string>
     <string name="vm_label_param_error">%1$s parameter error: %2$s</string>
     <string name="vm_label_failed">%1$s failed: %2$s</string>
     <string name="vm_app_started_on_display">App started on current display: %1$s</string>
@@ -587,6 +591,12 @@
     <string name="vm_mdns_updated">mDNS discovered new port, updated quick device: %1$s:%2$s -> %1$s:%3$s</string>
     <string name="vm_quick_probe_success">ADB quick probe connection succeeded: %1$s:%2$s</string>
     <string name="vm_device_switched_profile">Current connected device switched to profile: %1$s</string>
+
+    <string name="usb_connection">USB Connection</string>
+    <string name="usb_device_detected">USB device detected</string>
+    <string name="usb_device_disconnected">USB device disconnected</string>
+    <string name="usb_permission_request_hint">Please authorize USB debugging on the device</string>
+    <string name="usb_connection_no_response">Device not responding. Check the USB connection and confirm USB debugging authorization on the device</string>
 
     <string name="language_follow_system">Follow system</string>
     <string name="language_english">English</string>

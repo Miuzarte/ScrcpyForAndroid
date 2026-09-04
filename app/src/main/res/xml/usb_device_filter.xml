@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 
+        USB设备过滤配置
+        
+        过滤ADB设备（接口类0xFF）
+        这将允许应用自动检测ADB设备连接
+        
+        VID/PID过滤示例（可选）：
+        <usb-device vendor-id="1234" product-id="5678" />
+        
+        接口类过滤（ADB接口类为0xFF）：
+        <usb-device class="255" />
+    -->
+    <usb-device class="255" />
+</resources>

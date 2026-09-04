@@ -7,6 +7,17 @@ import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+/**
+ * 设备连接类型枚举
+ */
+enum class DeviceConnectionType {
+    /** 无线 LAN 连接 */
+    LAN,
+
+    /** 有线 USB 连接 */
+    USB
+}
+
 class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> by devices {
     fun marshalToString(): String = DeviceShortcut.json.encodeToString(devices)
 
@@ -147,7 +158,11 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
                 old.addresses.map { addr ->
                     val parsed = ConnectionTarget.unmarshalFrom(addr)
                     if (parsed != null && parsed.host == host && parsed.port == port) {
-                        "${parsed.host}:$newPort"
+                        // 根据连接类型生成正确的地址格式
+                        when (parsed.connectionType) {
+                            DeviceConnectionType.LAN -> "${parsed.host}:$newPort"
+                            DeviceConnectionType.USB -> parsed.toString()  // USB 地址保持不变
+                        }
                     } else addr
                 }
             }
@@ -272,25 +287,98 @@ data class DeviceShortcut(
 data class ConnectionTarget(
     val host: String,
     val port: Int = Defaults.ADB_PORT,
+    val deviceId: Int? = null,  // USB 设备 ID, LAN 连接时为 null
+    val connectionType: DeviceConnectionType = DeviceConnectionType.LAN,
 ): Parcelable {
-    override fun toString(): String =
-        if (':' in host) "[$host]:$port"
-        else "$host:$port"
+    /**
+     * 输出连接目标的字符串表示
+     * LAN 格式: host:port 或 [host]:port
+     * USB 格式: usb:0x{VID}/0x{PID}#{deviceId}
+     */
+    override fun toString(): String = when (connectionType) {
+        DeviceConnectionType.LAN -> {
+            if (':' in host) "[$host]:$port"
+            else "$host:$port"
+        }
+
+        DeviceConnectionType.USB -> {
+            // USB 格式: usb:0x{VID}/0x{PID}#{deviceId}
+            // host 存储 VID:PID 格式, deviceId 单独存储
+            val devicePart = if (deviceId != null) "#$deviceId" else ""
+            "usb:$host$devicePart"
+        }
+    }
 
     companion object {
+        /**
+         * 从字符串解析连接目标
+         * 支持格式:
+         * - LAN: host:port, [host]:port
+         * - USB: usb:0x{VID}/0x{PID}#{deviceId}
+         */
         fun unmarshalFrom(s: String): ConnectionTarget? {
+            val input = s.trim()
+
+            // 检测 USB 格式
+            if (input.startsWith("usb:", ignoreCase = true)) {
+                return parseUsbTarget(input)
+            }
+
+            // 解析 LAN 格式
+            return parseLanTarget(input)
+        }
+
+        /**
+         * 解析 USB 连接目标
+         * 格式: usb:0x{VID}/0x{PID}#{deviceId}
+         */
+        private fun parseUsbTarget(input: String): ConnectionTarget? {
+            // 移除 "usb:" 前缀
+            val usbPart = input.substring(4)
+
+            // 分离 deviceId 部分 (#后面的部分)
+            val hashIndex = usbPart.indexOf('#')
+            val vidPidPart: String
+            val deviceId: Int?
+
+            if (hashIndex >= 0) {
+                vidPidPart = usbPart.substring(0, hashIndex)
+                deviceId = usbPart.substring(hashIndex + 1).toIntOrNull()
+            } else {
+                vidPidPart = usbPart
+                deviceId = null
+            }
+
+            // 验证 VID/PID 格式 (0x{VID}/0x{PID})
+            if (!vidPidPart.matches(Regex("^0x[0-9A-Fa-f]{4}/0x[0-9A-Fa-f]{4}$"))) {
+                return null
+            }
+
+            return ConnectionTarget(
+                host = vidPidPart,  // 存储 VID:PID 格式
+                port = 0,  // USB 连接不使用端口
+                deviceId = deviceId,
+                connectionType = DeviceConnectionType.USB,
+            )
+        }
+
+        /**
+         * 解析 LAN 连接目标
+         * 格式: host:port, [host]:port
+         */
+        private fun parseLanTarget(input: String): ConnectionTarget? {
             val host: String
             val port: Int
-            if (s.startsWith('[')) {
-                val closeBracket = s.indexOf(']')
+
+            if (input.startsWith('[')) {
+                val closeBracket = input.indexOf(']')
                 if (closeBracket < 1) return null
-                host = s.substring(1, closeBracket)
-                port = if (s.length > closeBracket + 1 && s[closeBracket + 1] == ':')
-                    s.substring(closeBracket + 2).toIntOrNull() ?: Defaults.ADB_PORT
+                host = input.substring(1, closeBracket)
+                port = if (input.length > closeBracket + 1 && input[closeBracket + 1] == ':')
+                    input.substring(closeBracket + 2).toIntOrNull() ?: Defaults.ADB_PORT
                 else
                     Defaults.ADB_PORT
             } else {
-                val input = s.trim()
                 val colonCount = input.count { it == ':' }
                 if (colonCount > 1) {
                     host = input
@@ -304,7 +392,13 @@ data class ConnectionTarget(
                         Defaults.ADB_PORT
                 }
             }
-            return ConnectionTarget(host = host, port = port)
+
+            return ConnectionTarget(
+                host = host,
+                port = port,
+                deviceId = null,
+                connectionType = DeviceConnectionType.LAN,
+            )
         }
     }
 }
