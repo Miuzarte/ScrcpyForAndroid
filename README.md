@@ -40,7 +40,7 @@
   <img src="https://github.com/user-attachments/assets/1b52a662-108d-49cb-a86e-eccc8ac12d64" height="180" alt="Gaming" />
 </p>
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2fa8447d-d590-4612-92c6-1b34b899e045" height="180" alt="Gamepad" />
+  <img src="https://github.com/user-attachments/assets/59116f01-8163-417b-8f2b-45c5c624a37a" height="180" alt="Gamepad" />
 </p>
 
 ## Features
