@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
@@ -85,34 +86,27 @@ class MainActivity: FragmentActivity() {
         super.onDestroy()
     }
 
+    private val localNetworkPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                android.util.Log.w(
+                    "MainActivity",
+                    "本地网络权限被拒绝，局域网设备发现可能不可用"
+                )
+            }
+        }
+
     /**
      * 请求 Android 17+ 本地网络访问运行时权限。
      * 授权后 NsdManager 才能正常扫描局域网 ADB 设备。
      */
     private fun requestNearbyDevicePermissions() {
-        if (Build.VERSION.SDK_INT < 37) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return
 
         val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) return
 
-        requestPermissions(arrayOf(permission), REQUEST_CODE_NEARBY_PERMISSIONS)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE_NEARBY_PERMISSIONS
-            && grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED
-        ) {
-            android.util.Log.w(
-                "MainActivity",
-                "本地网络权限被拒绝，局域网设备发现可能不可用"
-            )
-        }
+        localNetworkPermissionLauncher.launch(permission)
     }
 
     private fun applyMainOrientationPolicy() {
@@ -139,7 +133,6 @@ class MainActivity: FragmentActivity() {
 
     internal companion object {
         private const val PHONE_LANDSCAPE_LOCK_ASPECT_RATIO = 16f / 9f
-        private const val REQUEST_CODE_NEARBY_PERMISSIONS = 1001
 
         private const val LOCALE_PREFS = "locale_cache"
         private const val KEY_LANGUAGE_TAG = "language_tag"
