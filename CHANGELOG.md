@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.5.5
+
+- 修复: 在安卓 17 下请求 `ACCESS_LOCAL_NETWORK` 权限以连接局域网设备
+  - [pr#99](https://github.com/Miuzarte/ScrcpyForAndroid/pull/99)
+- 改进: `AppRuntime` 包装多语言 `Context`
+  - [pr#86](https://github.com/Miuzarte/ScrcpyForAndroid/pull/86)
+
 ## 0.5.4
 
 - 修复: 在安卓 10 使用了不允许的认证方式组合
