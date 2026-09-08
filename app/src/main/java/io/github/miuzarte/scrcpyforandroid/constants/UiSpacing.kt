@@ -6,6 +6,7 @@ object UiSpacing {
     val Tiny = 2.dp
     val Small = 4.dp
     val Medium = 8.dp
+    val MediumLarge = 12.dp
     val PageItem = 12.dp
     val Large = 16.dp
     val PopupHorizontal = 20.dp

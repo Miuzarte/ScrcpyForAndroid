@@ -7,7 +7,6 @@ import io.github.miuzarte.scrcpyforandroid.MainActivity
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbMdnsDiscoverer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +15,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.SnackbarResult
+import java.util.Locale
 
 // 用于不同 activity 之间传递实例
 object AppRuntime {

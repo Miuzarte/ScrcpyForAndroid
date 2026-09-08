@@ -35,6 +35,7 @@ import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.pages.effect.BgEffectBackground
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
+import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
@@ -53,6 +54,7 @@ internal fun AboutScreen() {
     val navigator = LocalRootNavigator.current
     val enableBlur = LocalEnableBlur.current
     val blurBackdrop = rememberBlurBackdrop(enableBlur)
+    val blurActive = blurBackdrop != null
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
@@ -75,43 +77,48 @@ internal fun AboutScreen() {
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
-                title = stringResource(R.string.about_title),
-                scrollBehavior = topAppBarScrollBehavior,
-                modifier =
-                    if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop)
-                    else Modifier,
-                color =
-                    if (blurBackdrop != null) Color.Transparent
-                    else colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
-                titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
-                defaultWindowInsetsPadding = false,
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            haptic.contextClick()
-                            navigator.pop()
-                        },
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back),
-                        )
-                    }
-                },
-            )
+            BlurredBar(backdrop = blurBackdrop) {
+                SmallTopAppBar(
+                    title = stringResource(R.string.about_title),
+                    scrollBehavior = topAppBarScrollBehavior,
+                    color =
+                        if (blurActive) Color.Transparent
+                        else colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
+                    titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
+                    defaultWindowInsetsPadding = false,
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                haptic.contextClick()
+                                navigator.pop()
+                            },
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
+                            )
+                        }
+                    },
+                )
+            }
         },
     ) { innerPadding ->
-        AboutContent(
-            padding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-                bottom = innerPadding.calculateBottomPadding(),
-            ),
-            enableBlur = enableBlur,
-            lazyListState = lazyListState,
-            scrollProgress = scrollProgress,
-            onLogoHeightChanged = { logoHeightPx = it },
-        )
+        Box(
+            modifier = 
+                if (blurActive) Modifier.layerBackdrop(blurBackdrop) 
+                else Modifier,
+        ) {
+            AboutContent(
+                padding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding(),
+                ),
+                enableBlur = enableBlur,
+                lazyListState = lazyListState,
+                scrollProgress = scrollProgress,
+                onLogoHeightChanged = { logoHeightPx = it },
+            )
+        }
     }
 }
 

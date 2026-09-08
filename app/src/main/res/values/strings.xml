@@ -147,6 +147,7 @@
 
     <!-- Settings - Theme -->
     <string name="section_theme">Theme</string>
+    <string name="section_appearance">Appearance</string>
     <string name="pref_title_appearance_mode">Appearance mode</string>
     <string name="pref_summary_appearance_mode">Select the app\'s appearance mode</string>
     <string name="pref_title_monet">Monet color</string>
@@ -165,6 +166,20 @@
     <string name="pref_summary_liquid_glass">Enable liquid glass effect on the floating bottom bar</string>
     <string name="pref_title_smooth_corners">Smooth corners</string>
     <string name="pref_summary_smooth_corners">Enable global smooth corner effect</string>
+    <string name="pref_title_theme_settings">Theme settings</string>
+    <string name="pref_summary_theme_settings">Appearance, blur, navigation and more</string>
+    <string name="pref_blur_none">None</string>
+    <string name="pref_blur_gaussian">Gaussian blur</string>
+    <string name="pref_blur_progressive">Progressive blur</string>
+    <string name="pref_title_squircle">Enable squircle shapes</string>
+    <string name="pref_summary_squircle">Use smooth squircle corners on rounded UI elements</string>
+    <string name="section_navigation">Navigation</string>
+    <string name="pref_title_transition_style">Transition Style</string>
+    <string name="pref_summary_transition_style">Page transition animation style</string>
+    <string name="pref_transition_style_miuix">Miuix</string>
+    <string name="pref_transition_style_aosp">AOSP</string>
+    <string name="pref_title_enable_swipe_back">Enable Swipe Back</string>
+    <string name="pref_summary_enable_swipe_back">Swipe a pushed page to pop it; direction follows layout</string>
 
     <!-- Settings - Screen Mirroring -->
     <string name="section_screen_mirroring">Screen mirroring</string>

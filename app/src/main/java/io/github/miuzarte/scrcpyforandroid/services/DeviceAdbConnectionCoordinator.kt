@@ -5,19 +5,18 @@ import android.os.Parcelable
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
-import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbTunnel
 import io.github.miuzarte.scrcpyforandroid.storage.ScrcpyOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.parcelize.Parcelize
-import kotlin.time.Duration.Companion.milliseconds
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import kotlin.time.Duration.Companion.milliseconds
 
 @Parcelize
 internal data class DeviceAdbSessionState(
@@ -128,7 +127,7 @@ internal class DeviceAdbConnectionCoordinator(
 
     suspend fun isConnected(timeoutMs: Long): Boolean {
         return withContext(Dispatchers.IO) {
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 adbService.isConnected()
             }
         }
@@ -141,7 +140,7 @@ internal class DeviceAdbConnectionCoordinator(
      */
     suspend fun probeConnection(timeoutMs: Long): Boolean {
         return withContext(Dispatchers.IO) {
-            withTimeoutOrNull(timeoutMs) {
+            withTimeoutOrNull(timeoutMs.milliseconds) {
                 runCatching { adbService.shell(":") }.isSuccess
             } ?: false
         }

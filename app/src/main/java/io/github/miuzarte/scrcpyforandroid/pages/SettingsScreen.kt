@@ -3,7 +3,6 @@ package io.github.miuzarte.scrcpyforandroid.pages
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.compose.LocalActivity
@@ -57,8 +56,6 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import top.yukonga.miuix.kmp.theme.ThemeColorSpec
-import top.yukonga.miuix.kmp.theme.ThemePaletteStyle
 import java.io.File
 import kotlin.math.roundToInt
 import android.provider.Settings as AndroidSettings
@@ -69,8 +66,6 @@ private val languages = listOf(
     R.string.language_chinese to "zh",
 )
 private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
-private val monetPaletteStyleOptions = ThemePaletteStyle.entries.map { it.name }
-private val monetColorSpecOptions = ThemeColorSpec.entries.map { it.name }
 
 suspend fun clearTerminalFont(context: Context) =
     withContext(Dispatchers.IO) {
@@ -175,8 +170,6 @@ fun SettingsPage(
             }
         }
     }
-
-    val themeItems = AppSettings.ThemeModes.baseOptions.map { stringResource(it.labelResId) }
 
     val fullscreenVirtualButtonDock = remember(asBundle.fullscreenVirtualButtonDock) {
         FullscreenVirtualButtonDock.fromStoredValue(asBundle.fullscreenVirtualButtonDock)
@@ -349,114 +342,14 @@ fun SettingsPage(
                         ),
                     ),
                 )
-                OverlayDropdownPreference(
-                    title = stringResource(R.string.pref_title_appearance_mode),
-                    summary = stringResource(R.string.pref_summary_appearance_mode),
-                    items = themeItems,
-                    selectedIndex = asBundle.themeBaseIndex
-                        .coerceIn(0, AppSettings.ThemeModes.baseOptions.lastIndex),
-                    onSelectedIndexChange = {
-                        asBundle = asBundle.copy(
-                            themeBaseIndex = it,
-                        )
+                ArrowPreference(
+                    title = stringResource(R.string.pref_title_theme_settings),
+                    summary = stringResource(R.string.pref_summary_theme_settings),
+                    onClick = {
+                        haptic.contextClick()
+                        navigator.push(RootScreen.ThemeSettings)
                     },
                 )
-                SwitchPreference(
-                    title = stringResource(R.string.pref_title_monet),
-                    summary = stringResource(R.string.pref_summary_monet),
-                    checked = asBundle.monet,
-                    onCheckedChange = {
-                        asBundle = asBundle.copy(
-                            monet = it,
-                        )
-                    },
-                )
-                AnimatedVisibility(asBundle.monet) {
-                    Column {
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.pref_title_monet_key_color),
-                            summary = stringResource(R.string.pref_summary_monet_key_color),
-                            items = MonetKeyColorOptions,
-                            selectedIndex = asBundle.monetSeedIndex
-                                .coerceIn(0, MonetKeyColorOptions.lastIndex),
-                            onSelectedIndexChange = {
-                                asBundle = asBundle.copy(
-                                    monetSeedIndex = it,
-                                )
-                            },
-                        )
-                    }
-                }
-                AnimatedVisibility(asBundle.monet && asBundle.monetSeedIndex > 0) {
-                    Column {
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.pref_title_monet_palette_style),
-                            summary = stringResource(R.string.pref_summary_monet_palette_style),
-                            items = monetPaletteStyleOptions,
-                            selectedIndex = asBundle.monetPaletteStyle
-                                .coerceIn(0, monetPaletteStyleOptions.lastIndex),
-                            onSelectedIndexChange = {
-                                asBundle = asBundle.copy(
-                                    monetPaletteStyle = it,
-                                )
-                            },
-                        )
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.pref_title_monet_color_spec),
-                            summary = stringResource(R.string.pref_summary_monet_color_spec),
-                            items = monetColorSpecOptions,
-                            selectedIndex = asBundle.monetColorSpec
-                                .coerceIn(0, monetColorSpecOptions.lastIndex),
-                            onSelectedIndexChange = {
-                                asBundle = asBundle.copy(
-                                    monetColorSpec = it,
-                                )
-                            },
-                        )
-                    }
-                }
-                SwitchPreference(
-                    title = stringResource(R.string.pref_title_blur),
-                    summary = stringResource(R.string.pref_summary_blur),
-                    checked = asBundle.blur,
-                    onCheckedChange = {
-                        asBundle = asBundle.copy(
-                            blur = it,
-                        )
-                    },
-                )
-                // 悬浮底栏依赖 InteractiveHighlight, 其内部构造 android.graphics.RuntimeShader（API 33+ 引入）,
-                // 低版本开启会闪退, 故仅 Android 13+ 显示该开关
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && asBundle.floatingBottomBar) {
-                    asBundle = asBundle.copy(floatingBottomBar = false, floatingBottomBarBlur = false)
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    SwitchPreference(
-                        title = stringResource(R.string.pref_title_floating_bottom_bar),
-                        summary = stringResource(R.string.pref_summary_floating_bottom_bar),
-                        checked = asBundle.floatingBottomBar,
-                        onCheckedChange = {
-                            asBundle = asBundle.copy(
-                                floatingBottomBar = it,
-                            )
-                        },
-                    )
-                    AnimatedVisibility(asBundle.floatingBottomBar && asBundle.blur) {
-                        Column {
-                            SwitchPreference(
-                                title = stringResource(R.string.pref_title_liquid_glass),
-                                summary = stringResource(R.string.pref_summary_liquid_glass),
-                                checked = asBundle.floatingBottomBar && asBundle.blur
-                                        && asBundle.floatingBottomBarBlur,
-                                onCheckedChange = {
-                                    asBundle = asBundle.copy(
-                                        floatingBottomBarBlur = it,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
             }
         }
 

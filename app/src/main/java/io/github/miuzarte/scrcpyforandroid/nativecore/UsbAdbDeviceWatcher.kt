@@ -1,11 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -30,14 +26,14 @@ import kotlinx.coroutines.flow.asStateFlow
  * 4. 通过 eventsFlow 获取设备事件
  */
 class UsbAdbDeviceWatcher(
-    private val context: Context
+    private val context: Context,
 ) {
     companion object {
         private const val TAG = "UsbAdbDeviceWatcher"
-        
+
         // ADB 接口类 (Android Debug Bridge)
         private const val ADB_INTERFACE_CLASS = 0xFF
-        
+
         // USB 权限 Action
         private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
     }
@@ -57,7 +53,7 @@ class UsbAdbDeviceWatcher(
 
     // 广播接收器
     private var receiver: BroadcastReceiver? = null
-    
+
     // USB 权限回调
     private val permissionCallback: (UsbDevice, Boolean) -> Unit = { device, granted ->
         handlePermissionResult(device, granted)
@@ -74,13 +70,13 @@ class UsbAdbDeviceWatcher(
      */
     fun startWatching() {
         if (watching) return
-        
+
         Log.i(TAG, "startWatching(): starting USB device watcher")
-        
+
         // 注册 USB 权限回调
         UsbPermissionBus.addListener(permissionCallback)
-        
-        receiver = object : BroadcastReceiver() {
+
+        receiver = object: BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
                     UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
@@ -89,7 +85,7 @@ class UsbAdbDeviceWatcher(
                             handleDeviceAttached(device)
                         }
                     }
-                    
+
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                         val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                         if (device != null) {
@@ -99,20 +95,20 @@ class UsbAdbDeviceWatcher(
                 }
             }
         }
-        
+
         val filter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             context.registerReceiver(receiver, filter)
         }
-        
+
         watching = true
-        
+
         // 扫描已连接的设备
         scanConnectedDevices()
     }
@@ -122,12 +118,12 @@ class UsbAdbDeviceWatcher(
      */
     fun stopWatching() {
         if (!watching) return
-        
+
         Log.i(TAG, "stopWatching(): stopping USB device watcher")
-        
+
         // 注销 USB 权限回调
         UsbPermissionBus.removeListener(permissionCallback)
-        
+
         receiver?.let {
             try {
                 context.unregisterReceiver(it)
@@ -146,23 +142,26 @@ class UsbAdbDeviceWatcher(
      */
     fun scanConnectedDevices() {
         Log.d(TAG, "scanConnectedDevices(): scanning for connected USB devices")
-        
+
         val devices = mutableListOf<UsbDeviceInfo>()
-        
+
         for (device in usbManager.deviceList.values) {
             if (isAdbDevice(device)) {
                 val hasPermission = usbManager.hasPermission(device)
                 devices.add(UsbDeviceInfo(device, hasPermission))
-                
-                Log.d(TAG, "scanConnectedDevices(): found ADB device ${device.deviceName} " +
-                    "(VID=${String.format("0x%04X", device.vendorId)}, " +
-                    "PID=${String.format("0x%04X", device.productId)}, " +
-                    "permission=$hasPermission)")
+
+                Log.d(
+                    TAG,
+                    "scanConnectedDevices(): found ADB device ${device.deviceName} " +
+                            "(VID=${String.format("0x%04X", device.vendorId)}, " +
+                            "PID=${String.format("0x%04X", device.productId)}, " +
+                            "permission=$hasPermission)",
+                )
             }
         }
-        
+
         _devicesFlow.value = devices
-        
+
         Log.i(TAG, "scanConnectedDevices(): found ${devices.size} ADB devices")
     }
 
@@ -186,18 +185,18 @@ class UsbAdbDeviceWatcher(
      */
     private fun handleDeviceAttached(device: UsbDevice) {
         Log.i(TAG, "handleDeviceAttached(): device ${device.deviceName} attached")
-        
+
         if (!isAdbDevice(device)) {
             Log.d(TAG, "handleDeviceAttached(): not an ADB device, ignoring")
             return
         }
-        
+
         // 发送设备连接事件
         _eventsFlow.value = UsbDeviceEvent.Attached(device)
-        
+
         // 请求 USB 权限
         requestUsbPermission(device)
-        
+
         // 更新设备列表
         scanConnectedDevices()
     }
@@ -207,10 +206,10 @@ class UsbAdbDeviceWatcher(
      */
     private fun handleDeviceDetached(device: UsbDevice) {
         Log.i(TAG, "handleDeviceDetached(): device ${device.deviceName} detached")
-        
+
         // 发送设备断开事件
         _eventsFlow.value = UsbDeviceEvent.Detached(device)
-        
+
         // 更新设备列表
         scanConnectedDevices()
     }
@@ -219,12 +218,15 @@ class UsbAdbDeviceWatcher(
      * 处理权限结果
      */
     private fun handlePermissionResult(device: UsbDevice, granted: Boolean) {
-        Log.i(TAG, "handlePermissionResult(): device ${device.deviceName} " +
-            "permission ${if (granted) "granted" else "denied"}")
-        
+        Log.i(
+            TAG,
+            "handlePermissionResult(): device ${device.deviceName} " +
+                    "permission ${if (granted) "granted" else "denied"}",
+        )
+
         // 发送权限事件
         _eventsFlow.value = UsbDeviceEvent.PermissionResult(device, granted)
-        
+
         // 更新设备列表
         scanConnectedDevices()
     }
@@ -237,9 +239,9 @@ class UsbAdbDeviceWatcher(
             Log.d(TAG, "requestUsbPermission(): already have permission for ${device.deviceName}")
             return
         }
-        
+
         Log.i(TAG, "requestUsbPermission(): requesting permission for ${device.deviceName}")
-        
+
         // 使用显式 Intent 避免 Android 14+ FLAG_MUTABLE 限制
         val intent = Intent(ACTION_USB_PERMISSION).apply {
             component = ComponentName(context.packageName, UsbPermissionReceiver::class.java.name)
@@ -250,7 +252,7 @@ class UsbAdbDeviceWatcher(
             PendingIntent.FLAG_UPDATE_CURRENT
         }
         val permissionIntent = PendingIntent.getBroadcast(
-            context, 0, intent, flags
+            context, 0, intent, flags,
         )
         usbManager.requestPermission(device, permissionIntent)
     }
@@ -311,20 +313,23 @@ class UsbAdbDeviceWatcher(
  *
  * 用于接收 USB 权限请求结果, 避免隐式 Intent + FLAG_MUTABLE 的 Android 14+ 限制
  */
-class UsbPermissionReceiver : BroadcastReceiver() {
+class UsbPermissionReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_USB_PERMISSION) return
-        
+
         val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
         val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-        
+
         if (device != null) {
-            Log.i(TAG, "UsbPermissionReceiver: device ${device.deviceName} permission ${if (granted) "granted" else "denied"}")
+            Log.i(
+                TAG,
+                "UsbPermissionReceiver: device ${device.deviceName} permission ${if (granted) "granted" else "denied"}",
+            )
             // 通知全局事件总线
             UsbPermissionBus.notifyResult(device, granted)
         }
     }
-    
+
     companion object {
         private const val TAG = "UsbPermissionReceiver"
         private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
@@ -339,15 +344,15 @@ class UsbPermissionReceiver : BroadcastReceiver() {
 object UsbPermissionBus {
     // Binder 线程的广播回调与主线程的 add/remove 并发, 使用写时复制容器保证线程安全
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<(UsbDevice, Boolean) -> Unit>()
-    
+
     fun addListener(listener: (UsbDevice, Boolean) -> Unit) {
         listeners.add(listener)
     }
-    
+
     fun removeListener(listener: (UsbDevice, Boolean) -> Unit) {
         listeners.remove(listener)
     }
-    
+
     fun notifyResult(device: UsbDevice, granted: Boolean) {
         listeners.forEach { it(device, granted) }
     }
@@ -362,15 +367,15 @@ sealed class UsbDeviceEvent {
     /**
      * 设备连接事件
      */
-    data class Attached(val device: UsbDevice) : UsbDeviceEvent()
-    
+    data class Attached(val device: UsbDevice): UsbDeviceEvent()
+
     /**
      * 设备断开事件
      */
-    data class Detached(val device: UsbDevice) : UsbDeviceEvent()
-    
+    data class Detached(val device: UsbDevice): UsbDeviceEvent()
+
     /**
      * 权限结果事件
      */
-    data class PermissionResult(val device: UsbDevice, val granted: Boolean) : UsbDeviceEvent()
+    data class PermissionResult(val device: UsbDevice, val granted: Boolean): UsbDeviceEvent()
 }

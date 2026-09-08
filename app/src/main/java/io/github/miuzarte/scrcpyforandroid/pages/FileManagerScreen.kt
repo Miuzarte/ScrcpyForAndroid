@@ -134,7 +134,7 @@ fun FileManagerScreen(
 
     Scaffold(
         topBar = {
-            BlurredBar(backdrop = blurBackdrop) {
+            BlurredBar(backdrop = blurBackdrop, allowProgressive = false) {
                 SmallTopAppBar(
                     title = stringResource(R.string.main_tab_files),
                     color =

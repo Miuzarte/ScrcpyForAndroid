@@ -5,11 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbDeviceConnection
-import android.hardware.usb.UsbEndpoint
-import android.hardware.usb.UsbInterface
-import android.hardware.usb.UsbManager
+import android.hardware.usb.*
 import android.os.Build
 import android.util.Log
 import java.io.IOException
@@ -33,22 +29,22 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class UsbAdbTunnel(
     private val context: Context,
-    private val usbDevice: UsbDevice
-) : AutoCloseable {
+    private val usbDevice: UsbDevice,
+): AutoCloseable {
 
     companion object {
         private const val TAG = "UsbAdbTunnel"
-        
+
         // ADB 接口类 (Android Debug Bridge)
         private const val ADB_INTERFACE_CLASS = 0xFF
-        
+
         // USB 传输超时 (毫秒)
         private const val USB_TRANSFER_TIMEOUT_MS = 5000
-        
+
         // 最大 USB 包大小 (字节)
         // 注意: 受 Linux USB 驱动限制, 最大 payload 为 16KB
         private const val MAX_USB_PACKET_SIZE = 16384
-        
+
         // USB 权限 Action
         private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
 
@@ -63,29 +59,29 @@ class UsbAdbTunnel(
 
     // USB 设备连接
     private var usbConnection: UsbDeviceConnection? = null
-    
+
     // ADB 接口
     private var adbInterface: UsbInterface? = null
-    
+
     // Bulk IN 端点 (设备->主机)
     private var bulkInEndpoint: UsbEndpoint? = null
-    
+
     // Bulk OUT 端点 (主机->设备)
     private var bulkOutEndpoint: UsbEndpoint? = null
-    
+
     // 连接状态
     private val isConnected = AtomicBoolean(false)
-    
+
     // 关闭标志
     @Volatile
     private var closed = false
-    
+
     // USB 权限接收器
     private var permissionReceiver: BroadcastReceiver? = null
-    
+
     // USB 拔出接收器 (物理拔出检测)
     private var detachedReceiver: BroadcastReceiver? = null
-    
+
     // 权限等待队列
     private val permissionQueue = LinkedBlockingQueue<Boolean>()
 
@@ -149,12 +145,12 @@ class UsbAdbTunnel(
             Log.d(TAG, "checkUsbPermission(): already have permission")
             return
         }
-        
+
         Log.i(TAG, "checkUsbPermission(): requesting USB permission")
-        
+
         // 注册权限接收器
         registerPermissionReceiver()
-        
+
         // 请求权限
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -162,18 +158,18 @@ class UsbAdbTunnel(
             PendingIntent.FLAG_UPDATE_CURRENT
         }
         val permissionIntent = PendingIntent.getBroadcast(
-            context, 0, Intent(ACTION_USB_PERMISSION), flags
+            context, 0, Intent(ACTION_USB_PERMISSION), flags,
         )
         usbManager.requestPermission(usbDevice, permissionIntent)
-        
+
         // 等待权限结果
         val granted = permissionQueue.poll(10, TimeUnit.SECONDS)
             ?: throw IOException("USB permission request timed out")
-        
+
         if (!granted) {
             throw IOException("USB permission denied")
         }
-        
+
         Log.d(TAG, "checkUsbPermission(): permission granted")
     }
 
@@ -182,14 +178,14 @@ class UsbAdbTunnel(
      */
     private fun registerPermissionReceiver() {
         if (permissionReceiver != null) return
-        
-        permissionReceiver = object : BroadcastReceiver() {
+
+        permissionReceiver = object: BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (ACTION_USB_PERMISSION == intent.action) {
                     synchronized(this@UsbAdbTunnel) {
                         val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                         val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                        
+
                         if (device?.deviceId == usbDevice.deviceId) {
                             Log.d(TAG, "onReceive(): permission ${if (granted) "granted" else "denied"}")
                             permissionQueue.offer(granted)
@@ -198,7 +194,7 @@ class UsbAdbTunnel(
                 }
             }
         }
-        
+
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(permissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -216,8 +212,8 @@ class UsbAdbTunnel(
      */
     private fun registerDetachedReceiver() {
         if (detachedReceiver != null) return
-        
-        detachedReceiver = object : BroadcastReceiver() {
+
+        detachedReceiver = object: BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (UsbManager.ACTION_USB_DEVICE_DETACHED == intent.action) {
                     val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
@@ -229,7 +225,7 @@ class UsbAdbTunnel(
                 }
             }
         }
-        
+
         val filter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(detachedReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -259,10 +255,10 @@ class UsbAdbTunnel(
      */
     private fun findBulkEndpoints() {
         val iface = adbInterface ?: throw IllegalStateException("ADB interface not found")
-        
+
         for (i in 0 until iface.endpointCount) {
             val endpoint = iface.getEndpoint(i)
-            
+
             if (endpoint.type == android.hardware.usb.UsbConstants.USB_ENDPOINT_XFER_BULK) {
                 if (endpoint.direction == android.hardware.usb.UsbConstants.USB_DIR_IN) {
                     bulkInEndpoint = endpoint
@@ -273,7 +269,7 @@ class UsbAdbTunnel(
                 }
             }
         }
-        
+
         if (bulkInEndpoint == null || bulkOutEndpoint == null) {
             throw IOException("Failed to find Bulk IN/OUT endpoints")
         }
@@ -337,7 +333,7 @@ class UsbAdbTunnel(
      *
      * 从 USB Bulk IN 端点读取数据
      */
-    private inner class UsbInputStream : InputStream() {
+    private inner class UsbInputStream: InputStream() {
         private val buffer = ByteArray(MAX_USB_PACKET_SIZE)
         private var bufferPos = 0
         private var bufferLen = 0
@@ -370,7 +366,7 @@ class UsbAdbTunnel(
                     endpoint,
                     buffer,
                     minOf(len, buffer.size),
-                    USB_TRANSFER_TIMEOUT_MS
+                    USB_TRANSFER_TIMEOUT_MS,
                 )
 
                 when {
@@ -385,6 +381,7 @@ class UsbAdbTunnel(
                         }
                         return copyLen
                     }
+
                     else -> {
                         // bulkTransfer 超时 (-1) 或零长度传输 (0, 如 ZLP) 都表示本次无数据可取
                         // 注意不能把 0 作为读取结果返回: InputStream.read 契约在 len>0 时不允许返回 0,
@@ -411,16 +408,16 @@ class UsbAdbTunnel(
      *
      * 向 USB Bulk OUT 端点写入数据
      */
-    private inner class UsbOutputStream : OutputStream() {
+    private inner class UsbOutputStream: OutputStream() {
         override fun write(b: Int) = write(byteArrayOf(b.toByte()))
 
         override fun write(b: ByteArray, off: Int, len: Int) {
             if (closed) throw IOException("Tunnel is closed")
             if (!isConnected.get()) throw IOException("Tunnel is not connected")
-            
+
             val endpoint = bulkOutEndpoint ?: throw IOException("Bulk OUT endpoint not available")
             val connection = usbConnection ?: throw IOException("USB connection not available")
-            
+
             // 分块写入 (USB 包大小限制)
             var offset = off
             var remaining = len
@@ -435,7 +432,7 @@ class UsbAdbTunnel(
                     b,
                     offset,
                     chunkSize,
-                    USB_TRANSFER_TIMEOUT_MS
+                    USB_TRANSFER_TIMEOUT_MS,
                 )
 
                 when {
@@ -445,6 +442,7 @@ class UsbAdbTunnel(
                             throw IOException("USB write stalled (repeated zero-length transfers)")
                         }
                     }
+
                     else -> zeroWriteRetries = 0
                 }
 
@@ -470,7 +468,7 @@ class UsbAdbTunnel(
  */
 data class UsbDeviceInfo(
     val device: UsbDevice,
-    val hasPermission: Boolean
+    val hasPermission: Boolean,
 ) {
     /**
      * 获取设备显示名称

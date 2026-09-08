@@ -146,6 +146,7 @@
 
     <!-- Settings - Theme -->
     <string name="section_theme">主题</string>
+    <string name="section_appearance">外观</string>
     <string name="pref_title_appearance_mode">外观模式</string>
     <string name="pref_summary_appearance_mode">选择应用的外观模式</string>
     <string name="pref_title_monet">Monet 颜色</string>
@@ -164,6 +165,20 @@
     <string name="pref_summary_liquid_glass">启用悬浮底栏的液态玻璃效果</string>
     <string name="pref_title_smooth_corners">平滑圆角</string>
     <string name="pref_summary_smooth_corners">启用全局平滑圆角效果</string>
+    <string name="pref_title_theme_settings">主题设置</string>
+    <string name="pref_summary_theme_settings">外观、模糊、导航等设置</string>
+    <string name="pref_blur_none">无</string>
+    <string name="pref_blur_gaussian">高斯模糊</string>
+    <string name="pref_blur_progressive">渐进模糊</string>
+    <string name="pref_title_squircle">圆角矩形</string>
+    <string name="pref_summary_squircle">在圆角 UI 元素上使用平滑的圆角矩形</string>
+    <string name="section_navigation">导航</string>
+    <string name="pref_title_transition_style">过渡风格</string>
+    <string name="pref_summary_transition_style">页面过渡动画样式</string>
+    <string name="pref_transition_style_miuix">Miuix</string>
+    <string name="pref_transition_style_aosp">AOSP</string>
+    <string name="pref_title_enable_swipe_back">横滑返回</string>
+    <string name="pref_summary_enable_swipe_back">滑动已推入的页面以返回</string>
 
     <!-- Settings - Screen Mirroring -->
     <string name="section_screen_mirroring">投屏</string>

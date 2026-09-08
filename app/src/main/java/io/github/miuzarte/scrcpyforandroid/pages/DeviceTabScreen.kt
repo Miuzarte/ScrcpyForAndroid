@@ -53,11 +53,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 private const val PREVIEW_CARD_ITEM_KEY = "preview_card"
 private const val PREVIEW_CARD_ITEM_INDEX = 3
@@ -158,7 +158,11 @@ internal fun DeviceTabScreen(
             }
         },
     ) { pagePadding ->
-        Box(modifier = if (blurActive) Modifier.layerBackdrop(blurBackdrop) else Modifier) {
+        Box(
+            modifier =
+                if (blurActive) Modifier.layerBackdrop(blurBackdrop)
+                else Modifier,
+        ) {
             DeviceTabPage(
                 viewModel = viewModel,
                 contentPadding = pagePadding,

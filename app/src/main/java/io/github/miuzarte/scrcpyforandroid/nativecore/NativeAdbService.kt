@@ -1,14 +1,10 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path

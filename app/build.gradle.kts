@@ -97,8 +97,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         compose = true
@@ -127,6 +127,12 @@ android {
     ndkVersion = "29.0.14206865"
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
 androidComponents {
     onVariants { variant ->
         singleAbi?.let { abi ->
@@ -149,14 +155,13 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.window.size)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.navigation3.runtime)
     implementation(libs.material)
     implementation(libs.miuix.ui)
     implementation(libs.miuix.blur)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
-    implementation(libs.miuix.navigation3.ui)
-    implementation(libs.backdrop)
+    implementation(libs.miuix.nav)
+    implementation(libs.miuix.squircle)
     implementation(libs.boringssl)
     implementation(libs.libcxx)
     implementation(libs.bcpkix.jdk18on)

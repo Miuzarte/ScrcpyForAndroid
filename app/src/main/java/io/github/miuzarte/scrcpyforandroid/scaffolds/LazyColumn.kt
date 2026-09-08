@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun LazyColumn(
@@ -67,6 +68,7 @@ fun LazyColumn(
                 modifier = contentWidthModifier
                     .fillMaxSize()
                     .overScrollVertical()
+                    .scrollEndHaptic()
                     .then(
                         if (scrollBehavior != null)
                             Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)

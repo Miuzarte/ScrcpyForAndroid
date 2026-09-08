@@ -4,19 +4,17 @@ bcpkixJdk18on = "1.85"
 boringssl = "20251124"
 conscryptAndroid = "2.7.0"
 datastorePreferences = "1.2.1"
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 kotlinx-serialization = "1.11.0"
 coreKtx = "1.19.0"
 libcxx = "29.0.14206865"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
 composeBom = "2026.08.00"
-androidxNavigation3 = "1.1.7"
 junit = "4.13.2"
 androidxJunit = "1.3.0"
 espressoCore = "3.7.0"
 miuix = "0.9.3"
-backdrop = "2.0.1"
 material = "1.14.0"
 reorderable = "3.1.0"
 runtime = "1.12.0"
@@ -39,7 +37,6 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material3-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
-androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime-android", version.ref = "androidxNavigation3" }
 bcpkix-jdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcpkixJdk18on" }
 boringssl = { module = "io.github.vvb2060.ndk:boringssl", version.ref = "boringssl" }
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscryptAndroid" }
@@ -52,8 +49,8 @@ miuix-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-ui", version.ref = "
 miuix-blur = { group = "top.yukonga.miuix.kmp", name = "miuix-blur", version.ref = "miuix" }
 miuix-preference = { group = "top.yukonga.miuix.kmp", name = "miuix-preference", version.ref = "miuix" }
 miuix-icons = { group = "top.yukonga.miuix.kmp", name = "miuix-icons", version.ref = "miuix" }
-miuix-navigation3-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-navigation3-ui", version.ref = "miuix" }
-backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
+miuix-nav = { group = "top.yukonga.miuix.kmp", name = "miuix-nav", version.ref = "miuix" }
+miuix-squircle = { group = "top.yukonga.miuix.kmp", name = "miuix-squircle", version.ref = "miuix" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
 androidx-core-pip = { group = "androidx.core", name = "core-pip", version.ref = "androidxCorePip" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "androidxBiometric" }

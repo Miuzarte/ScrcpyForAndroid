@@ -163,7 +163,7 @@ internal fun ScrcpyAllOptionsScreen(
 
     Scaffold(
         topBar = {
-            BlurredBar(backdrop = blurBackdrop) {
+            BlurredBar(backdrop = blurBackdrop, allowProgressive = false) {
                 TopAppBar(
                     title = stringResource(R.string.scrcpyopt_title),
                     color =

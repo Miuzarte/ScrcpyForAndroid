@@ -103,7 +103,7 @@ class ReorderableList(
                                                 },
                                             ),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.Small),
+                                        horizontalArrangement = Arrangement.spacedBy(UiSpacing.MediumLarge),
                                     ) {
                                         if (item.icon != null) Icon(
                                             item.icon,

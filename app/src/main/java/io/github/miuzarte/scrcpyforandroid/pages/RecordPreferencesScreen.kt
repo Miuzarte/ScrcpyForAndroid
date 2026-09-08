@@ -81,7 +81,11 @@ internal fun RecordPreferencesScreen(
             }
         },
     ) { pagePadding ->
-        Box(modifier = if (blurActive) Modifier.layerBackdrop(blurBackdrop) else Modifier) {
+        Box(
+            modifier =
+                if (blurActive) Modifier.layerBackdrop(blurBackdrop)
+                else Modifier,
+        ) {
             RecordPreferencesPage(
                 contentPadding = pagePadding,
                 scrollBehavior = scrollBehavior,
