@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -54,7 +55,6 @@ internal fun AboutScreen() {
     val navigator = LocalRootNavigator.current
     val enableBlur = LocalEnableBlur.current
     val blurBackdrop = rememberBlurBackdrop(enableBlur)
-    val blurActive = blurBackdrop != null
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
@@ -74,16 +74,24 @@ internal fun AboutScreen() {
             }
         }
     }
+    // About 顶栏滚过 logo 区之前完全透明 (backdrop 传 null, 无底色也无模糊), 之后才显示模糊;
+    // 同时把 topAppBarScrollBehavior 接进下面的列表, 让 BlurredBar 拿到 contentOffset 驱动渐进模糊的淡入
+    // (SmallTopAppBar 会把它钉住, 只更新 contentOffset, 顶栏不会塌陷)
+    val collapsed by remember { derivedStateOf { scrollProgress == 1f } }
+    val blurActive by remember(blurBackdrop) { derivedStateOf { blurBackdrop != null && scrollProgress == 1f } }
 
     Scaffold(
         topBar = {
-            BlurredBar(backdrop = blurBackdrop) {
+            BlurredBar(
+                backdrop = if (blurActive) blurBackdrop else null,
+                scrollBehavior = topAppBarScrollBehavior,
+            ) {
                 SmallTopAppBar(
                     title = stringResource(R.string.about_title),
                     scrollBehavior = topAppBarScrollBehavior,
                     color =
                         if (blurActive) Color.Transparent
-                        else colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
+                        else colorScheme.surface.copy(alpha = if (collapsed) 1f else 0f),
                     titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
                     defaultWindowInsetsPadding = false,
                     navigationIcon = {
@@ -104,8 +112,8 @@ internal fun AboutScreen() {
         },
     ) { innerPadding ->
         Box(
-            modifier = 
-                if (blurActive) Modifier.layerBackdrop(blurBackdrop) 
+            modifier =
+                if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop)
                 else Modifier,
         ) {
             AboutContent(
@@ -113,6 +121,7 @@ internal fun AboutScreen() {
                     top = innerPadding.calculateTopPadding(),
                     bottom = innerPadding.calculateBottomPadding(),
                 ),
+                topAppBarScrollBehavior = topAppBarScrollBehavior,
                 enableBlur = enableBlur,
                 lazyListState = lazyListState,
                 scrollProgress = scrollProgress,
@@ -125,6 +134,7 @@ internal fun AboutScreen() {
 @Composable
 private fun AboutContent(
     padding: PaddingValues,
+    topAppBarScrollBehavior: ScrollBehavior,
     enableBlur: Boolean,
     lazyListState: LazyListState,
     scrollProgress: Float,
@@ -324,7 +334,10 @@ private fun AboutContent(
 
         LazyColumn(
             state = lazyListState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                // 只把滚动量喂给顶栏的渐进模糊, 不参与顶栏塌陷 (见 AboutScreen)
+                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 16.dp,

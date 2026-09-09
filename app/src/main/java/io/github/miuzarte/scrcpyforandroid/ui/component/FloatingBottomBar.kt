@@ -40,6 +40,8 @@ import io.github.miuzarte.scrcpyforandroid.ui.component.miuix.animation.Interact
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
@@ -50,6 +52,7 @@ import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import kotlin.math.PI
 import kotlin.math.abs
@@ -172,15 +175,19 @@ fun FloatingBottomBar(
     backdrop: LayerBackdrop?,
     tabsCount: Int,
     isBlurEnabled: Boolean = true,
+    // 液态玻璃关闭时的普通高斯模糊
+    isGaussianBlurEnabled: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val isInLightTheme = colorScheme.background.luminance() >= 0.5f
     val isDark = colorScheme.background.luminance() < 0.5f
     val accentColor = colorScheme.primary
-    val containerColor = if (isBlurEnabled) {
-        colorScheme.surfaceContainer.copy(0.4f)
-    } else {
-        colorScheme.surfaceContainer
+    // 液态玻璃关闭但开了模糊时, 底色交给模糊的混合色, 自身保持透明
+    val gaussianBlurBackdrop = if (!isBlurEnabled && isGaussianBlurEnabled) backdrop else null
+    val containerColor = when {
+        isBlurEnabled -> colorScheme.surfaceContainer.copy(0.4f)
+        gaussianBlurBackdrop != null -> Color.Transparent
+        else -> colorScheme.surfaceContainer
     }
 
     val tabsBackdrop = rememberLayerBackdrop()
@@ -342,6 +349,19 @@ fun FloatingBottomBar(
                             },
                             onDrawSurface = { drawRect(containerColor) },
                         )
+                    } else if (gaussianBlurBackdrop != null) {
+                        Modifier
+                            .textureBlur(
+                                backdrop = gaussianBlurBackdrop,
+                                shape = pillShape,
+                                blurRadius = 25f,
+                                colors = BlurDefaults.blurColors(
+                                    blendColors = listOf(
+                                        BlendColorEntry(color = colorScheme.surfaceContainer.copy(0.6f)),
+                                    ),
+                                ),
+                            )
+                            .background(containerColor, pillShape)
                     } else {
                         Modifier.background(containerColor, pillShape)
                     },

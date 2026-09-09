@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -540,8 +541,12 @@ fun MainScreen() {
     val navRootContent: NavEntryBuilder.() -> Unit = {
         entry<RootScreen.Home>(swipeDismiss = swipeBackDirection) {
             val blurBackdrop = rememberBlurBackdrop(enableBlur = asBundle.blur != AppSettings.BlurMode.NONE)
-            val floatingBarBlurActive =
-                asBundle.blur != AppSettings.BlurMode.NONE && asBundle.floatingBottomBarBlur
+            // 悬浮底栏是否需要采样背后的内容 (液态玻璃和高斯模糊都要)
+            val floatingBarBlurActive = asBundle.blur != AppSettings.BlurMode.NONE
+            // 液态玻璃
+            val floatingBarGlassActive = floatingBarBlurActive && asBundle.floatingBottomBarBlur
+            // 液态玻璃关闭时悬浮底栏回退到高斯模糊
+            val floatingBarGaussianBlur = floatingBarBlurActive && !asBundle.floatingBottomBarBlur
             val surfaceColor = colorScheme.surface
             val glassBackdrop = rememberLayerBackdrop {
                 drawRect(surfaceColor)
@@ -551,7 +556,8 @@ fun MainScreen() {
             Scaffold(
                 bottomBar = {
                     if (!asBundle.floatingBottomBar) {
-                        BlurredBar(backdrop = blurBackdrop) {
+                        // 底栏不跟随渐进模糊, 渐进模糊回退到高斯模糊, 没启用模糊则无模糊
+                        BlurredBar(backdrop = blurBackdrop, allowProgressive = false) {
                             NavigationBar(
                                 color =
                                     if (blurBackdrop != null) Color.Transparent
@@ -648,7 +654,12 @@ fun MainScreen() {
                         }
                     }
 
-                    if (asBundle.floatingBottomBar) {
+                    // 悬浮底栏依赖 InteractiveHighlight, 其内部构造 android.graphics.RuntimeShader (API 33+),
+                    // 低版本组合即崩, 故在此拦截, 不依赖设置页的清理
+                    if (
+                        asBundle.floatingBottomBar &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ) {
                         FloatingBottomBar(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -664,7 +675,8 @@ fun MainScreen() {
                             },
                             backdrop = glassBackdrop,
                             tabsCount = tabs.size,
-                            isBlurEnabled = floatingBarBlurActive,
+                            isBlurEnabled = floatingBarGlassActive,
+                            isGaussianBlurEnabled = floatingBarGaussianBlur,
                         ) {
                             tabs.forEach { tab ->
                                 FloatingBottomBarItem(

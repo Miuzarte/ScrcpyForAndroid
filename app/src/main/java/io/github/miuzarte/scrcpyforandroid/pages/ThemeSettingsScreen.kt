@@ -75,7 +75,7 @@ internal fun ThemeSettingsScreen() {
     Scaffold(
         topBar = {
             BlurredBar(backdrop = blurBackdrop) {
-                SmallTopAppBar(
+                TopAppBar(
                     title = stringResource(R.string.pref_title_theme_settings),
                     scrollBehavior = scrollBehavior,
                     color =
@@ -111,7 +111,8 @@ internal fun ThemeSettingsScreen() {
             ) {
                 item {
                     SectionSmallTitle(stringResource(R.string.section_appearance))
-                    // 外观模式 TabRow — 置于最顶部、Card 外部
+
+                    // 外观模式 TabRow, 置于最上方 Card 外部
                     val themeItems = AppSettings.ThemeModes.baseOptions.map { stringResource(it.labelResId) }
                     TabRow(
                         tabs = themeItems,
@@ -120,6 +121,7 @@ internal fun ThemeSettingsScreen() {
                             asBundle = asBundle.copy(themeBaseIndex = index)
                         },
                     )
+
                     Spacer(modifier = Modifier.height(UiSpacing.ContentVertical))
 
                     Card {
@@ -132,17 +134,15 @@ internal fun ThemeSettingsScreen() {
                             },
                         )
                         AnimatedVisibility(asBundle.monet) {
-                            Column {
-                                OverlayDropdownPreference(
-                                    title = stringResource(R.string.pref_title_monet_key_color),
-                                    summary = stringResource(R.string.pref_summary_monet_key_color),
-                                    items = monetKeyColorOptions,
-                                    selectedIndex = asBundle.monetSeedIndex.coerceIn(0, monetKeyColorOptions.lastIndex),
-                                    onSelectedIndexChange = { idx ->
-                                        asBundle = asBundle.copy(monetSeedIndex = idx)
-                                    },
-                                )
-                            }
+                            OverlayDropdownPreference(
+                                title = stringResource(R.string.pref_title_monet_key_color),
+                                summary = stringResource(R.string.pref_summary_monet_key_color),
+                                items = monetKeyColorOptions,
+                                selectedIndex = asBundle.monetSeedIndex.coerceIn(0, monetKeyColorOptions.lastIndex),
+                                onSelectedIndexChange = { idx ->
+                                    asBundle = asBundle.copy(monetSeedIndex = idx)
+                                },
+                            )
                         }
                         AnimatedVisibility(asBundle.monet && asBundle.monetSeedIndex > 0) {
                             Column {
@@ -172,11 +172,6 @@ internal fun ThemeSettingsScreen() {
                                 )
                             }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(UiSpacing.ContentVertical))
-
-                    Card {
                         SwitchPreference(
                             title = stringResource(R.string.pref_title_squircle),
                             summary = stringResource(R.string.pref_summary_squircle),
@@ -195,15 +190,7 @@ internal fun ThemeSettingsScreen() {
                             },
                         )
                         // 悬浮底栏依赖 InteractiveHighlight, 其内部构造 android.graphics.RuntimeShader (API 33+ 引入),
-                        // 低版本开启会闪退, 故仅 Android 13+ 显示该开关
-                        LaunchedEffect(asBundle.floatingBottomBar) {
-                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && asBundle.floatingBottomBar) {
-                                asBundle = asBundle.copy(
-                                    floatingBottomBar = false,
-                                    floatingBottomBarBlur = false,
-                                )
-                            }
-                        }
+                        // 低版本不显示该开关; 组合处的版本兜底在 MainScreen
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             SwitchPreference(
                                 title = stringResource(R.string.pref_title_floating_bottom_bar),
@@ -214,21 +201,18 @@ internal fun ThemeSettingsScreen() {
                                 },
                             )
                             AnimatedVisibility(
-                                asBundle.floatingBottomBar &&
-                                        asBundle.blur != AppSettings.BlurMode.NONE,
+                                asBundle.floatingBottomBar && asBundle.blur != AppSettings.BlurMode.NONE,
                             ) {
-                                Column {
-                                    SwitchPreference(
-                                        title = stringResource(R.string.pref_title_liquid_glass),
-                                        summary = stringResource(R.string.pref_summary_liquid_glass),
-                                        checked = asBundle.floatingBottomBar &&
-                                                asBundle.blur != AppSettings.BlurMode.NONE &&
-                                                asBundle.floatingBottomBarBlur,
-                                        onCheckedChange = {
-                                            asBundle = asBundle.copy(floatingBottomBarBlur = it)
-                                        },
-                                    )
-                                }
+                                SwitchPreference(
+                                    title = stringResource(R.string.pref_title_liquid_glass),
+                                    summary = stringResource(R.string.pref_summary_liquid_glass),
+                                    checked = asBundle.floatingBottomBar &&
+                                            asBundle.blur != AppSettings.BlurMode.NONE &&
+                                            asBundle.floatingBottomBarBlur,
+                                    onCheckedChange = {
+                                        asBundle = asBundle.copy(floatingBottomBarBlur = it)
+                                    },
+                                )
                             }
                         }
                     }

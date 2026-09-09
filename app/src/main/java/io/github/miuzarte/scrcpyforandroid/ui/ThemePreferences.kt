@@ -29,12 +29,15 @@ fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
 @Composable
 fun BlurredBar(
     backdrop: LayerBackdrop?,
+    // 传入后渐进模糊改为随滚动淡入 (contentOffset 为 0 时不可见), 只适合静止时该透明的页面 (如 About);
+    // 列表可能不滚动的短页面不要传, 否则 contentOffset 一直是 0, 顶栏会一直没有模糊
     scrollBehavior: ScrollBehavior? = null,
     // 置 false 时回退到高斯或无模糊, 用于有 bottomContent 的顶栏
     allowProgressive: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val blurActive = backdrop != null
+    // 渐进模糊默认常驻; 传了 scrollBehavior 才改为随滚动淡入 (见上面的参数说明)
     val progressive = blurActive && LocalBlurMode.current == AppSettings.BlurMode.PROGRESSIVE && allowProgressive
     Box(
         modifier =

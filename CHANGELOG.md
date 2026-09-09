@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.6.1
+
+- 重构: 外观与导航
+  - 导航从 `androidx navigation3` 迁移到 `miuix-nav`, 新增 `CrossActivityTransition` 提供 AOSP 过渡效果
+  - 新增主题设置页 `ThemeSettingsScreen`, 收拢 Monet/模糊/悬浮底栏/液态玻璃, 新增导航区 (过渡风格 + 横滑返回) 与圆角矩形开关
+  - 悬浮底栏从 `com.kyant.backdrop` 迁移到 `miuix-blur`, 液态玻璃实现照搬 miuix example
+- 改进: 模糊从布尔开关改为三态 (无/高斯/渐进)
+- 改进: 状态栏图标色跟随应用生效主题 (`ApplySystemBarsAppearance`)
+- 修复: 关于页/锁屏密码页顶栏模糊
+- 修复: 带 `bottomContent` 的页面禁用渐进模糊, 回退高斯或无模糊
+- 依赖: 移除 `androidx.navigation3-runtime` / `miuix-navigation3-ui`, 新增 `miuix-nav` / `miuix-squircle`
+- 依赖: Kotlin `2.4.10` -> `2.4.20`, JVM target `17` -> `21`
+
 ## 0.6.0
 
 - 新增: 有线 ADB
