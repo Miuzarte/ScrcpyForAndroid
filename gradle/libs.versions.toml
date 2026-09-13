@@ -1,6 +1,6 @@
 [versions]
 agp = "9.4.0"
-bcpkixJdk18on = "1.85"
+bcpkixJdk18on = "1.86"
 boringssl = "20251124"
 conscryptAndroid = "2.7.0"
 datastorePreferences = "1.2.1"
