@@ -22,7 +22,7 @@ import kotlin.math.roundToInt
 object GamepadHid {
     const val VENDOR_ID = 0x045e // Microsoft
     const val PRODUCT_ID = 0x028e // Xbox 360 pad
-    const val NAME = "Microsoft X-Box 360 Pad"
+    const val NAME = "Scrcpy Virtual Gamepad" // default value of Settings.Misc gamepad name
     const val REPORT_SIZE = 15
 
     // Reserved for future keyboard/mouse UHID devices (matches upstream ids).
@@ -192,6 +192,7 @@ object GamepadHid {
  */
 class GamepadInputHandler(
     private val scope: CoroutineScope,
+    private val deviceName: () -> String,
     private val onUhidCreate: suspend (
         id: Int,
         vendorId: Int,
@@ -316,7 +317,7 @@ class GamepadInputHandler(
                             id,
                             GamepadHid.VENDOR_ID,
                             GamepadHid.PRODUCT_ID,
-                            GamepadHid.NAME,
+                            deviceName(),
                             GamepadHid.reportDescriptor,
                         )
                         state.created = true

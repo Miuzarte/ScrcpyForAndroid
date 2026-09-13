@@ -36,6 +36,7 @@ import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadHid
 import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadInputHandler
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
@@ -395,6 +396,7 @@ fun FullscreenControlScreen(
                 onDismiss = onBack,
                 showDebugInfo = fullscreenDebugInfo && !isInPip,
                 currentFps = currentFps,
+                gamepadDeviceName = asBundle.gamepadDeviceName.ifBlank { GamepadHid.NAME },
                 imeRequestToken = imeRequestToken,
                 enableBackHandler = false,
                 interactive = !isInPip,
@@ -612,6 +614,7 @@ fun FullscreenControlPage(
     onDismiss: () -> Unit,
     showDebugInfo: Boolean,
     currentFps: Float,
+    gamepadDeviceName: String = GamepadHid.NAME,
     imeRequestToken: Int = 0,
     enableBackHandler: Boolean = true,
     interactive: Boolean = true,
@@ -663,10 +666,12 @@ fun FullscreenControlPage(
         )
     }
 
+    val gamepadDeviceNameLatest = rememberUpdatedState(gamepadDeviceName)
     val gamepadHandler = remember(session.gamepadEnabled, scrcpy) {
         if (session.gamepadEnabled) {
             GamepadInputHandler(
                 scope = coroutineScope,
+                deviceName = { gamepadDeviceNameLatest.value },
                 onUhidCreate = { id, vendorId, productId, name, reportDesc ->
                     scrcpy.uhidCreate(id, vendorId, productId, name, reportDesc)
                 },

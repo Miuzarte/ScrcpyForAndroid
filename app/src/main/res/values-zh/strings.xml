@@ -284,6 +284,7 @@
     <string name="pref_summary_clear_logs_on_exit">双击返回退出应用时清除日志</string>
     <string name="pref_title_hide_log_box">隐藏设备页日志框</string>
     <string name="pref_summary_hide_log_box">隐藏设备页最下方的日志框</string>
+    <string name="pref_title_gamepad_device_name">虚拟手柄设备名称</string>
     <string name="pref_title_language">语言</string>
     <string name="pref_summary_language">应用显示语言</string>
 

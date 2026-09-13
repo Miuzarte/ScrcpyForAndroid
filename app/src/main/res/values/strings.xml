@@ -285,6 +285,7 @@
     <string name="pref_summary_clear_logs_on_exit">Clear logs when double-pressing back to exit the app</string>
     <string name="pref_title_hide_log_box">Hide device page log box</string>
     <string name="pref_summary_hide_log_box">Hide the log box at the bottom of the device page</string>
+    <string name="pref_title_gamepad_device_name">Virtual gamepad device name</string>
     <string name="pref_title_language">Language</string>
     <string name="pref_summary_language">App display language</string>
 

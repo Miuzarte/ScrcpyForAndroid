@@ -195,6 +195,13 @@ fun SettingsPage(
         )
     }
 
+    var gamepadDeviceNameInput by rememberSaveable(asBundle.gamepadDeviceName) {
+        mutableStateOf(
+            if (asBundle.gamepadDeviceName == AppSettings.GAMEPAD_DEVICE_NAME.defaultValue) ""
+            else asBundle.gamepadDeviceName,
+        )
+    }
+
     val adbPrivateKeyPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
@@ -1171,6 +1178,36 @@ fun SettingsPage(
                         )
                     },
                 )
+                Column(
+                    modifier = Modifier.padding(vertical = UiSpacing.Large),
+                    verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = UiSpacing.Large),
+                        verticalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.pref_title_gamepad_device_name),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        SuperTextField(
+                            value = gamepadDeviceNameInput,
+                            onValueChange = { gamepadDeviceNameInput = it },
+                            onFocusLost = {
+                                if (gamepadDeviceNameInput == AppSettings.GAMEPAD_DEVICE_NAME.defaultValue)
+                                    gamepadDeviceNameInput = ""
+                                asBundle = asBundle.copy(
+                                    gamepadDeviceName = gamepadDeviceNameInput
+                                        .ifBlank { AppSettings.GAMEPAD_DEVICE_NAME.defaultValue },
+                                )
+                            },
+                            label = AppSettings.GAMEPAD_DEVICE_NAME.defaultValue,
+                            useLabelAsPlaceholder = true,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
 

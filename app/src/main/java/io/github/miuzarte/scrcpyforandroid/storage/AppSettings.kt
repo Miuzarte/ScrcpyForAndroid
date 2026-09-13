@@ -5,6 +5,7 @@ import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.*
 import io.github.miuzarte.scrcpyforandroid.R
+import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadHid
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
@@ -323,6 +324,10 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
             booleanPreferencesKey("hide_device_logs"),
             false,
         )
+        val GAMEPAD_DEVICE_NAME = Pair(
+            stringPreferencesKey("gamepad_device_name"),
+            GamepadHid.NAME,
+        )
     }
 
     @Parcelize
@@ -392,6 +397,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         val lastUpdateCheckAt: Long,
         val clearLogsOnExit: Boolean,
         val hideDeviceLogs: Boolean,
+        val gamepadDeviceName: String,
     ): Parcelable {
     }
 
@@ -461,6 +467,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         bundleField(LAST_UPDATE_CHECK_AT) { it.lastUpdateCheckAt },
         bundleField(CLEAR_LOGS_ON_EXIT) { it.clearLogsOnExit },
         bundleField(HIDE_DEVICE_LOGS) { it.hideDeviceLogs },
+        bundleField(GAMEPAD_DEVICE_NAME) { it.gamepadDeviceName },
     )
 
     val bundleState: StateFlow<Bundle> = createBundleState(::bundleFromPreferences)
@@ -534,6 +541,7 @@ class AppSettings(context: Context): Settings(context, "AppSettings") {
         lastUpdateCheckAt = preferences.read(LAST_UPDATE_CHECK_AT),
         clearLogsOnExit = preferences.read(CLEAR_LOGS_ON_EXIT),
         hideDeviceLogs = preferences.read(HIDE_DEVICE_LOGS),
+        gamepadDeviceName = preferences.read(GAMEPAD_DEVICE_NAME),
     )
 
     suspend fun loadBundle() = loadBundle(::bundleFromPreferences)
