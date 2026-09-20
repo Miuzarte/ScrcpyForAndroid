@@ -315,9 +315,10 @@ internal fun DeviceTabPage(
         listState.animateScrollToItem(PREVIEW_CARD_ITEM_INDEX)
     }
 
-    fun handleVirtualButtonAction(action: VirtualButtonAction) {
-        when (action) {
-            VirtualButtonAction.RECENT_TASKS -> {
+    // 虚拟按钮的宿主动作: 预览卡上的动作只落在设备页自己的状态上
+    val virtualButtonHost = remember(scope, context, viewModel) {
+        object: VirtualButtonHost {
+            override fun handleShowRecentTasks() {
                 viewModel.showRecentTasks()
                 if (recentTasks.isEmpty() && !listingsRefreshBusy) {
                     scope.launch(Dispatchers.IO) {
@@ -329,7 +330,7 @@ internal fun DeviceTabPage(
                 }
             }
 
-            VirtualButtonAction.ALL_APPS -> {
+            override fun handleShowAllApps() {
                 viewModel.showAllApps()
                 if (apps.isEmpty() && !listingsRefreshBusy) {
                     scope.launch(Dispatchers.IO) {
@@ -338,13 +339,30 @@ internal fun DeviceTabPage(
                 }
             }
 
-            VirtualButtonAction.TOGGLE_IME -> viewModel.toggleIme()
-            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> scope.launch {
-                viewModel.pasteLocalClipboard(context)
+            override fun handleToggleIme() {
+                viewModel.toggleIme()
             }
 
-            else -> viewModel.handleVirtualButtonAction(action)
+            override fun handlePasteLocalClipboard() {
+                // 与原先一致: 在主线程取剪贴板, 内部自行切到 IO
+                scope.launch {
+                    viewModel.pasteLocalClipboard(context)
+                }
+            }
         }
+    }
+
+    fun handleVirtualButtonAction(action: VirtualButtonAction) {
+        VirtualButtonActions.perform(
+            scope = scope,
+            action = action,
+            host = virtualButtonHost,
+            onInjectKeycode = { keycode ->
+                scope.launch(Dispatchers.IO) {
+                    viewModel.injectVirtualKeycode(keycode)
+                }
+            },
+        )
     }
 
     @Composable

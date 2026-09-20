@@ -105,9 +105,9 @@ fun FullscreenControlScreen(
             VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout),
         )
     }
-    val floatingActions = remember(buttonItems) {
-        (buttonItems.first + buttonItems.second).filter { it != VirtualButtonAction.MORE }
-    }
+    // 悬浮球同样位于全屏页, 与全屏停靠栏使用同一套可见动作 (排除"更多")
+    val floatingActions = VirtualButtonActions.visibleOn(VirtualButtonSurface.FULLSCREEN)
+        .filter { it != VirtualButtonAction.MORE }
     val fullscreenDebugInfo = asBundle.fullscreenDebugInfo
     val showFullscreenVirtualButtons = asBundle.showFullscreenVirtualButtons
     val fullscreenVirtualButtonHeight = asBundle.fullscreenVirtualButtonHeightDp.dp
@@ -302,9 +302,14 @@ fun FullscreenControlScreen(
         }
     }
 
-    fun handleButtonAction(action: VirtualButtonAction) {
-        when (action) {
-            VirtualButtonAction.RECENT_TASKS -> {
+    val virtualButtonHostScope = rememberCoroutineScope()
+
+    // 虚拟按钮的宿主动作: 该界面上能把动作落到哪里, 由这里决定
+    val virtualButtonHost = remember(onBack) {
+        object: VirtualButtonHost {
+            override fun handleExitFullscreen() = onBack()
+
+            override fun handleShowRecentTasks() {
                 showRecentTasksSheet = true
                 if (recentTasks.isEmpty() && !listingsRefreshBusy) {
                     taskScope.launch {
@@ -314,7 +319,7 @@ fun FullscreenControlScreen(
                 }
             }
 
-            VirtualButtonAction.ALL_APPS -> {
+            override fun handleShowAllApps() {
                 showAllAppsSheet = true
                 if (apps.isEmpty() && !listingsRefreshBusy) {
                     taskScope.launch {
@@ -323,9 +328,11 @@ fun FullscreenControlScreen(
                 }
             }
 
-            VirtualButtonAction.TOGGLE_IME -> imeRequestToken++
+            override fun handleToggleIme() {
+                imeRequestToken++
+            }
 
-            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD ->
+            override fun handlePasteLocalClipboard() {
                 taskScope.launch {
                     val session = currentSession ?: return@launch
                     val text = LocalInputService.getClipboardText(activity ?: return@launch)
@@ -348,26 +355,32 @@ fun FullscreenControlScreen(
                         )
                     }
                 }
-
-            else -> action.keycode?.let {
-                taskScope.launch {
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            scrcpy.injectKeycode(0, it)
-                            scrcpy.injectKeycode(1, it)
-                        }
-                    }.onFailure { e ->
-                        Log.w(
-                            "FullscreenControlPage",
-                            "sendKeycode failed for keycode=$it",
-                            e,
-                        )
-                    }
-                }
             }
         }
     }
 
+    fun handleButtonAction(action: VirtualButtonAction) {
+        VirtualButtonActions.perform(
+            // 主线程作用域: 宿主动作直接落界面状态, 按键下发在回调内部切到 IO
+            scope = virtualButtonHostScope,
+            action = action,
+            host = virtualButtonHost,
+            onInjectKeycode = { keycode ->
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        scrcpy.injectKeycode(0, keycode)
+                        scrcpy.injectKeycode(1, keycode)
+                    }
+                }.onFailure { e ->
+                    Log.w(
+                        "FullscreenControlPage",
+                        "sendKeycode failed for keycode=$keycode",
+                        e,
+                    )
+                }
+            },
+        )
+    }
     suspend fun startApp(packageName: String) =
         runCatching {
             withContext(Dispatchers.IO) {

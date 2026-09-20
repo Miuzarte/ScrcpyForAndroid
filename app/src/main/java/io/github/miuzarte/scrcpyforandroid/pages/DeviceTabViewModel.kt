@@ -28,6 +28,7 @@ import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyOptions
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.scrcpyProfiles
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
+import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonSurface
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -239,12 +240,15 @@ internal class DeviceTabViewModel(
         _asBundle.map {
             VirtualButtonActions.splitLayout(
                 VirtualButtonActions.parseStoredLayout(it.virtualButtonsLayout),
+                // 设备页预览卡: 全屏专属动作 (如退出全屏) 在这里不出现
+                VirtualButtonSurface.PREVIEW,
             )
         }.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
             VirtualButtonActions.splitLayout(
                 VirtualButtonActions.parseStoredLayout(_asBundle.value.virtualButtonsLayout),
+                VirtualButtonSurface.PREVIEW,
             ),
         )
 
@@ -406,25 +410,25 @@ internal class DeviceTabViewModel(
         _savedShortcuts.update { it.remove(id) }
     }
 
-    fun handleVirtualButtonAction(action: VirtualButtonAction) {
-        when (action) {
-            VirtualButtonAction.RECENT_TASKS -> _showRecentTasksSheet.value = true
-            VirtualButtonAction.ALL_APPS -> _showAllAppsSheet.value = true
-            VirtualButtonAction.TOGGLE_IME -> _imeRequestToken.update { it + 1 }
-            VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> { /* handled by Composable with context */
-            }
-
-            else -> {
-                val keycode = action.keycode ?: return
-                runBusy(
-                    EventLogMessage.Resource(
-                        R.string.vm_send_action,
-                        listOf(EventLogMessage.Resource(action.titleResId)),
-                    ),
-                ) {
-                    scrcpy.injectKeycode(0, keycode)
-                    scrcpy.injectKeycode(1, keycode)
-                }
+    /**
+     * 注入一个虚拟按钮按键
+     *
+     * 按键类动作由 [VirtualButtonActions.perform] 统一分发, 这里只负责下发与日志
+     */
+    fun injectVirtualKeycode(keycode: Int) {
+        val action = VirtualButtonActions.byKeycode(keycode)
+        runBusy(
+            EventLogMessage.Resource(
+                R.string.vm_send_action,
+                listOf(
+                    action?.let { EventLogMessage.Resource(it.titleResId) }
+                        ?: EventLogMessage.Raw(keycode.toString()),
+                ),
+            ),
+        ) {
+            withContext(Dispatchers.IO) {
+                scrcpy.injectKeycode(0, keycode)
+                scrcpy.injectKeycode(1, keycode)
             }
         }
     }

@@ -44,107 +44,152 @@ import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import kotlin.ranges.coerceAtLeast
 
+// 动作语义: 决定动作由谁执行, 分发方只需按行为分支, 不必再按具体动作穷举
+enum class VirtualButtonBehavior {
+    // 注入设备按键: 由客户端向设备发送 keycode
+    INJECT_KEYCODE,
+
+    // 客户端本地动作: 需要宿主的 scrcpy 会话 / 界面状态, 客户端内部消化
+    HOST_ACTION,
+}
+
+// 动作出现的界面: 用于把只在流媒体全屏页有意义的动作挡在预览卡与排序页之外
+enum class VirtualButtonSurface {
+    // 设备页预览卡 + 虚拟按钮排序页 (按同一套布局渲染)
+    PREVIEW,
+
+    // 流媒体全屏页的停靠栏
+    FULLSCREEN,
+}
+
 enum class VirtualButtonAction(
     val id: String,
     @field:StringRes val titleResId: Int,
     val icon: ImageVector,
     val keycode: Int?,
+    val behavior: VirtualButtonBehavior,
+    // 是否只在流媒体全屏页显示, 预览卡与排序页会整体隐藏该动作
+    val fullscreenOnly: Boolean = false,
 ) {
     MORE(
-        "more",
-        R.string.vb_more,
-        MiuixIcons.More,
-        null,
+        id = "more",
+        titleResId = R.string.vb_more,
+        icon = MiuixIcons.More,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
     ),
     HOME(
-        "home",
-        R.string.vb_home,
-        Icons.Rounded.Home,
-        UiAndroidKeycodes.HOME,
+        id = "home",
+        titleResId = R.string.vb_home,
+        icon = Icons.Rounded.Home,
+        keycode = UiAndroidKeycodes.HOME,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     BACK(
-        "back",
-        R.string.vb_back,
-        Icons.AutoMirrored.Rounded.ArrowBack,
-        UiAndroidKeycodes.BACK,
+        id = "back",
+        titleResId = R.string.vb_back,
+        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+        keycode = UiAndroidKeycodes.BACK,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     APP_SWITCH(
-        "app_switch",
-        R.string.vb_app_switch,
-        Icons.Rounded.Apps,
-        UiAndroidKeycodes.APP_SWITCH,
+        id = "app_switch",
+        titleResId = R.string.vb_app_switch,
+        icon = Icons.Rounded.Apps,
+        keycode = UiAndroidKeycodes.APP_SWITCH,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     MENU(
-        "menu",
-        R.string.vb_menu,
-        Icons.Rounded.Menu,
-        UiAndroidKeycodes.MENU,
+        id = "menu",
+        titleResId = R.string.vb_menu,
+        icon = Icons.Rounded.Menu,
+        keycode = UiAndroidKeycodes.MENU,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     NOTIFICATION(
-        "notification",
-        R.string.vb_notifications,
-        Icons.Rounded.Notifications,
-        UiAndroidKeycodes.NOTIFICATION,
+        id = "notification",
+        titleResId = R.string.vb_notifications,
+        icon = Icons.Rounded.Notifications,
+        keycode = UiAndroidKeycodes.NOTIFICATION,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     VOLUME_UP(
-        "volume_up",
-        R.string.vb_volume_up,
-        Icons.AutoMirrored.Rounded.VolumeUp,
-        UiAndroidKeycodes.VOLUME_UP,
+        id = "volume_up",
+        titleResId = R.string.vb_volume_up,
+        icon = Icons.AutoMirrored.Rounded.VolumeUp,
+        keycode = UiAndroidKeycodes.VOLUME_UP,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     VOLUME_DOWN(
-        "volume_down",
-        R.string.vb_volume_down,
-        Icons.AutoMirrored.Rounded.VolumeDown,
-        UiAndroidKeycodes.VOLUME_DOWN,
+        id = "volume_down",
+        titleResId = R.string.vb_volume_down,
+        icon = Icons.AutoMirrored.Rounded.VolumeDown,
+        keycode = UiAndroidKeycodes.VOLUME_DOWN,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     VOLUME_MUTE(
-        "volume_mute",
-        R.string.vb_volume_mute,
-        Icons.AutoMirrored.Rounded.VolumeOff,
-        UiAndroidKeycodes.VOLUME_MUTE,
+        id = "volume_mute",
+        titleResId = R.string.vb_volume_mute,
+        icon = Icons.AutoMirrored.Rounded.VolumeOff,
+        keycode = UiAndroidKeycodes.VOLUME_MUTE,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     POWER(
-        "power",
-        R.string.vb_lock_screen,
-        Icons.Rounded.PowerSettingsNew,
-        UiAndroidKeycodes.POWER,
+        id = "power",
+        titleResId = R.string.vb_lock_screen,
+        icon = Icons.Rounded.PowerSettingsNew,
+        keycode = UiAndroidKeycodes.POWER,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     SCREENSHOT(
-        "screenshot",
-        R.string.vb_screenshot,
-        Icons.Rounded.Screenshot,
-        UiAndroidKeycodes.SYSRQ,
+        id = "screenshot",
+        titleResId = R.string.vb_screenshot,
+        icon = Icons.Rounded.Screenshot,
+        keycode = UiAndroidKeycodes.SYSRQ,
+        behavior = VirtualButtonBehavior.INJECT_KEYCODE,
     ),
     PASSWORD_INPUT(
-        "password_input",
-        R.string.vb_fill_password,
-        Icons.Rounded.Password,
-        null,
+        id = "password_input",
+        titleResId = R.string.vb_fill_password,
+        icon = Icons.Rounded.Password,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
     ),
     ALL_APPS(
-        "all_apps",
-        R.string.vb_all_apps,
-        Icons.Rounded.Apps,
-        null,
+        id = "all_apps",
+        titleResId = R.string.vb_all_apps,
+        icon = Icons.Rounded.Apps,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
     ),
     RECENT_TASKS(
-        "recent_tasks",
-        R.string.vb_recent_tasks,
-        Icons.Rounded.DashboardCustomize,
-        null,
+        id = "recent_tasks",
+        titleResId = R.string.vb_recent_tasks,
+        icon = Icons.Rounded.DashboardCustomize,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
     ),
     TOGGLE_IME(
-        "toggle_ime",
-        R.string.vb_toggle_ime,
-        Icons.Rounded.Keyboard,
-        null,
+        id = "toggle_ime",
+        titleResId = R.string.vb_toggle_ime,
+        icon = Icons.Rounded.Keyboard,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
     ),
     PASTE_LOCAL_CLIPBOARD(
-        "paste_local_clipboard",
-        R.string.vb_paste_clipboard,
-        Icons.Rounded.ContentPaste,
-        null,
+        id = "paste_local_clipboard",
+        titleResId = R.string.vb_paste_clipboard,
+        icon = Icons.Rounded.ContentPaste,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
+    ),
+    EXIT_FULLSCREEN(
+        id = "exit_fullscreen",
+        titleResId = R.string.vb_exit_fullscreen,
+        icon = Icons.Rounded.FullscreenExit,
+        keycode = null,
+        behavior = VirtualButtonBehavior.HOST_ACTION,
+        fullscreenOnly = true,
     );
 }
 
@@ -153,10 +198,46 @@ data class VirtualButtonItem(
     val showOutside: Boolean,
 )
 
+/**
+ * 宿主动作回调: 由承载虚拟按钮的界面实现, 只有界面自己知道这些动作该落到什么状态上
+ *
+ * 新增一个宿主动作时, 在这里加一个方法即可, 不需要再去每个界面补一个 when 分支
+ */
+interface VirtualButtonHost {
+    // 关闭流媒体全屏页, 回到设备页
+    fun handleExitFullscreen() = Unit
+
+    // 打开最近任务面板
+    fun handleShowRecentTasks() = Unit
+
+    // 打开应用列表面板
+    fun handleShowAllApps() = Unit
+
+    // 拉起设备输入法
+    fun handleToggleIme() = Unit
+
+    // 把本机剪贴板内容粘贴到设备
+    fun handlePasteLocalClipboard() = Unit
+}
+
 object VirtualButtonActions {
     val all = VirtualButtonAction.entries
 
     private val byId = all.associateBy { it.id }
+
+    private val byKeycode = all.mapNotNull { action ->
+        action.keycode?.let { keycode -> keycode to action }
+    }.toMap()
+
+    fun byKeycode(keycode: Int): VirtualButtonAction? = byKeycode[keycode]
+
+    // 该界面上可见的动作: 全屏专属动作只在流媒体全屏页提供
+    fun visibleOn(surface: VirtualButtonSurface): List<VirtualButtonAction> = all.filter { action ->
+        when (surface) {
+            VirtualButtonSurface.FULLSCREEN -> true
+            VirtualButtonSurface.PREVIEW -> !action.fullscreenOnly
+        }
+    }
 
     fun parseStoredLayout(raw: String): List<VirtualButtonItem> {
         val parsed = raw.takeIf { it.isNotBlank() }
@@ -174,6 +255,7 @@ object VirtualButtonActions {
         val base = parsed.ifEmpty {
             parseStoredLayout(AppSettings.VIRTUAL_BUTTONS_LAYOUT.defaultValue)
         }
+        // 新增动作无需迁移存储: 未出现在已存布局里的动作统一追加到更多菜单
         val missing = all
             .filterNot { action -> base.any { it.action == action } }
             .map { action ->
@@ -191,10 +273,51 @@ object VirtualButtonActions {
         }
     }
 
-    fun splitLayout(items: List<VirtualButtonItem>): Pair<List<VirtualButtonAction>, List<VirtualButtonAction>> {
-        val outside = items.filter { it.showOutside }.map { it.action }
-        val more = items.filter { !it.showOutside }.map { it.action }
+    fun splitLayout(
+        items: List<VirtualButtonItem>,
+        surface: VirtualButtonSurface = VirtualButtonSurface.FULLSCREEN,
+    ): Pair<List<VirtualButtonAction>, List<VirtualButtonAction>> {
+        val visible = visibleOn(surface).toSet()
+        val shown = items.filter { it.action in visible }
+        val outside = shown.filter { it.showOutside }.map { it.action }
+        val more = shown.filter { !it.showOutside }.map { it.action }
         return outside to more
+    }
+
+    /**
+     * 虚拟按钮动作的唯一分发点
+     *
+     * 按 [VirtualButtonBehavior] 分类处理: 注入按键的动作直接下发设备, 客户端本地动作交给
+     * [host]; 因此新增动作不会再掉进某个界面的 else 兜底分支里被静默忽略
+     *
+     * [scope] 用一个主线程作用域即可: 界面回调本就在主线程, 设备侧的下发由各回调内部
+     * 自行切到 IO, 与重构前逐动作手写时的线程语义保持一致
+     */
+    fun perform(
+        scope: CoroutineScope,
+        action: VirtualButtonAction,
+        onInjectKeycode: suspend (Int) -> Unit,
+        host: VirtualButtonHost,
+    ) {
+        when (action.behavior) {
+            VirtualButtonBehavior.INJECT_KEYCODE -> {
+                val keycode = action.keycode ?: return
+                scope.launch { onInjectKeycode(keycode) }
+            }
+
+            // 宿主动作同步执行, 不额外启动协程, 保证在调用线程 (主线程) 上落地
+            VirtualButtonBehavior.HOST_ACTION -> when (action) {
+                VirtualButtonAction.MORE -> Unit
+                VirtualButtonAction.PASSWORD_INPUT -> Unit
+                VirtualButtonAction.EXIT_FULLSCREEN -> host.handleExitFullscreen()
+                VirtualButtonAction.RECENT_TASKS -> host.handleShowRecentTasks()
+                VirtualButtonAction.ALL_APPS -> host.handleShowAllApps()
+                VirtualButtonAction.TOGGLE_IME -> host.handleToggleIme()
+                VirtualButtonAction.PASTE_LOCAL_CLIPBOARD -> host.handlePasteLocalClipboard()
+                // 该动作标了 HOST_ACTION 却没有分发目标: 属于接错线, 直接暴露而不是静默吞掉
+                else -> error("unhandled host action: ${action.id}")
+            }
+        }
     }
 }
 
@@ -231,12 +354,15 @@ class VirtualButtonBar(
         val disabledContentColor = colorScheme.onPrimary.copy(alpha = 0.45f)
 
         var showMorePopup by remember { mutableStateOf(false) }
+        // 预览卡只渲染该界面可见的动作, 全屏专属动作在这里整体隐藏
+        val previewVisible = remember { VirtualButtonActions.visibleOn(VirtualButtonSurface.PREVIEW).toSet() }
+        val visibleActions = outsideActions.filter { it in previewVisible }
 
         Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
         ) {
-            outsideActions.forEach { action ->
+            visibleActions.forEach { action ->
                 var showPasswordPopup by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.weight(1f)) {
                     Button(
@@ -266,16 +392,11 @@ class VirtualButtonBar(
                         val contentColor =
                             if (enabled) activeContentColor
                             else disabledContentColor
-                        Icon(
-                            imageVector = action.icon,
-                            contentDescription = stringResource(action.titleResId),
-                            modifier = Modifier.size(18.dp),
-                            tint = contentColor,
+                        PreviewActionButtonContent(
+                            action = action,
+                            showText = showText,
+                            contentColor = contentColor,
                         )
-                        if (showText) {
-                            Spacer(Modifier.width(UiSpacing.Small))
-                            Text(stringResource(action.titleResId), color = contentColor)
-                        }
                     }
                     if (action == VirtualButtonAction.MORE) {
                         ActionPopup(
@@ -313,6 +434,24 @@ class VirtualButtonBar(
     }
 
     @Composable
+    private fun PreviewActionButtonContent(
+        action: VirtualButtonAction,
+        showText: Boolean,
+        contentColor: Color,
+    ) {
+        Icon(
+            imageVector = action.icon,
+            contentDescription = stringResource(action.titleResId),
+            modifier = Modifier.size(18.dp),
+            tint = contentColor,
+        )
+        if (showText) {
+            Spacer(Modifier.width(UiSpacing.Small))
+            Text(stringResource(action.titleResId), color = contentColor)
+        }
+    }
+
+    @Composable
     fun Fullscreen(
         onAction: suspend (VirtualButtonAction) -> Unit,
         modifier: Modifier = Modifier,
@@ -345,119 +484,61 @@ class VirtualButtonBar(
                 .fillMaxWidth()
                 .height(thickness)
 
+        // 纵向与横向只有容器与按钮尺寸不同, 按钮本体与弹层共用同一套渲染
+        // weight 是 RowScope / ColumnScope 的作用域扩展, 因此由调用方算好等分修饰符传进来
+        @Composable
+        fun renderButton(action: VirtualButtonAction, itemModifier: Modifier) {
+            Box(modifier = itemModifier) {
+                FullscreenActionButton(
+                    action = action,
+                    thickness = thickness,
+                    modifier = buttonModifier,
+                    onClick = {
+                        haptic.contextClick()
+                        when (action) {
+                            // 更多菜单与密码输入由本组件自行展开弹层, 其余动作上抛
+                            VirtualButtonAction.MORE -> showMorePopup = true
+                            VirtualButtonAction.PASSWORD_INPUT
+                                if passwordPopupContent != null -> showPasswordPopup = true
+
+                            else -> scope.launch { onAction(action) }
+                        }
+                    },
+                )
+
+                if (action == VirtualButtonAction.MORE) {
+                    ActionPopup(
+                        show = showMorePopup,
+                        actions = moreActions,
+                        onDismiss = { showMorePopup = false },
+                        onAction = {
+                            if (it == VirtualButtonAction.PASSWORD_INPUT
+                                && passwordPopupContent != null
+                            ) showPasswordPopup = true
+                            else onAction(it)
+
+                            showMorePopup = false
+                        },
+                        passwordPopupContent = passwordPopupContent,
+                        renderInRootScaffold = true,
+                    )
+                }
+            }
+        }
+
         if (isVertical) Column(
             modifier = containerModifier,
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            visibleActions.forEach { action ->
-                Box(modifier = Modifier.weight(1f)) {
-                    Button(
-                        onClick = {
-                            haptic.contextClick()
-                            when (action) {
-                                VirtualButtonAction.MORE -> {
-                                    showMorePopup = true
-                                }
-
-                                VirtualButtonAction.PASSWORD_INPUT
-                                    if passwordPopupContent != null -> {
-                                    showPasswordPopup = true
-                                }
-
-                                else -> scope.launch { onAction(action) }
-                            }
-                        },
-                        modifier = buttonModifier,
-                        cornerRadius = 0.dp,
-                        minHeight = thickness,
-                        insideMargin = PaddingValues(0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            color = Color.Black.copy(alpha = 0.1f),
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = action.icon,
-                            contentDescription = stringResource(action.titleResId),
-                            tint = Color.White,
-                        )
-                    }
-
-                    if (action == VirtualButtonAction.MORE) {
-                        ActionPopup(
-                            show = showMorePopup,
-                            actions = moreActions,
-                            onDismiss = { showMorePopup = false },
-                            onAction = {
-                                if (it == VirtualButtonAction.PASSWORD_INPUT
-                                    && passwordPopupContent != null
-                                ) showPasswordPopup = true
-                                else onAction(it)
-
-                                showMorePopup = false
-                            },
-                            passwordPopupContent = passwordPopupContent,
-                            renderInRootScaffold = true,
-                        )
-                    }
-                }
-            }
+            val itemModifier = Modifier.weight(1f)
+            visibleActions.forEach { renderButton(it, itemModifier) }
         }
         else Row(
             modifier = containerModifier,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            visibleActions.forEach { action ->
-                Box(modifier = Modifier.weight(1f)) {
-                    Button(
-                        onClick = {
-                            haptic.contextClick()
-                            when (action) {
-                                VirtualButtonAction.MORE -> {
-                                    showMorePopup = true
-                                }
-
-                                VirtualButtonAction.PASSWORD_INPUT
-                                    if passwordPopupContent != null -> {
-                                    showPasswordPopup = true
-                                }
-
-                                else -> scope.launch { onAction(action) }
-                            }
-                        },
-                        modifier = buttonModifier,
-                        cornerRadius = 0.dp,
-                        minHeight = thickness,
-                        insideMargin = PaddingValues(0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            color = Color.Black.copy(alpha = 0.1f),
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = action.icon,
-                            contentDescription = stringResource(action.titleResId),
-                            tint = Color.White,
-                        )
-                    }
-
-                    if (action == VirtualButtonAction.MORE) {
-                        ActionPopup(
-                            show = showMorePopup,
-                            actions = moreActions,
-                            onDismiss = { showMorePopup = false },
-                            onAction = {
-                                if (it == VirtualButtonAction.PASSWORD_INPUT
-                                    && passwordPopupContent != null
-                                ) showPasswordPopup = true
-                                else onAction(it)
-
-                                showMorePopup = false
-                            },
-                            passwordPopupContent = passwordPopupContent,
-                            renderInRootScaffold = true,
-                        )
-                    }
-                }
-            }
+            val itemModifier = Modifier.weight(1f)
+            visibleActions.forEach { renderButton(it, itemModifier) }
         }
 
         if (passwordPopupContent != null) {
@@ -471,6 +552,31 @@ class VirtualButtonBar(
             ) {
                 passwordPopupContent { showPasswordPopup = false }
             }
+        }
+    }
+
+    @Composable
+    private fun FullscreenActionButton(
+        action: VirtualButtonAction,
+        thickness: Dp,
+        modifier: Modifier,
+        onClick: () -> Unit,
+    ) {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            cornerRadius = 0.dp,
+            minHeight = thickness,
+            insideMargin = PaddingValues(0.dp),
+            colors = ButtonDefaults.buttonColors(
+                color = Color.Black.copy(alpha = 0.1f),
+            ),
+        ) {
+            Icon(
+                imageVector = action.icon,
+                contentDescription = stringResource(action.titleResId),
+                tint = Color.White,
+            )
         }
     }
 

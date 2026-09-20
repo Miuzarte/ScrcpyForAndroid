@@ -335,6 +335,7 @@
     <string name="vb_recent_tasks">最近任务</string>
     <string name="vb_toggle_ime">拉起输入法</string>
     <string name="vb_paste_clipboard">粘贴本机剪贴板</string>
+    <string name="vb_exit_fullscreen">退出全屏</string>
 
     <!-- Dock Positions -->
     <string name="dock_follow">跟随</string>
