@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
+import top.yukonga.miuix.kmp.overlay.OverlayCascadingListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import kotlin.ranges.coerceAtLeast
 
@@ -198,6 +198,9 @@ data class VirtualButtonItem(
     val showOutside: Boolean,
 )
 
+// 动作列表中「展开密码列表」的那一项: 它是级联菜单的触发项, 本身不是可执行动作
+private val PasswordMenuAction = VirtualButtonAction.PASSWORD_INPUT
+
 /**
  * 宿主动作回调: 由承载虚拟按钮的界面实现, 只有界面自己知道这些动作该落到什么状态上
  *
@@ -285,6 +288,22 @@ object VirtualButtonActions {
     }
 
     /**
+     * 不分「栏上 / 更多」的动作顺序, 用于把动作收进单个入口的形态 (悬浮球)
+     *
+     * 与 [splitLayout] 同一份用户排序, 因此悬浮球的菜单顺序与停靠栏一致;
+     * 不需要的项 (例如"更多"这个开关本身) 由调用方剔除
+     */
+    fun mergedOrder(
+        items: List<VirtualButtonItem>,
+        excluded: Set<VirtualButtonAction> = emptySet(),
+    ): List<VirtualButtonAction> {
+        val visible = visibleOn(VirtualButtonSurface.FULLSCREEN).toSet()
+        return items.map { it.action }
+            .filter { it in visible && it !in excluded }
+            .distinct()
+    }
+
+    /**
      * 虚拟按钮动作的唯一分发点
      *
      * 按 [VirtualButtonBehavior] 分类处理: 注入按键的动作直接下发设备, 客户端本地动作交给
@@ -308,6 +327,7 @@ object VirtualButtonActions {
             // 宿主动作同步执行, 不额外启动协程, 保证在调用线程 (主线程) 上落地
             VirtualButtonBehavior.HOST_ACTION -> when (action) {
                 VirtualButtonAction.MORE -> Unit
+                // 密码列表由菜单自己做二级展开, 选中密码才是填充动作
                 VirtualButtonAction.PASSWORD_INPUT -> Unit
                 VirtualButtonAction.EXIT_FULLSCREEN -> host.handleExitFullscreen()
                 VirtualButtonAction.RECENT_TASKS -> host.handleShowRecentTasks()
@@ -321,9 +341,113 @@ object VirtualButtonActions {
     }
 }
 
+/**
+ * 动作列表转成级联菜单的一级条目: [PasswordMenuAction] 展开后就是二级的密码列表
+ *
+ * [passwordChildren] 为 null 表示宿主没有提供密码列表, 此时该动作仍然展示, 但禁用且不展开,
+ * 避免用户点了没有任何反馈
+ */
+@Composable
+private fun rememberMenuEntries(
+    actions: List<VirtualButtonAction>,
+    passwordChildren: List<DropdownItem>?,
+    dispatch: (VirtualButtonAction) -> Unit,
+): List<DropdownEntry> {
+    val titles = actions.map { stringResource(it.titleResId) }
+    // 回调每个组合都是新实例, 所以不进 key: 条目在菜单展开期间必须保持同一份实例,
+    // 否则级联菜单会把已展开的二级菜单收起
+    val currentDispatch by rememberUpdatedState(dispatch)
+    return remember(actions, titles, passwordChildren) {
+        menuEntries(actions, titles, passwordChildren) { action ->
+            currentDispatch(action)
+        }
+    }
+}
+
+private fun menuEntries(
+    actions: List<VirtualButtonAction>,
+    titles: List<String>,
+    passwordChildren: List<DropdownItem>?,
+    dispatch: (VirtualButtonAction) -> Unit,
+): List<DropdownEntry> {
+    val items = actions.mapIndexed { index, action ->
+        val title = titles[index]
+        val icon: @Composable (Modifier) -> Unit = { iconModifier ->
+            Icon(
+                imageVector = action.icon,
+                contentDescription = title,
+                modifier = iconModifier,
+            )
+        }
+        if (action == PasswordMenuAction) {
+            DropdownItem(
+                text = title,
+                enabled = !passwordChildren.isNullOrEmpty(),
+                icon = icon,
+                children = passwordChildren,
+            )
+        } else {
+            DropdownItem(
+                text = title,
+                icon = icon,
+                onClick = { dispatch(action) },
+            )
+        }
+    }
+    return listOf(DropdownEntry(items = items))
+}
+
+// 密码列表是一层平铺的条目, 作为二级菜单时不需要再分组
+private fun passwordEntry(items: List<DropdownItem>): List<DropdownEntry> =
+    listOf(DropdownEntry(items = items))
+
+/**
+ * 虚拟按钮所有弹层的统一状态
+ *
+ * 预览卡、全屏停靠栏、悬浮球共用这一份结构: 三条路径的差别只剩下面那几个可点的按钮画成
+ * 什么样, 弹层与动作分发完全同源, 不会再出现某一条路径漏改的情况
+ *
+ * 槽位由调用方传进来, 因为预览卡与停靠栏可以同时存在, 两侧的菜单是互不影响的两份状态
+ */
+private class ActionPopups<S>(
+    val menuSlot: S,
+    val entries: List<DropdownEntry>,
+    // 动作分发: 注入按键的在回调内部切到 IO, 与重构前的线程语义一致
+    private val dispatch: (VirtualButtonAction) -> Unit,
+    val passwordSlot: S? = null,
+    val passwordChildren: List<DropdownItem>? = null,
+) {
+    var openSlot: S? by mutableStateOf(null)
+        private set
+
+    fun isOpen(slot: S): Boolean = openSlot == slot
+
+    fun open(slot: S) {
+        openSlot = slot
+    }
+
+    fun close() {
+        openSlot = null
+    }
+
+    /** 点了某个动作按钮: 「更多」开菜单, 密码项开二级列表, 其余按行为分发 */
+    fun trigger(action: VirtualButtonAction) {
+        when {
+            action == VirtualButtonAction.MORE -> open(menuSlot)
+
+            // 没有密码列表可展开 (例如没配密码) 时仍然弹出菜单, 而不是点了没反应
+            action == PasswordMenuAction ->
+                if (passwordChildren.isNullOrEmpty() || passwordSlot == null) open(menuSlot)
+                else open(passwordSlot)
+
+            else -> dispatch(action)
+        }
+    }
+}
+
 class VirtualButtonBar(
-    private val outsideActions: List<VirtualButtonAction>,
-    private val moreActions: List<VirtualButtonAction>,
+    private val outside: List<VirtualButtonAction>,
+    private val more: List<VirtualButtonAction>,
 ) {
     enum class FullscreenDock {
         TOP,
@@ -332,143 +456,169 @@ class VirtualButtonBar(
         RIGHT,
     }
 
-    private enum class ActionPopupDestination {
-        Actions,
-        Passwords,
+    /**
+     * 弹层槽位: 每个"锚点"各自持有独立的状态, 因此预览卡、停靠栏、悬浮球各自的菜单互不影响
+     *
+     * 菜单与密码二级列表共用一个锚点 (二级菜单本来就挂在它的锚点上), 所以要分成两套槽位
+     */
+    private enum class PopupSlot {
+        PreviewMore,
+        PreviewPassword,
+        FullscreenMore,
+        FullscreenPassword,
+        Ball,
     }
 
+    // 每条渲染路径各持一份状态 (预览卡与停靠栏会同时存在), 但结构、条目与分发完全同源
+    @Composable
+    private fun rememberActionPopups(
+        passwordChildren: List<DropdownItem>?,
+        onAction: suspend (VirtualButtonAction) -> Unit,
+        menuSlot: PopupSlot = PopupSlot.FullscreenMore,
+        passwordSlot: PopupSlot? = PopupSlot.FullscreenPassword,
+    ): ActionPopups<PopupSlot> {
+        val scope = rememberCoroutineScope()
+        fun dispatch(action: VirtualButtonAction) {
+            scope.launch { onAction(action) }
+        }
+        val entries = rememberMenuEntries(more, passwordChildren) { action -> dispatch(action) }
+        return remember(this) {
+            ActionPopups(
+                menuSlot = menuSlot,
+                entries = entries,
+                dispatch = { action -> dispatch(action) },
+                passwordSlot = passwordSlot,
+                passwordChildren = passwordChildren,
+            )
+        }
+    }
+
+    // 预览卡只渲染该界面可见的动作, 全屏专属动作在这里整体隐藏
     @Composable
     fun Preview(
         enabled: Boolean,
         showText: Boolean,
-        onAction: (VirtualButtonAction) -> Unit,
+        onAction: suspend (VirtualButtonAction) -> Unit,
         modifier: Modifier = Modifier,
-        passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
+        passwordChildren: List<DropdownItem>? = null,
         popupBottomPadding: Dp = 0.dp,
     ) {
-        val haptic = LocalHapticFeedback.current
-
-        val activeContainerColor = colorScheme.primary
-        val disabledContainerColor = colorScheme.primary.copy(alpha = 0.35f)
-        val activeContentColor = colorScheme.onPrimary
-        val disabledContentColor = colorScheme.onPrimary.copy(alpha = 0.45f)
-
-        var showMorePopup by remember { mutableStateOf(false) }
-        // 预览卡只渲染该界面可见的动作, 全屏专属动作在这里整体隐藏
+        val popups = rememberActionPopups(
+            passwordChildren = passwordChildren,
+            onAction = onAction,
+            menuSlot = PopupSlot.PreviewMore,
+            passwordSlot = PopupSlot.PreviewPassword,
+        )
         val previewVisible = remember { VirtualButtonActions.visibleOn(VirtualButtonSurface.PREVIEW).toSet() }
-        val visibleActions = outsideActions.filter { it in previewVisible }
+        val visibleActions = outside.filter { it in previewVisible }
 
         Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
         ) {
             visibleActions.forEach { action ->
-                var showPasswordPopup by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.weight(1f)) {
-                    Button(
-                        onClick = {
-                            haptic.contextClick()
-                            when (action) {
-                                VirtualButtonAction.MORE -> {
-                                    showMorePopup = true
-                                }
-
-                                VirtualButtonAction.PASSWORD_INPUT
-                                    if passwordPopupContent != null -> {
-                                    showPasswordPopup = true
-                                }
-
-                                else -> onAction(action)
-                            }
-                        },
+                    PreviewActionButton(
+                        action = action,
                         enabled = enabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            color = activeContainerColor,
-                            disabledColor = disabledContainerColor,
-                        ),
-                        insideMargin = PaddingValues(0.dp),
-                    ) {
-                        val contentColor =
-                            if (enabled) activeContentColor
-                            else disabledContentColor
-                        PreviewActionButtonContent(
-                            action = action,
-                            showText = showText,
-                            contentColor = contentColor,
-                        )
-                    }
-                    if (action == VirtualButtonAction.MORE) {
-                        ActionPopup(
-                            show = showMorePopup,
-                            actions = moreActions,
-                            onDismiss = { showMorePopup = false },
-                            onAction = {
-                                onAction(it)
-                                showMorePopup = false
-                            },
-                            passwordPopupContent = passwordPopupContent,
-                            renderInRootScaffold = false,
-                            popupBottomPadding = popupBottomPadding,
-                        )
-                    }
-                    if (
-                        action == VirtualButtonAction.PASSWORD_INPUT &&
-                        passwordPopupContent != null
-                    ) {
-                        OverlayListPopup(
-                            show = showPasswordPopup,
-                            popupPositionProvider =
-                                rememberBottomSafeContextMenuPositionProvider(popupBottomPadding),
-                            alignment = PopupPositionProvider.Align.TopEnd,
-                            onDismissRequest = { showPasswordPopup = false },
-                            renderInRootScaffold = false,
-                            enableWindowDim = false,
-                        ) {
-                            passwordPopupContent { showPasswordPopup = false }
-                        }
-                    }
+                        showText = showText,
+                        onClick = { popups.trigger(action) },
+                    )
+                    PreviewActionPopups(
+                        state = popups,
+                        visibleAction = action,
+                        popupBottomPadding = popupBottomPadding,
+                    )
                 }
             }
         }
     }
 
     @Composable
-    private fun PreviewActionButtonContent(
+    private fun PreviewActionButton(
         action: VirtualButtonAction,
+        enabled: Boolean,
         showText: Boolean,
-        contentColor: Color,
+        onClick: () -> Unit,
     ) {
-        Icon(
-            imageVector = action.icon,
-            contentDescription = stringResource(action.titleResId),
-            modifier = Modifier.size(18.dp),
-            tint = contentColor,
-        )
-        if (showText) {
-            Spacer(Modifier.width(UiSpacing.Small))
-            Text(stringResource(action.titleResId), color = contentColor)
+        val haptic = LocalHapticFeedback.current
+        Button(
+            onClick = {
+                haptic.contextClick()
+                onClick()
+            },
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                color = colorScheme.primary,
+                disabledColor = colorScheme.primary.copy(alpha = 0.35f),
+            ),
+            insideMargin = PaddingValues(0.dp),
+        ) {
+            val contentColor =
+                if (enabled) colorScheme.onPrimary
+                else colorScheme.onPrimary.copy(alpha = 0.45f)
+            Icon(
+                imageVector = action.icon,
+                contentDescription = stringResource(action.titleResId),
+                modifier = Modifier.size(18.dp),
+                tint = contentColor,
+            )
+            if (showText) {
+                Spacer(Modifier.width(UiSpacing.Small))
+                Text(stringResource(action.titleResId), color = contentColor)
+            }
+        }
+    }
+
+    @Composable
+    private fun PreviewActionPopups(
+        state: ActionPopups<PopupSlot>,
+        visibleAction: VirtualButtonAction,
+        popupBottomPadding: Dp,
+    ) {
+        if (visibleAction == VirtualButtonAction.MORE) {
+            ActionCascadingPopup(
+                show = state.isOpen(state.menuSlot),
+                entries = state.entries,
+                onDismissRequest = state::close,
+                alignment = PopupPositionProvider.Align.TopEnd,
+                renderInRootScaffold = false,
+                popupBottomPadding = popupBottomPadding,
+            )
+        }
+        val passwordSlot = state.passwordSlot
+        val passwordChildren = state.passwordChildren
+        if (visibleAction == PasswordMenuAction && passwordSlot != null && !passwordChildren.isNullOrEmpty()) {
+            ActionCascadingPopup(
+                show = state.isOpen(passwordSlot),
+                entries = passwordEntry(passwordChildren),
+                onDismissRequest = state::close,
+                alignment = PopupPositionProvider.Align.TopEnd,
+                renderInRootScaffold = false,
+                popupBottomPadding = popupBottomPadding,
+            )
         }
     }
 
     @Composable
     fun Fullscreen(
         onAction: suspend (VirtualButtonAction) -> Unit,
+        showOutsideButtons: Boolean = true,
         modifier: Modifier = Modifier,
         dock: FullscreenDock = FullscreenDock.BOTTOM,
         reverseOrder: Boolean = false,
         thickness: Dp = 16.dp,
-        passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
+        passwordChildren: List<DropdownItem>? = null,
     ) {
-        val scope = rememberCoroutineScope()
-        val haptic = LocalHapticFeedback.current
-        var showMorePopup by remember { mutableStateOf(false) }
-        var showPasswordPopup by remember { mutableStateOf(false) }
+        val popups = rememberActionPopups(passwordChildren, onAction)
+        // 悬浮球形态下停靠栏一个按钮都不画, 只保留共享状态 (showOutsideButtons = false)
+        if (!showOutsideButtons) return
 
         val isVertical = dock == FullscreenDock.LEFT || dock == FullscreenDock.RIGHT
         val visibleActions =
-            if (reverseOrder) outsideActions.asReversed()
-            else outsideActions
+            if (reverseOrder) outside.asReversed()
+            else outside
         val containerModifier =
             if (isVertical) modifier
                 .width(thickness)
@@ -477,129 +627,112 @@ class VirtualButtonBar(
                 .fillMaxWidth()
                 .height(thickness)
 
-        val buttonModifier =
-            if (isVertical) Modifier
-                .fillMaxSize()
-            else Modifier
-                .fillMaxWidth()
-                .height(thickness)
-
-        // 纵向与横向只有容器与按钮尺寸不同, 按钮本体与弹层共用同一套渲染
-        // weight 是 RowScope / ColumnScope 的作用域扩展, 因此由调用方算好等分修饰符传进来
-        @Composable
-        fun renderButton(action: VirtualButtonAction, itemModifier: Modifier) {
-            Box(modifier = itemModifier) {
-                FullscreenActionButton(
-                    action = action,
-                    thickness = thickness,
-                    modifier = buttonModifier,
-                    onClick = {
-                        haptic.contextClick()
-                        when (action) {
-                            // 更多菜单与密码输入由本组件自行展开弹层, 其余动作上抛
-                            VirtualButtonAction.MORE -> showMorePopup = true
-                            VirtualButtonAction.PASSWORD_INPUT
-                                if passwordPopupContent != null -> showPasswordPopup = true
-
-                            else -> scope.launch { onAction(action) }
-                        }
-                    },
-                )
-
-                if (action == VirtualButtonAction.MORE) {
-                    ActionPopup(
-                        show = showMorePopup,
-                        actions = moreActions,
-                        onDismiss = { showMorePopup = false },
-                        onAction = {
-                            if (it == VirtualButtonAction.PASSWORD_INPUT
-                                && passwordPopupContent != null
-                            ) showPasswordPopup = true
-                            else onAction(it)
-
-                            showMorePopup = false
-                        },
-                        passwordPopupContent = passwordPopupContent,
-                        renderInRootScaffold = true,
-                    )
-                }
-            }
-        }
-
         if (isVertical) Column(
             modifier = containerModifier,
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             val itemModifier = Modifier.weight(1f)
-            visibleActions.forEach { renderButton(it, itemModifier) }
+            visibleActions.forEach { FullscreenAction(it, thickness, itemModifier, popups) }
         }
         else Row(
             modifier = containerModifier,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             val itemModifier = Modifier.weight(1f)
-            visibleActions.forEach { renderButton(it, itemModifier) }
+            visibleActions.forEach { FullscreenAction(it, thickness, itemModifier, popups) }
         }
+    }
 
-        if (passwordPopupContent != null) {
-            OverlayListPopup(
-                show = showPasswordPopup,
-                popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                alignment = PopupPositionProvider.Align.TopEnd,
-                onDismissRequest = { showPasswordPopup = false },
-                renderInRootScaffold = true,
-                enableWindowDim = false,
+    // 纵向与横向只有容器与按钮尺寸不同, 按钮本体与弹层共用同一套渲染
+    // weight 是 RowScope / ColumnScope 的作用域扩展, 因此由调用方算好等分修饰符传进来
+    @Composable
+    private fun FullscreenAction(
+        action: VirtualButtonAction,
+        thickness: Dp,
+        itemModifier: Modifier,
+        popups: ActionPopups<PopupSlot>,
+    ) {
+        val haptic = LocalHapticFeedback.current
+        Box(modifier = itemModifier) {
+            Button(
+                onClick = {
+                    haptic.contextClick()
+                    popups.trigger(action)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(thickness),
+                cornerRadius = 0.dp,
+                minHeight = thickness,
+                insideMargin = PaddingValues(0.dp),
+                colors = ButtonDefaults.buttonColors(
+                    color = Color.Black.copy(alpha = 0.1f),
+                ),
             ) {
-                passwordPopupContent { showPasswordPopup = false }
+                Icon(
+                    imageVector = action.icon,
+                    contentDescription = stringResource(action.titleResId),
+                    tint = Color.White,
+                )
+            }
+
+            if (action == VirtualButtonAction.MORE) {
+                ActionCascadingPopup(
+                    show = popups.isOpen(popups.menuSlot),
+                    entries = popups.entries,
+                    onDismissRequest = popups::close,
+                )
+            }
+            val passwordSlot = popups.passwordSlot
+            val passwordChildren = popups.passwordChildren
+            if (action == PasswordMenuAction && passwordSlot != null && !passwordChildren.isNullOrEmpty()) {
+                ActionCascadingPopup(
+                    show = popups.isOpen(passwordSlot),
+                    entries = passwordEntry(passwordChildren),
+                    onDismissRequest = popups::close,
+                )
             }
         }
     }
 
-    @Composable
-    private fun FullscreenActionButton(
-        action: VirtualButtonAction,
-        thickness: Dp,
-        modifier: Modifier,
-        onClick: () -> Unit,
-    ) {
-        Button(
-            onClick = onClick,
-            modifier = modifier,
-            cornerRadius = 0.dp,
-            minHeight = thickness,
-            insideMargin = PaddingValues(0.dp),
-            colors = ButtonDefaults.buttonColors(
-                color = Color.Black.copy(alpha = 0.1f),
-            ),
-        ) {
-            Icon(
-                imageVector = action.icon,
-                contentDescription = stringResource(action.titleResId),
-                tint = Color.White,
-            )
-        }
-    }
-
+    /**
+     * 悬浮球: 与停靠栏共用同一套弹层与分发, 只是把可点的东西收成一个球
+     *
+     * 调用方构造时把 more 传成完整动作列表 (走 [VirtualButtonActions.mergedOrder]), outside 传空;
+     * 两边读的是同一份用户排序, 因此球的菜单顺序与停靠栏一致
+     */
     @Composable
     fun FloatingBall(
-        actions: List<VirtualButtonAction>,
         onAction: suspend (VirtualButtonAction) -> Unit,
         modifier: Modifier = Modifier,
-        passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
+        passwordChildren: List<DropdownItem>? = null,
     ) {
-        val scope = rememberCoroutineScope()
+        val popups = rememberActionPopups(
+            passwordChildren = passwordChildren,
+            onAction = onAction,
+            menuSlot = PopupSlot.Ball,
+            passwordSlot = null,
+        )
+        // 没有任何动作可放进菜单时, 退回停靠栏形态 (画全部动作按钮), 避免出现一颗点不出东西的球
+        if (more.isEmpty()) {
+            Fullscreen(
+                onAction = onAction,
+                modifier = modifier,
+                passwordChildren = passwordChildren,
+            )
+            return
+        }
+
         val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-        val haptic = LocalHapticFeedback.current
-        var showActions by remember { mutableStateOf(false) }
-        var showPasswordPopup by remember { mutableStateOf(false) }
+        // 悬浮球的位置与外观设置
         val asBundleShared by appSettings.bundleState.collectAsState()
-        val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
         var offsetXFraction by rememberSaveable(asBundleShared.fullscreenFloatingButtonXFraction) {
             mutableFloatStateOf(asBundleShared.fullscreenFloatingButtonXFraction)
         }
         var offsetYFraction by rememberSaveable(asBundleShared.fullscreenFloatingButtonYFraction) {
             mutableFloatStateOf(asBundleShared.fullscreenFloatingButtonYFraction)
         }
+        val asBundleSharedLatest by rememberUpdatedState(asBundleShared)
         DisposableEffect(Unit) {
             onDispose {
                 taskScope.launch {
@@ -619,36 +752,19 @@ class VirtualButtonBar(
             }
         }
 
-        BoxWithConstraints(
-            modifier = modifier.fillMaxSize(),
-        ) {
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
             val ballSize = asBundleShared.fullscreenFloatingButtonSizeDp.dp
-            val ringSize = ballSize / 2
-            val ringWidth = ballSize / 24
-            val backgroundAlpha =
-                (asBundleShared.fullscreenFloatingButtonBackgroundAlphaPercent / 100f)
-                    .coerceIn(0.1f, 1f)
-            val ringAlpha =
-                (asBundleShared.fullscreenFloatingButtonRingAlphaPercent / 100f)
-                    .coerceIn(0f, 1f)
             val maxX = (maxWidth - ballSize).coerceAtLeast(0.dp)
             val maxY = (maxHeight - ballSize).coerceAtLeast(0.dp)
-            val currentX =
-                maxX * offsetXFraction.coerceIn(0f, 1f)
-            val currentY =
-                maxY * offsetYFraction.coerceIn(0f, 1f)
+            val currentX = maxX * offsetXFraction.coerceIn(0f, 1f)
+            val currentY = maxY * offsetYFraction.coerceIn(0f, 1f)
             val popupAlignment =
                 if (offsetXFraction > 0.5f) PopupPositionProvider.Align.TopEnd
                 else PopupPositionProvider.Align.TopStart
 
             Box(
                 modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            currentX.roundToPx(),
-                            currentY.roundToPx(),
-                        )
-                    }
+                    .offset { IntOffset(currentX.roundToPx(), currentY.roundToPx()) }
                     .size(ballSize)
                     .pointerInput(maxX, maxY) {
                         var dragStartXFraction = offsetXFraction
@@ -677,165 +793,96 @@ class VirtualButtonBar(
                         }
                     },
             ) {
-                Button(
-                    modifier = Modifier.fillMaxSize(),
-                    onClick = {
-                        haptic.contextClick()
-                        showActions = true
-                    },
-                    cornerRadius = ballSize / 2,
-                    minHeight = ballSize,
-                    insideMargin = PaddingValues(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        color = Color.Black.copy(alpha = backgroundAlpha),
-                    ),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(ringSize)
-                            .clip(CircleShape)
-                            .then(
-                                if (ringAlpha > 0f) {
-                                    Modifier.border(
-                                        ringWidth,
-                                        Color.White.copy(alpha = ringAlpha),
-                                        CircleShape,
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            ),
-                    )
-                }
-
-                ActionPopup(
-                    show = showActions,
-                    actions = actions,
-                    onDismiss = { showActions = false },
-                    onAction = {
-                        if (it == VirtualButtonAction.PASSWORD_INPUT &&
-                            passwordPopupContent != null
-                        ) showPasswordPopup = true
-                        else scope.launch { onAction(it) }
-
-                        showActions = false
-                    },
-                    passwordPopupContent = passwordPopupContent,
-                    renderInRootScaffold = true,
-                    popupAlignment = popupAlignment,
+                FloatingBallButton(
+                    ballSize = ballSize,
+                    backgroundAlpha =
+                        (asBundleShared.fullscreenFloatingButtonBackgroundAlphaPercent / 100f)
+                            .coerceIn(0.1f, 1f),
+                    ringAlpha =
+                        (asBundleShared.fullscreenFloatingButtonRingAlphaPercent / 100f)
+                            .coerceIn(0f, 1f),
+                    // 「更多」不在球的条目里, 用它当"打开菜单"的触发动作
+                    onClick = { popups.trigger(VirtualButtonAction.MORE) },
                 )
 
-                if (passwordPopupContent != null) {
-                    OverlayListPopup(
-                        show = showPasswordPopup,
-                        popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
-                        alignment = popupAlignment,
-                        onDismissRequest = { showPasswordPopup = false },
-                        renderInRootScaffold = true,
-                        enableWindowDim = false,
-                    ) {
-                        passwordPopupContent { showPasswordPopup = false }
-                    }
-                }
+                ActionCascadingPopup(
+                    show = popups.isOpen(popups.menuSlot),
+                    entries = popups.entries,
+                    onDismissRequest = popups::close,
+                    alignment = popupAlignment,
+                )
             }
         }
     }
 
     @Composable
-    private fun ActionPopup(
-        show: Boolean,
-        actions: List<VirtualButtonAction>,
-        onDismiss: () -> Unit,
-        onAction: suspend (VirtualButtonAction) -> Unit,
-        passwordPopupContent: (@Composable (onDismissRequest: () -> Unit) -> Unit)? = null,
-        renderInRootScaffold: Boolean,
-        popupAlignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
-        popupBottomPadding: Dp = 0.dp,
+    private fun FloatingBallButton(
+        ballSize: Dp,
+        backgroundAlpha: Float,
+        ringAlpha: Float,
+        onClick: () -> Unit,
     ) {
-        val scope = rememberCoroutineScope()
         val haptic = LocalHapticFeedback.current
-        val spinnerItems = actions.map { action ->
-            val title = stringResource(action.titleResId)
-            DropdownItem(
-                icon = {
-                    Icon(
-                        imageVector = action.icon,
-                        contentDescription = title,
-                        modifier = Modifier
-                            .padding(end = UiSpacing.ContentVertical),
-                    )
-                },
-                title = title,
+        val ringSize = ballSize / 2
+        val ringWidth = ballSize / 24
+        Button(
+            modifier = Modifier.fillMaxSize(),
+            onClick = {
+                haptic.contextClick()
+                onClick()
+            },
+            cornerRadius = ballSize / 2,
+            minHeight = ballSize,
+            insideMargin = PaddingValues(0.dp),
+            colors = ButtonDefaults.buttonColors(
+                color = Color.Black.copy(alpha = backgroundAlpha),
+            ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(ringSize)
+                    .clip(CircleShape)
+                    .then(
+                        if (ringAlpha > 0f) {
+                            Modifier.border(
+                                ringWidth,
+                                Color.White.copy(alpha = ringAlpha),
+                                CircleShape,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
-
-        NavOverlayListPopup(
-            show = show,
-            startDestination = ActionPopupDestination.Actions,
-            popupAlignment = popupAlignment,
-            onDismiss = onDismiss,
-            renderInRootScaffold = renderInRootScaffold,
-            popupBottomPadding = popupBottomPadding,
-        ) { destination, navigateTo, dismiss ->
-            ListPopupColumn {
-                if (destination == ActionPopupDestination.Actions)
-                    spinnerItems.forEachIndexed { index, entry ->
-                        SpinnerItemImpl(
-                            entry = entry,
-                            entryCount = spinnerItems.size,
-                            isSelected = false,
-                            index = index,
-                            spinnerColors = DropdownDefaults.dropdownColors(),
-                            dialogMode = false,
-                            onSelectedIndexChange = { selectedIdx ->
-                                haptic.confirm()
-                                val selectedAction = actions[selectedIdx]
-                                if (
-                                    selectedAction == VirtualButtonAction.PASSWORD_INPUT &&
-                                    passwordPopupContent != null
-                                ) {
-                                    navigateTo(ActionPopupDestination.Passwords)
-                                } else {
-                                    scope.launch { onAction(selectedAction) }
-                                    dismiss()
-                                }
-                            },
-                        )
-                    }
-                else if (passwordPopupContent != null)
-                    passwordPopupContent { dismiss() }
-                else
-                    dismiss()
-            }
-        }
     }
 
+    /**
+     * 级联菜单弹层: 一级是动作列表, 「填充锁屏密码」展开后是二级的密码列表
+     */
     @Composable
-    private fun <Destination> NavOverlayListPopup(
+    private fun ActionCascadingPopup(
         show: Boolean,
-        startDestination: Destination,
-        popupAlignment: PopupPositionProvider.Align,
-        onDismiss: () -> Unit,
-        renderInRootScaffold: Boolean,
+        entries: List<DropdownEntry>,
+        onDismissRequest: () -> Unit,
+        alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
+        renderInRootScaffold: Boolean = true,
         popupBottomPadding: Dp = 0.dp,
-        content: @Composable (
-            destination: Destination,
-            navigateTo: (Destination) -> Unit,
-            dismiss: () -> Unit,
-        ) -> Unit,
     ) {
-        var destination by remember(show, startDestination) { mutableStateOf(startDestination) }
-        OverlayListPopup(
+        OverlayCascadingListPopup(
             show = show,
+            entries = entries,
+            onDismissRequest = onDismissRequest,
             popupPositionProvider =
-                rememberBottomSafeContextMenuPositionProvider(popupBottomPadding),
-            alignment = popupAlignment,
-            onDismissRequest = onDismiss,
+                if (popupBottomPadding > 0.dp) {
+                    rememberBottomSafeContextMenuPositionProvider(popupBottomPadding)
+                } else {
+                    ListPopupDefaults.ContextMenuPositionProvider
+                },
+            alignment = alignment,
             renderInRootScaffold = renderInRootScaffold,
             enableWindowDim = false,
-        ) {
-            content(destination, { destination = it }, onDismiss)
-        }
+        )
     }
 
     @Composable

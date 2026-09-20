@@ -37,7 +37,7 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbDeviceWatcher
 import io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceEvent
-import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
+import io.github.miuzarte.scrcpyforandroid.password.rememberPasswordPickerEntries
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
@@ -776,9 +776,8 @@ internal fun DeviceTabPage(
             moreActions = virtualButtonLayout.second,
             showText = asBundle.previewVirtualButtonShowText,
             onAction = ::handleVirtualButtonAction,
-            passwordPopupContent = { onDismissRequest ->
-                PasswordPickerPopupContent(onDismissRequest = onDismissRequest)
-            },
+            // 有二级菜单的密码列表由宿主提供, 预览卡只负责在动作菜单里展开它
+            passwordChildren = rememberPasswordPickerEntries(),
             popupBottomPadding = bottomInnerPadding,
             modifier = modifier,
         )

@@ -30,11 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.fragment.app.FragmentActivity
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
-import io.github.miuzarte.scrcpyforandroid.password.PasswordPickerPopupContent
+import io.github.miuzarte.scrcpyforandroid.password.rememberPasswordPickerEntries
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadHid
 import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadInputHandler
@@ -65,7 +64,6 @@ fun FullscreenControlScreen(
     val activity = LocalActivity.current
     val context = LocalContext.current
     val snackbarController = LocalSnackbarController.current
-    val fragmentActivity = remember(activity) { activity as? FragmentActivity }
 
     val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
@@ -101,13 +99,19 @@ fun FullscreenControlScreen(
     }
 
     val buttonItems = remember(asBundle.virtualButtonsLayout) {
-        VirtualButtonActions.splitLayout(
-            VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout),
+        VirtualButtonActions.parseStoredLayout(asBundle.virtualButtonsLayout)
+    }
+    // 停靠栏: 按用户排序切分成"栏上按钮 / 更多菜单"
+    val virtualButtonLayout = remember(buttonItems) {
+        VirtualButtonActions.splitLayout(buttonItems)
+    }
+    // 悬浮球: 与停靠栏同一份用户排序, 但动作合并回一条列表并去掉"更多"这个开关本身
+    val floatingActions = remember(buttonItems) {
+        VirtualButtonActions.mergedOrder(
+            items = buttonItems,
+            excluded = setOf(VirtualButtonAction.MORE),
         )
     }
-    // 悬浮球同样位于全屏页, 与全屏停靠栏使用同一套可见动作 (排除"更多")
-    val floatingActions = VirtualButtonActions.visibleOn(VirtualButtonSurface.FULLSCREEN)
-        .filter { it != VirtualButtonAction.MORE }
     val fullscreenDebugInfo = asBundle.fullscreenDebugInfo
     val showFullscreenVirtualButtons = asBundle.showFullscreenVirtualButtons
     val fullscreenVirtualButtonHeight = asBundle.fullscreenVirtualButtonHeightDp.dp
@@ -200,10 +204,17 @@ fun FullscreenControlScreen(
             ?: false
     }
 
-    val bar = remember(buttonItems) {
+    val bar = remember(virtualButtonLayout) {
         VirtualButtonBar(
-            outsideActions = buttonItems.first,
-            moreActions = buttonItems.second,
+            outside = virtualButtonLayout.first,
+            more = virtualButtonLayout.second,
+        )
+    }
+    // 悬浮球与停靠栏是同一个组件的两种画法: 球把全部动作收进菜单, 所以没有"栏上按钮"
+    val ballBar = remember(floatingActions) {
+        VirtualButtonBar(
+            outside = emptyList(),
+            more = floatingActions,
         )
     }
     val recentTasks = remember(listingsRefreshVersion) { scrcpy.listings.recentTasks }
@@ -393,6 +404,9 @@ fun FullscreenControlScreen(
             )
         }
 
+    // 虚拟按钮级联菜单二级的密码列表; 无法拉起验证时这里只会给出不可点击的提示项
+    val passwordPickerEntries = rememberPasswordPickerEntries()
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarController.hostState) },
@@ -449,20 +463,15 @@ fun FullscreenControlScreen(
                     reverseOrder = fullscreenVirtualButtonReverseOrder,
                     thickness = fullscreenVirtualButtonHeight,
                     onAction = ::handleButtonAction,
-                    passwordPopupContent = fragmentActivity?.let {
-                        { onDismissRequest -> PasswordPickerPopupContent(onDismissRequest = onDismissRequest) }
-                    },
+                    passwordChildren = passwordPickerEntries,
                 )
             }
 
             if (asBundle.showFullscreenFloatingButton && !isInPip) {
-                bar.FloatingBall(
-                    actions = floatingActions,
+                ballBar.FloatingBall(
                     modifier = Modifier.fillMaxSize(),
                     onAction = ::handleButtonAction,
-                    passwordPopupContent = fragmentActivity?.let {
-                        { onDismissRequest -> PasswordPickerPopupContent(onDismissRequest = onDismissRequest) }
-                    },
+                    passwordChildren = passwordPickerEntries,
                 )
             }
 

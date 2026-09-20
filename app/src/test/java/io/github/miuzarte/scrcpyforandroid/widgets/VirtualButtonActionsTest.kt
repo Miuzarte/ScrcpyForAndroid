@@ -65,6 +65,39 @@ class VirtualButtonActionsTest {
     }
 
     @Test
+    fun mergedOrderFollowsUserLayoutInsteadOfEnumOrder() {
+        // 存储顺序与枚举顺序刻意不同: 悬浮球这类"一个菜单装下全部动作"的入口必须跟着用户排序
+        val stored = "power:0,home:0,back:0"
+
+        val merged = VirtualButtonActions.mergedOrder(
+            VirtualButtonActions.parseStoredLayout(stored),
+            excluded = setOf(VirtualButtonAction.MORE),
+        )
+
+        assertEquals(
+            listOf(VirtualButtonAction.POWER, VirtualButtonAction.HOME, VirtualButtonAction.BACK),
+            merged.take(3),
+        )
+    }
+
+    @Test
+    fun mergedOrderExcludesRequestedActionsAndKeepsEveryOtherOne() {
+        val items = VirtualButtonActions.parseStoredLayout("")
+
+        val merged = VirtualButtonActions.mergedOrder(
+            items,
+            excluded = setOf(VirtualButtonAction.MORE),
+        )
+
+        assertFalse(VirtualButtonAction.MORE in merged)
+        // 除被剔除的以外, 菜单式入口不该漏掉任何动作
+        assertEquals(
+            VirtualButtonAction.entries.filterNot { it == VirtualButtonAction.MORE }.toSet(),
+            merged.toSet(),
+        )
+    }
+
+    @Test
     fun behaviorMatchesKeycodePresence() {
         VirtualButtonAction.entries.forEach { action ->
             when (action.behavior) {
