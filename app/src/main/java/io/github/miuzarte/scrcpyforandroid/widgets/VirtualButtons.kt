@@ -31,7 +31,6 @@ import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
-import io.github.miuzarte.scrcpyforandroid.ui.confirm
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,9 +52,10 @@ enum class VirtualButtonBehavior {
     HOST_ACTION,
 }
 
-// 动作出现的界面: 用于把只在流媒体全屏页有意义的动作挡在预览卡与排序页之外
+// 动作出现的界面: 用于把只在流媒体全屏页有意义的动作挡在预览卡之外
 enum class VirtualButtonSurface {
-    // 设备页预览卡 + 虚拟按钮排序页 (按同一套布局渲染)
+    // 设备页预览卡, 全屏专属动作在这里整体隐藏
+    // (虚拟按钮排序页不受此过滤, 它要列出全部动作让用户配置)
     PREVIEW,
 
     // 流媒体全屏页的停靠栏
@@ -401,24 +401,9 @@ private fun menuEntries(
 private fun passwordEntry(items: List<DropdownItem>): List<DropdownEntry> =
     listOf(DropdownEntry(items = items))
 
-/**
- * 虚拟按钮所有弹层的统一状态
- *
- * 预览卡、全屏停靠栏、悬浮球共用这一份结构: 三条路径的差别只剩下面那几个可点的按钮画成
- * 什么样, 弹层与动作分发完全同源, 不会再出现某一条路径漏改的情况
- *
- * 槽位由调用方传进来, 因为预览卡与停靠栏可以同时存在, 两侧的菜单是互不影响的两份状态
- */
-private class ActionPopups<S>(
-    val menuSlot: S,
-    val entries: List<DropdownEntry>,
-    // 动作分发: 注入按键的在回调内部切到 IO, 与重构前的线程语义一致
-    private val dispatch: (VirtualButtonAction) -> Unit,
-    val passwordSlot: S? = null,
-    val passwordChildren: List<DropdownItem>? = null,
-) {
-    var openSlot: S? by mutableStateOf(null)
-        private set
+/** 弹层槽位的唯一持久状态: 当前打开的是哪个槽位 */
+private class PopupSlots<S> {
+    private var openSlot: S? by mutableStateOf(null)
 
     fun isOpen(slot: S): Boolean = openSlot == slot
 
@@ -429,16 +414,40 @@ private class ActionPopups<S>(
     fun close() {
         openSlot = null
     }
+}
+
+/**
+ * 虚拟按钮弹层的当次组合视图
+ *
+ * 只有槽位状态留在 [PopupSlots] 里跨组合保留; 条目、密码列表与分发回调都取当次组合的值,
+ * 否则弹层会一直展示首次组合时的快照 (密码列表变了或者宿主状态变了都读不到)
+ *
+ * 槽位由调用方传进来, 因为预览卡与停靠栏可以同时存在, 两侧的菜单是互不影响的两份状态
+ */
+private class ActionPopups<S>(
+    private val slots: PopupSlots<S>,
+    val menuSlot: S,
+    val passwordSlot: S?,
+    val entries: List<DropdownEntry>,
+    val passwordChildren: List<DropdownItem>?,
+    // 动作分发: 注入按键的在回调内部切到 IO, 与重构前的线程语义一致
+    private val dispatch: (VirtualButtonAction) -> Unit,
+) {
+    fun isOpen(slot: S): Boolean = slots.isOpen(slot)
+
+    fun close() {
+        slots.close()
+    }
 
     /** 点了某个动作按钮: 「更多」开菜单, 密码项开二级列表, 其余按行为分发 */
     fun trigger(action: VirtualButtonAction) {
         when {
-            action == VirtualButtonAction.MORE -> open(menuSlot)
+            action == VirtualButtonAction.MORE -> slots.open(menuSlot)
 
             // 没有密码列表可展开 (例如没配密码) 时仍然弹出菜单, 而不是点了没反应
             action == PasswordMenuAction ->
-                if (passwordChildren.isNullOrEmpty() || passwordSlot == null) open(menuSlot)
-                else open(passwordSlot)
+                if (passwordChildren.isNullOrEmpty() || passwordSlot == null) slots.open(menuSlot)
+                else slots.open(passwordSlot)
 
             else -> dispatch(action)
         }
@@ -478,19 +487,21 @@ class VirtualButtonBar(
         passwordSlot: PopupSlot? = PopupSlot.FullscreenPassword,
     ): ActionPopups<PopupSlot> {
         val scope = rememberCoroutineScope()
+        // 只有槽位状态跨组合保留, 其余数据每次组合重新构造
+        val slots = remember(this) { PopupSlots<PopupSlot>() }
         fun dispatch(action: VirtualButtonAction) {
             scope.launch { onAction(action) }
         }
+        // 条目回调经 rememberUpdatedState 转发, 点下去时读到的总是当次组合的分发
         val entries = rememberMenuEntries(more, passwordChildren) { action -> dispatch(action) }
-        return remember(this) {
-            ActionPopups(
-                menuSlot = menuSlot,
-                entries = entries,
-                dispatch = { action -> dispatch(action) },
-                passwordSlot = passwordSlot,
-                passwordChildren = passwordChildren,
-            )
-        }
+        return ActionPopups(
+            slots = slots,
+            menuSlot = menuSlot,
+            passwordSlot = passwordSlot,
+            entries = entries,
+            passwordChildren = passwordChildren,
+            dispatch = ::dispatch,
+        )
     }
 
     // 预览卡只渲染该界面可见的动作, 全屏专属动作在这里整体隐藏
@@ -604,7 +615,6 @@ class VirtualButtonBar(
     @Composable
     fun Fullscreen(
         onAction: suspend (VirtualButtonAction) -> Unit,
-        showOutsideButtons: Boolean = true,
         modifier: Modifier = Modifier,
         dock: FullscreenDock = FullscreenDock.BOTTOM,
         reverseOrder: Boolean = false,
@@ -612,8 +622,6 @@ class VirtualButtonBar(
         passwordChildren: List<DropdownItem>? = null,
     ) {
         val popups = rememberActionPopups(passwordChildren, onAction)
-        // 悬浮球形态下停靠栏一个按钮都不画, 只保留共享状态 (showOutsideButtons = false)
-        if (!showOutsideButtons) return
 
         val isVertical = dock == FullscreenDock.LEFT || dock == FullscreenDock.RIGHT
         val visibleActions =
@@ -700,6 +708,9 @@ class VirtualButtonBar(
      *
      * 调用方构造时把 more 传成完整动作列表 (走 [VirtualButtonActions.mergedOrder]), outside 传空;
      * 两边读的是同一份用户排序, 因此球的菜单顺序与停靠栏一致
+     *
+     * more 由 [VirtualButtonActions.parseStoredLayout] 补全过, 除「更多」以外不会漏动作,
+     * 所以这里不需要再兜一个"空菜单"的分支
      */
     @Composable
     fun FloatingBall(
@@ -713,15 +724,6 @@ class VirtualButtonBar(
             menuSlot = PopupSlot.Ball,
             passwordSlot = null,
         )
-        // 没有任何动作可放进菜单时, 退回停靠栏形态 (画全部动作按钮), 避免出现一颗点不出东西的球
-        if (more.isEmpty()) {
-            Fullscreen(
-                onAction = onAction,
-                modifier = modifier,
-                passwordChildren = passwordChildren,
-            )
-            return
-        }
 
         val taskScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
         // 悬浮球的位置与外观设置

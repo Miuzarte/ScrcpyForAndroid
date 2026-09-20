@@ -316,11 +316,15 @@ internal fun DeviceTabPage(
     }
 
     // 虚拟按钮的宿主动作: 预览卡上的动作只落在设备页自己的状态上
+    // 列表状态一律现读, 宿主对象会跨组合存活, 捕获快照会让 isEmpty() 停在首次组合的画面
     val virtualButtonHost = remember(scope, context, viewModel) {
         object: VirtualButtonHost {
             override fun handleShowRecentTasks() {
                 viewModel.showRecentTasks()
-                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                if (
+                    viewModel.scrcpyListings.recentTasks.isEmpty() &&
+                    !viewModel.listingsRefreshBusy.value
+                ) {
                     scope.launch(Dispatchers.IO) {
                         viewModel.refreshApps()
                     }
@@ -332,7 +336,10 @@ internal fun DeviceTabPage(
 
             override fun handleShowAllApps() {
                 viewModel.showAllApps()
-                if (apps.isEmpty() && !listingsRefreshBusy) {
+                if (
+                    viewModel.scrcpyListings.apps.isEmpty() &&
+                    !viewModel.listingsRefreshBusy.value
+                ) {
                     scope.launch(Dispatchers.IO) {
                         viewModel.refreshApps()
                     }
@@ -357,10 +364,9 @@ internal fun DeviceTabPage(
             scope = scope,
             action = action,
             host = virtualButtonHost,
+            // 留在主线程调用: runBusy 的先查后置是主线程语义, 切 IO 由 VM 内部负责
             onInjectKeycode = { keycode ->
-                scope.launch(Dispatchers.IO) {
-                    viewModel.injectVirtualKeycode(keycode)
-                }
+                viewModel.injectVirtualKeycode(keycode)
             },
         )
     }

@@ -316,13 +316,17 @@ fun FullscreenControlScreen(
     val virtualButtonHostScope = rememberCoroutineScope()
 
     // 虚拟按钮的宿主动作: 该界面上能把动作落到哪里, 由这里决定
+    // 列表状态一律现读, 宿主对象会跨组合存活, 捕获快照会让 isEmpty() 停在首次组合的画面
     val virtualButtonHost = remember(onBack) {
         object: VirtualButtonHost {
             override fun handleExitFullscreen() = onBack()
 
             override fun handleShowRecentTasks() {
                 showRecentTasksSheet = true
-                if (recentTasks.isEmpty() && !listingsRefreshBusy) {
+                if (
+                    scrcpy.listings.recentTasks.isEmpty() &&
+                    !scrcpy.listings.refreshBusyState.value
+                ) {
                     taskScope.launch {
                         refreshApps()
                         refreshRecentTasks()
@@ -332,7 +336,10 @@ fun FullscreenControlScreen(
 
             override fun handleShowAllApps() {
                 showAllAppsSheet = true
-                if (apps.isEmpty() && !listingsRefreshBusy) {
+                if (
+                    scrcpy.listings.apps.isEmpty() &&
+                    !scrcpy.listings.refreshBusyState.value
+                ) {
                     taskScope.launch {
                         refreshApps()
                     }
