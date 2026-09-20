@@ -1,5 +1,5 @@
 [versions]
-agp = "9.4.0"
+agp = "9.4.1"
 bcpkixJdk18on = "1.86"
 boringssl = "20251124"
 conscryptAndroid = "2.7.0"
