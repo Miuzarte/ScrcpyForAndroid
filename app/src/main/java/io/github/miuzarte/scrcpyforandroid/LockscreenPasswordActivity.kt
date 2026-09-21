@@ -2,7 +2,6 @@ package io.github.miuzarte.scrcpyforandroid
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -27,10 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.i18n.LocalizedActivity
 import io.github.miuzarte.scrcpyforandroid.password.*
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ReorderableList
@@ -57,22 +56,8 @@ import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
-import java.util.Locale
 
-class LockscreenPasswordActivity: FragmentActivity() {
-    override fun attachBaseContext(newBase: Context) {
-        val languageTag = MainActivity.getAppLanguageTag(newBase)
-        val wrappedContext =
-            if (languageTag.isNotEmpty()) {
-                val config = Configuration(newBase.resources.configuration)
-                config.setLocale(Locale.forLanguageTag(languageTag))
-                newBase.createConfigurationContext(config)
-            } else {
-                newBase
-            }
-        super.attachBaseContext(wrappedContext)
-    }
-
+class LockscreenPasswordActivity: LocalizedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)

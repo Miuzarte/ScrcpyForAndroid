@@ -3,6 +3,7 @@ package io.github.miuzarte.scrcpyforandroid.pages
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.compose.LocalActivity
@@ -27,9 +28,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.core.net.toUri
 import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.LockscreenPasswordActivity
-import io.github.miuzarte.scrcpyforandroid.MainActivity
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import io.github.miuzarte.scrcpyforandroid.i18n.AppLocale
 import io.github.miuzarte.scrcpyforandroid.nativecore.DirectAdbTransport
 import io.github.miuzarte.scrcpyforandroid.scaffolds.ArrowSlider
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
@@ -60,11 +61,12 @@ import java.io.File
 import kotlin.math.roundToInt
 import android.provider.Settings as AndroidSettings
 
-private val languages = listOf(
-    R.string.language_follow_system to "",
-    R.string.language_english to "en",
-    R.string.language_chinese to "zh",
+private val languageLabelRes = mapOf(
+    AppLocale.FOLLOW_SYSTEM to R.string.language_follow_system,
+    "en" to R.string.language_english,
+    "zh" to R.string.language_chinese,
 )
+private val languages = listOf(AppLocale.FOLLOW_SYSTEM) + AppLocale.SUPPORTED_TAGS
 private const val TERMINAL_FONT_RELATIVE_PATH = "terminal/font.ttf"
 
 suspend fun clearTerminalFont(context: Context) =
@@ -318,6 +320,9 @@ fun SettingsPage(
         LazyListState()
     }
 
+    // 语言选择不走 bundle: AppLocale 是唯一来源
+    var selectedLanguageTag by rememberSaveable { mutableStateOf(AppLocale.currentTag(context)) }
+
     // 设置
     LazyColumn(
         contentPadding = contentPadding,
@@ -333,16 +338,17 @@ fun SettingsPage(
                     summary = stringResource(R.string.pref_summary_language),
                     entries = listOf(
                         DropdownEntry(
-                            items = languages.map { lang ->
+                            items = languages.map { tag ->
                                 DropdownItem(
-                                    text = stringResource(lang.first),
-                                    selected = lang.second == asBundle.languageTag,
+                                    text = languageLabelRes[tag]?.let { stringResource(it) } ?: tag,
+                                    selected = tag == selectedLanguageTag,
                                     onClick = {
-                                        asBundle = asBundle.copy(
-                                            languageTag = lang.second,
-                                        )
-                                        MainActivity.setAppLanguageTag(context, lang.second)
-                                        activity?.recreate()
+                                        selectedLanguageTag = tag
+                                        AppLocale.setTag(context, tag)
+                                        // API 33+ 的 locale 配置变更由 MainActivity 就地处理 (见 manifest), 不重建
+                                        // 低于 33 必须重建, 才能换掉 attachBaseContext 里包装的 base context
+                                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+                                            activity?.recreate()
                                     },
                                 )
                             },

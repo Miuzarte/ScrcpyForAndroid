@@ -1,9 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import android.content.Context
-import android.content.res.Configuration
 import androidx.annotation.StringRes
-import io.github.miuzarte.scrcpyforandroid.MainActivity
+import io.github.miuzarte.scrcpyforandroid.i18n.AppLocale
 import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
 import io.github.miuzarte.scrcpyforandroid.nativecore.AdbMdnsDiscoverer
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
@@ -15,7 +14,6 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.SnackbarResult
-import java.util.Locale
 
 // 用于不同 activity 之间传递实例
 object AppRuntime {
@@ -117,18 +115,9 @@ object AppRuntime {
         dismissNewest = dismissNewest,
     )
 
-    // 应用内语言设置只包裹了 Activity 的 base context,
-    // 这里用同样的方式包装 application context, 使 snackbar 等全局文案跟随应用内语言
-    private fun localizedContext(): Context {
-        val languageTag = MainActivity.getAppLanguageTag(appContext)
-        return if (languageTag.isEmpty()) appContext
-        else appContext.createConfigurationContext(
-            Configuration(appContext.resources.configuration).apply {
-                setLocale(Locale.forLanguageTag(languageTag))
-            },
-        )
-    }
-
-    fun stringResource(@StringRes resId: Int) = localizedContext().getString(resId)
-    fun stringResource(@StringRes resId: Int, vararg args: Any) = localizedContext().getString(resId, *args)
+    // application context 不经过 Activity 的 base context,
+    // 这里按当前应用内语言包装, 使 snackbar 等全局文案跟随应用内语言
+    fun stringResource(@StringRes resId: Int) = AppLocale.localizedContext(appContext).getString(resId)
+    fun stringResource(@StringRes resId: Int, vararg args: Any) =
+        AppLocale.localizedContext(appContext).getString(resId, *args)
 }

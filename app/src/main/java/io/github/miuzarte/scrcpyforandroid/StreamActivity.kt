@@ -11,7 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.core.app.PictureInPictureParamsCompat.Builder
 import androidx.core.content.ContextCompat
 import androidx.core.pip.BasicPictureInPicture
-import androidx.fragment.app.FragmentActivity
+import io.github.miuzarte.scrcpyforandroid.i18n.LocalizedActivity
 import io.github.miuzarte.scrcpyforandroid.pages.StreamScreen
 import io.github.miuzarte.scrcpyforandroid.services.AppScreenOn
 import io.github.miuzarte.scrcpyforandroid.services.PictureInPictureActionReceiver
@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.lang.ref.WeakReference
 
-class StreamActivity: FragmentActivity() {
+class StreamActivity: LocalizedActivity() {
     private val basicPip by lazy { BasicPictureInPicture(this, ContextCompat.getMainExecutor(this)) }
 
     private val pipActionReceiver = PictureInPictureActionReceiver()

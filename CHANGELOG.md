@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.6.5
+
+- 修复: 应用内语言在全屏页 (虚拟按键 / 悬浮球菜单 / 密码列表) 未生效
+- 重构: 多语言逻辑收拢到 `AppLocale` + `LocalizedActivity`, 所有 Activity 继承 `LocalizedActivity`
+  - Android 13+ 接入系统 `按应用设定语言`, 低于 13 仍由 base context 包装生效
+  - 新增 `preBuild` 校验: Activity 未继承 `LocalizedActivity` 时构建失败
+  - `MainActivity` 声明 `locale|layoutDirection` 的 `configChanges`, 切语言就地生效不重建 Activity (避免丢掉正在投屏的 Scrcpy 会话)
+
 ## 0.6.4
 
 - 新增: 虚拟按键增加 `退出全屏`

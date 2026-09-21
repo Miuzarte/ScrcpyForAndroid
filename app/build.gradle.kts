@@ -59,8 +59,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 37
-        versionCode = 47
-        versionName = "0.6.4"
+        versionCode = 48
+        versionName = "0.6.5"
 
         externalNativeBuild {
             cmake {
@@ -254,4 +254,75 @@ val downloadScrcpyServer by tasks.registering {
 
 tasks.named("preBuild") {
     dependsOn(downloadScrcpyServer)
+}
+
+// 语言接线校验: 保证新加的 Activity 不会绕过 LocalizedActivity, 且多语言配置三处一致
+val verifyAppLocaleWiring by tasks.registering {
+    description = "Fail the build when an Activity bypasses LocalizedActivity or app locales are inconsistent"
+    group = "verification"
+
+    val javaDir = layout.projectDirectory.dir("src/main/java")
+    val resDir = layout.projectDirectory.dir("src/main/res")
+    inputs.dir(javaDir)
+    inputs.dir(resDir)
+
+    doLast {
+        // 1. 任何 Activity 子类都必须继承 LocalizedActivity
+        // \b 保证 LocalizedActivity( / MainActivity( 不会被误判
+        val forbiddenBases = listOf("Activity", "FragmentActivity", "ComponentActivity", "AppCompatActivity")
+        val offenders = mutableListOf<String>()
+        javaDir.asFile.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && it.name != "LocalizedActivity.kt" }
+            .forEach { file ->
+                val source = file.readText()
+                    .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "")
+                    .replace(Regex("//[^\n]*"), "")
+                forbiddenBases.forEach { base ->
+                    if (Regex("\\b$base\\s*[(<]").containsMatchIn(source)) {
+                        offenders.add("${file.relativeTo(javaDir.asFile)} -> $base")
+                    }
+                }
+            }
+        if (offenders.isNotEmpty()) {
+            throw GradleException(
+                "Activity 必须继承 io.github.miuzarte.scrcpyforandroid.i18n.LocalizedActivity, " +
+                    "否则应用内语言不会生效:\n  " + offenders.joinToString("\n  ")
+            )
+        }
+
+        // 2. AppLocale.SUPPORTED_TAGS / locales_config.xml / values-xx 资源目录三者必须一致
+        val appLocaleFile = javaDir.file("io/github/miuzarte/scrcpyforandroid/i18n/AppLocale.kt").asFile
+        if (!appLocaleFile.isFile) throw GradleException("缺少 ${appLocaleFile.path}")
+
+        val supportedTags = Regex("SUPPORTED_TAGS\\s*=\\s*listOf\\(([^)]*)\\)")
+            .find(appLocaleFile.readText())
+            ?.groupValues?.get(1)
+            ?.let { inner -> Regex("\"([^\"]*)\"").findAll(inner).map { it.groupValues[1] }.toSet() }
+            ?: throw GradleException("无法从 AppLocale.kt 解析 SUPPORTED_TAGS")
+
+        val localeConfigFile = resDir.file("xml/locales_config.xml").asFile
+        if (!localeConfigFile.isFile) throw GradleException("缺少 ${localeConfigFile.path}")
+
+        val declaredTags = Regex("<locale\\s+android:name=\"([^\"]+)\"")
+            .findAll(localeConfigFile.readText())
+            .map { it.groupValues[1] }
+            .toSet()
+
+        if (declaredTags != supportedTags) {
+            throw GradleException(
+                "locales_config.xml $declaredTags 与 AppLocale.SUPPORTED_TAGS $supportedTags 不一致"
+            )
+        }
+        supportedTags.forEach { tag ->
+            // 默认语言 (en) 放在 values/, 其余语言放在 values-<tag>/
+            val dir = if (tag == "en") resDir.dir("values").asFile else resDir.dir("values-$tag").asFile
+            if (!dir.isDirectory) {
+                throw GradleException("语言 $tag 缺少资源目录 ${dir.relativeTo(resDir.asFile)}")
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn(verifyAppLocaleWiring)
 }

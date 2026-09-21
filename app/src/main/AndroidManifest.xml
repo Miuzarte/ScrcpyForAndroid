@@ -24,13 +24,19 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.ScrcpyForAndroid">
 
+        <!--
+          locale|layoutDirection: 应用内切语言 / 系统语言变化时就地生效, 不重建 Activity
+          重建会丢掉正在投屏的 Scrcpy 会话 (MainScreen 中由 remember 创建), 导致全屏进不去
+          文案由 Compose 的 LocalConfiguration / LocalResources 在 onConfigurationChanged 后自动刷新
+        -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|locale|layoutDirection"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

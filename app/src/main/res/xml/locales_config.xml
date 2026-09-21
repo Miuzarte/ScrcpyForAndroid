@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  按应用设定的语言 (API 33+)
+  新增语言时必须同时添加 values-xx 资源目录, 并同步 AppLocale.SUPPORTED_TAGS
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="zh" />
+</locale-config>
