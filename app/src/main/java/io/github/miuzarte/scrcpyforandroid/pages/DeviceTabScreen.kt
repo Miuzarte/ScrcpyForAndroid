@@ -63,13 +63,6 @@ private const val PREVIEW_CARD_ITEM_KEY = "preview_card"
 private const val PREVIEW_CARD_ITEM_INDEX = 3
 private val DEVICE_TWO_PANE_CONFIG_MAX_WIDTH = 640.dp
 
-internal data class DeviceConnectionServices(
-    val adbCoordinator: DeviceAdbConnectionCoordinator,
-    val connectionStateStore: ConnectionStateStore,
-    val connectionController: ConnectionController,
-    val autoReconnectManager: DeviceAdbAutoReconnectManager,
-)
-
 @Composable
 internal fun DeviceTabScreen(
     viewModelFactory: ViewModelProvider.Factory,

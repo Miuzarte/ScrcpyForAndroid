@@ -59,6 +59,8 @@ class MainActivity: LocalizedActivity() {
 
     override fun onDestroy() {
         AppScreenOn.unregister(window)
+        // Activity 重建 (配置变更) 不能收尾会话, 只有真正退出才释放
+        if (isFinishing) AppRuntime.releaseSession()
         super.onDestroy()
     }
 

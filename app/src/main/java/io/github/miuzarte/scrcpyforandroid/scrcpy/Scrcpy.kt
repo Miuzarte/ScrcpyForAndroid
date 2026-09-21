@@ -46,19 +46,34 @@ import kotlin.random.nextUInt
  * 
  * @param appContext Android context
  * @param serverAsset Asset path for the default server jar
- * @param customServerUri Optional custom server URI (overrides serverAsset)
- * @param serverVersion Server version string
- * @param serverRemotePath Remote path where server jar will be pushed on device
+ * @param initialSessionConfig 初始会话配置, 之后通过 [sessionConfig] 整体替换
  */
 class Scrcpy(
     private val appContext: Context,
 
     private val serverAsset: String = DEFAULT_SERVER_ASSET,
-    private val customServerUri: String? = null,
-    private val serverVersion: String = DEFAULT_SERVER_VERSION,
-    private val serverRemotePath: String = DEFAULT_REMOTE_PATH,
-    private val lowLatency: Boolean = false,
+    initialSessionConfig: SessionConfig = SessionConfig(),
 ) {
+
+    /**
+     * 启动一次会话前需要固定的配置
+     */
+    data class SessionConfig(
+        val customServerUri: String? = null,
+        val serverVersion: String = DEFAULT_SERVER_VERSION,
+        val serverRemotePath: String = DEFAULT_REMOTE_PATH,
+        val lowLatency: Boolean = false,
+    )
+
+    /**
+     * 当前会话配置
+     *
+     * 实例由 [AppRuntime] 持有并跨 Activity 重建复用, 配置变化只整体替换本属性, 不重建实例
+     * 新值在下一次 start() / executeList() / executeServer() 生效
+     * 只应单点写入, 读取方一律先取局部快照, 避免读到半套配置
+     */
+    @Volatile
+    var sessionConfig: SessionConfig = initialSessionConfig
 
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val session = Session(
@@ -159,14 +174,17 @@ class Scrcpy(
             // Validate options
             options.validate()
 
+            // 会话配置可能被并发替换, 先取局部快照, 本次 start 全程用同一套
+            val cfg = sessionConfig
+
             // Generate session ID
             val scid = generateScid()
             Log.d(TAG, "scid=0x${scid.toString(16)}")
 
-            val serverJar = if (customServerUri.isNullOrBlank()) {
+            val serverJar = if (cfg.customServerUri.isNullOrBlank()) {
                 extractAssetToCache(serverAsset)
             } else {
-                extractUriToCache(customServerUri.toUri())
+                extractUriToCache(cfg.customServerUri.toUri())
             }
 
             // Execute server
@@ -227,7 +245,7 @@ class Scrcpy(
                         info.audioCodecId.toUInt().toString(16)
                     }",
                 )
-                val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, lowLatency)
+                val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, cfg.lowLatency)
                 audioPlayer = player
                 session.attachAudioConsumer { packet ->
                     player.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
@@ -751,13 +769,16 @@ class Scrcpy(
     private suspend fun executeList(list: ListOptions): String = withContext(Dispatchers.IO) {
         require(list != ListOptions.NULL) { "Nothing to do with ListOptions.NULL" }
 
-        val serverJar = if (customServerUri.isNullOrBlank()) {
+        // 会话配置可能被并发替换, 先取局部快照, 本次调用全程用同一套
+        val cfg = sessionConfig
+
+        val serverJar = if (cfg.customServerUri.isNullOrBlank()) {
             extractAssetToCache(serverAsset)
         } else {
-            extractUriToCache(customServerUri.toUri())
+            extractUriToCache(cfg.customServerUri.toUri())
         }
 
-        NativeAdbService.push(serverJar.toPath(), serverRemotePath)
+        NativeAdbService.push(serverJar.toPath(), cfg.serverRemotePath)
 
         val scid = generateScid()
         val options = ClientOptions(
@@ -769,11 +790,11 @@ class Scrcpy(
         )
         val serverParams = options.toServerParams(scid)
         val serverCommand = serverParams.build(
-            "CLASSPATH=$serverRemotePath",
+            "CLASSPATH=${cfg.serverRemotePath}",
             "app_process",
             "/",
             "com.genymobile.scrcpy.Server",
-            serverVersion,
+            cfg.serverVersion,
         )
 
         Log.i(TAG, "listOptions(): cmd=$serverCommand")
@@ -977,16 +998,18 @@ class Scrcpy(
         options: ClientOptions,
         scid: UInt,
     ): Session.SessionInfo {
-        NativeAdbService.push(serverJar.toPath(), serverRemotePath)
+        // 会话配置可能被并发替换, 先取局部快照, 本次启动全程用同一套
+        val cfg = sessionConfig
+        NativeAdbService.push(serverJar.toPath(), cfg.serverRemotePath)
 
         val serverParams = options.toServerParams(scid)
 
         val serverCommand = serverParams.build(
-            "CLASSPATH=$serverRemotePath",
+            "CLASSPATH=${cfg.serverRemotePath}",
             "app_process",
             "/",
             "com.genymobile.scrcpy.Server",
-            serverVersion,
+            cfg.serverVersion,
         )
         Log.d(TAG, "Server command: $serverCommand")
 

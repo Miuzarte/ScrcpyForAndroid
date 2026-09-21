@@ -262,6 +262,8 @@ fun MainScreen() {
     }
 
     // Scrcpy instance and session state
+    // 实例与连接服务由 AppRuntime 持有, 跨 Activity 重建复用;
+    // 配置变化只回写 sessionConfig, 重建实例会丢掉正在投屏的会话与连接状态
     val customServerUri = asBundle.customServerUri
         .ifBlank { null }
     val customServerVersion = asBundle.customServerVersion
@@ -269,53 +271,23 @@ fun MainScreen() {
     val serverRemotePath = asBundle.serverRemotePath
         .ifBlank { AppSettings.SERVER_REMOTE_PATH.defaultValue }
     val lowLatency = asBundle.lowLatency
-    val scrcpy = remember(
-        appContext,
-        customServerUri,
-        customServerVersion,
-        serverRemotePath,
-        lowLatency,
-    ) {
-        Scrcpy(
-            appContext = appContext,
-            customServerUri = customServerUri,
-            serverVersion = customServerVersion,
-            serverRemotePath = serverRemotePath,
-            lowLatency = lowLatency,
-        ).also {
-            AppRuntime.scrcpy = it
-        }
-    }
+    val sessionConfig = Scrcpy.SessionConfig(
+        customServerUri = customServerUri,
+        serverVersion = customServerVersion,
+        serverRemotePath = serverRemotePath,
+        lowLatency = lowLatency,
+    )
 
-    val deviceConnectionServices = remember(scrcpy) {
-        val adbCoordinator = DeviceAdbConnectionCoordinator()
-        val connectionStateStore = ConnectionStateStore()
-        val connectionController = ConnectionController(
-            scrcpy = scrcpy,
-            stateStore = connectionStateStore,
-            adbCoordinator = adbCoordinator,
-        )
-        val autoReconnectManager = DeviceAdbAutoReconnectManager(
-            controller = connectionController,
-            stateStore = connectionStateStore,
-        )
-        DeviceConnectionServices(
-            adbCoordinator = adbCoordinator,
-            connectionStateStore = connectionStateStore,
-            connectionController = connectionController,
-            autoReconnectManager = autoReconnectManager,
-        )
+    val session = remember(appContext) { AppRuntime.obtainSession(sessionConfig) }
+    val scrcpy = session.scrcpy
+    val deviceConnectionServices = session.services
+
+    LaunchedEffect(sessionConfig) {
+        scrcpy.sessionConfig = sessionConfig
     }
 
     val deviceTabViewModelFactory = remember(scrcpy, deviceConnectionServices) {
         DeviceTabViewModel.Factory(scrcpy, deviceConnectionServices)
-    }
-
-    DisposableEffect(deviceConnectionServices) {
-        onDispose {
-            deviceConnectionServices.autoReconnectManager.close()
-            AppScreenOn.release()
-        }
     }
 
     // Side-effect launchers and composition locals

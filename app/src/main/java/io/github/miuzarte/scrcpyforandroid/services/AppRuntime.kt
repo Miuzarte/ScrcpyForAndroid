@@ -28,11 +28,75 @@ object AppRuntime {
         get() = appContext
 
     var scrcpy: Scrcpy? = null
+        private set
     var currentConnectionTarget: ConnectionTarget? = null
     var currentConnectedDevice: ConnectedDeviceInfo? = null
 
     // 当前设备使用的 profile ID (session 级, 脱离快捷设备独立运作)
     val currentConnectionProfileId = MutableStateFlow("global")
+
+    private val sessionLock = Any()
+    private var sessionServices: DeviceConnectionServices? = null
+
+    /**
+     * 进程级会话: [Scrcpy] 与连接服务只创建一次, Activity 重建 (切语言 / 深浅色 / 系统回收) 时复用
+     *
+     * 配置变化不要重建实例, 改 [Scrcpy.sessionConfig] 即可, 下一次 start() 生效
+     */
+    internal fun obtainSession(sessionConfig: Scrcpy.SessionConfig): Session {
+        synchronized(sessionLock) {
+            val existingScrcpy = scrcpy
+            val existingServices = sessionServices
+            if (existingScrcpy != null && existingServices != null) {
+                return Session(existingScrcpy, existingServices)
+            }
+
+            val createdScrcpy = Scrcpy(
+                appContext = appContext,
+                initialSessionConfig = sessionConfig,
+            )
+            val adbCoordinator = DeviceAdbConnectionCoordinator()
+            val connectionStateStore = ConnectionStateStore()
+            val connectionController = ConnectionController(
+                scrcpy = createdScrcpy,
+                stateStore = connectionStateStore,
+                adbCoordinator = adbCoordinator,
+            )
+            val autoReconnectManager = DeviceAdbAutoReconnectManager(
+                controller = connectionController,
+                stateStore = connectionStateStore,
+            )
+            val services = DeviceConnectionServices(
+                adbCoordinator = adbCoordinator,
+                connectionStateStore = connectionStateStore,
+                connectionController = connectionController,
+                autoReconnectManager = autoReconnectManager,
+            )
+            scrcpy = createdScrcpy
+            sessionServices = services
+            return Session(createdScrcpy, services)
+        }
+    }
+
+    /**
+     * 收尾会话
+     *
+     * 只应在 MainActivity 真正退出 (isFinishing) 时调用;
+     * Activity 重建 (配置变更) 不能走这里, 否则连接状态与自动重连会被重置
+     */
+    internal fun releaseSession() {
+        synchronized(sessionLock) {
+            sessionServices?.autoReconnectManager?.close()
+            AppScreenOn.release()
+            sessionServices = null
+            scrcpy = null
+        }
+    }
+
+    internal class Session(
+        val scrcpy: Scrcpy,
+        val services: DeviceConnectionServices,
+    )
 
     private val snackbarHostStateLock = Any()
     private val snackbarHostStateStack = mutableListOf<SnackbarHostState>()
