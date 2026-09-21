@@ -16,6 +16,12 @@
         "miuix"
       ],
       "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "java-jdk"
+      ],
+      "allowedVersions": "<=21"
     }
   ]
 }

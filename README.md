@@ -130,7 +130,7 @@
 
 ## 构建
 
-- JDK 17+
+- JDK 21
 - Android SDK (`compileSdk 37` / `buildTools 37.0.0`)
 - Android NDK `29.0.14206865`
 
