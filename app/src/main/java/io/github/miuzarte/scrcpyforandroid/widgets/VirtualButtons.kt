@@ -634,30 +634,40 @@ class VirtualButtonBar(
             else modifier
                 .fillMaxWidth()
                 .height(thickness)
+        // 按钮要占满自己那一份槽位: 纵向停靠时如果还用横向的"高度 = 停靠栏厚度",
+        // 按钮会全部挤在槽位起点那一侧, 看起来整排按钮偏向一端
+        val buttonModifier =
+            if (isVertical) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().height(thickness)
 
         if (isVertical) Column(
             modifier = containerModifier,
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             val itemModifier = Modifier.weight(1f)
-            visibleActions.forEach { FullscreenAction(it, thickness, itemModifier, popups) }
+            visibleActions.forEach {
+                FullscreenAction(it, thickness, itemModifier, buttonModifier, popups)
+            }
         }
         else Row(
             modifier = containerModifier,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             val itemModifier = Modifier.weight(1f)
-            visibleActions.forEach { FullscreenAction(it, thickness, itemModifier, popups) }
+            visibleActions.forEach {
+                FullscreenAction(it, thickness, itemModifier, buttonModifier, popups)
+            }
         }
     }
 
     // 纵向与横向只有容器与按钮尺寸不同, 按钮本体与弹层共用同一套渲染
-    // weight 是 RowScope / ColumnScope 的作用域扩展, 因此由调用方算好等分修饰符传进来
+    // weight 是 RowScope / ColumnScope 的作用域扩展, 因此由调用方算好等分修饰符与按钮尺寸传进来
     @Composable
     private fun FullscreenAction(
         action: VirtualButtonAction,
         thickness: Dp,
         itemModifier: Modifier,
+        buttonModifier: Modifier,
         popups: ActionPopups<PopupSlot>,
     ) {
         val haptic = LocalHapticFeedback.current
@@ -667,9 +677,7 @@ class VirtualButtonBar(
                     haptic.contextClick()
                     popups.trigger(action)
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(thickness),
+                modifier = buttonModifier,
                 cornerRadius = 0.dp,
                 minHeight = thickness,
                 insideMargin = PaddingValues(0.dp),
