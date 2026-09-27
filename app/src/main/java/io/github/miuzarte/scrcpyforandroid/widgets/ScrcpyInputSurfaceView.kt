@@ -63,9 +63,10 @@ class ScrcpyInputSurfaceView @JvmOverloads constructor(
      */
     private fun isGameController(deviceId: Int): Boolean {
         val device = InputDevice.getDevice(deviceId) ?: return false
-        val sources = device.sources
-        return (sources and InputDevice.SOURCE_GAMEPAD) != 0 ||
-                (sources and InputDevice.SOURCE_JOYSTICK) != 0
+        // SOURCE_* 是"类别位 + 类型位"的复合常量 (KEYBOARD 0x101 / DPAD 0x201 / GAMEPAD 0x401
+        // 共用低位 0x01), 所以只能整体比较; 用 `and != 0` 会把键盘/方向键类设备也判成手柄
+        return device.supportsSource(InputDevice.SOURCE_GAMEPAD) ||
+                device.supportsSource(InputDevice.SOURCE_JOYSTICK)
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {

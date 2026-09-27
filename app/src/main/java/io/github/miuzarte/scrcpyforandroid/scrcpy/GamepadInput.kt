@@ -45,9 +45,10 @@ object GamepadHid {
      */
     fun isGameController(device: InputDevice?): Boolean {
         if (device == null) return false
-        val sources = device.sources
-        return (sources and InputDevice.SOURCE_GAMEPAD) != 0 ||
-                (sources and InputDevice.SOURCE_JOYSTICK) != 0
+        // SOURCE_* 是"类别位 + 类型位"的复合常量 (KEYBOARD 0x101 / DPAD 0x201 / GAMEPAD 0x401
+        // 共用低位 0x01), 所以只能整体比较; 用 `and != 0` 会把键盘/方向键类设备也判成手柄
+        return device.supportsSource(InputDevice.SOURCE_GAMEPAD) ||
+                device.supportsSource(InputDevice.SOURCE_JOYSTICK)
     }
 
     /**
@@ -124,6 +125,9 @@ object GamepadHid {
         KeyEvent.KEYCODE_BUTTON_L1 -> 0x0040 // left shoulder
         KeyEvent.KEYCODE_BUTTON_R1 -> 0x0080 // right shoulder
         KeyEvent.KEYCODE_BUTTON_SELECT -> 0x0400 // back
+        // Generic.kl 系手柄 (没有厂商 kl 的手柄 / 遥控器) 的返回键在 Android 层就是 BACK,
+        // 之前它落在未映射分支里被静默丢弃, 这里并入虚拟手柄的同一个 select / back 位
+        KeyEvent.KEYCODE_BACK -> 0x0400
         KeyEvent.KEYCODE_BUTTON_START -> 0x0800 // start
         KeyEvent.KEYCODE_BUTTON_MODE -> 0x1000 // guide
         KeyEvent.KEYCODE_BUTTON_THUMBL -> 0x2000 // left stick
