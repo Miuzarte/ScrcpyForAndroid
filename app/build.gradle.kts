@@ -59,8 +59,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 37
-        versionCode = 50
-        versionName = "0.6.7"
+        versionCode = 51
+        versionName = "0.6.8"
 
         externalNativeBuild {
             cmake {

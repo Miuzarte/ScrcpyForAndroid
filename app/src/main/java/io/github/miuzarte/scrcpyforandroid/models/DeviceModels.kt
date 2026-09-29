@@ -137,6 +137,7 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
         scrcpyProfileId: String? = null,
         newPort: Int? = null,
         updateNameOnlyWhenEmpty: Boolean = false,
+        addresses: List<String>? = null,
     ): DeviceShortcuts {
         val idx = if (id != null) getIndex(id)
         else if (host != null && port != null) getIndex(host, port)
@@ -147,9 +148,17 @@ class DeviceShortcuts(val devices: List<DeviceShortcut>): List<DeviceShortcut> b
         val updateById = id != null
 
         val updatedAddresses = when {
+            // 地址列表是编辑器的完整快照, 必须整体写入 (备选地址不能在这里被丢掉)
+            addresses != null -> addresses
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .ifEmpty { listOf("") }
+
             updateById && host != null -> {
+                // 只换主地址, 其余备选地址原样保留
                 val p = port ?: old.port
-                listOf("$host:$p")
+                if (old.addresses.isEmpty()) listOf("$host:$p")
+                else old.addresses.toMutableList().apply { this[0] = "$host:$p" }
             }
 
             updateById -> old.addresses

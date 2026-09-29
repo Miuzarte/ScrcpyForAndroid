@@ -1142,9 +1142,10 @@ internal fun DeviceTile(
     val haptic = LocalHapticFeedback.current
     val scrcpyProfilesState by Storage.scrcpyProfiles.state.collectAsState()
 
-    var draft by remember(editing, device.id) {
+    val draftState = remember(editing, device.id) {
         mutableStateOf(if (editing) device else null)
     }
+    var draft by draftState
     var originalDraft by remember(editing, device.id) {
         mutableStateOf(if (editing) device else null)
     }
@@ -1154,20 +1155,31 @@ internal fun DeviceTile(
         }
     }
 
-    fun buildDraftFromAddresses(): DeviceShortcut {
-        val c = draft ?: return device
+    fun buildDraftFromAddresses(base: DeviceShortcut? = draftState.value): DeviceShortcut? {
+        val c = base ?: return null
         val cleaned = draftAddresses
             .map { it.trim().replace('：', ':') }
             .filter { it.isNotBlank() }
         return c.copy(addresses = cleaned.ifEmpty { listOf("") })
     }
 
+    fun saveDraftIfChanged() {
+        val updated = buildDraftFromAddresses() ?: return
+        if (updated != device && updated.host.isNotBlank()) {
+            onEditorSave(updated)
+        }
+    }
+
     LaunchedEffect(editing, draft) {
         if (!editing) return@LaunchedEffect
         delay(Settings.BUNDLE_SAVE_DELAY)
-        val updated = buildDraftFromAddresses()
-        if (updated != device && updated.host.isNotBlank()) {
-            onEditorSave(updated)
+        saveDraftIfChanged()
+    }
+
+    // 关闭编辑器时补一次保存: 防抖窗口内点完成/收起编辑器会取消上面的协程, 最后一次输入就丢了
+    DisposableEffect(editing, device.id) {
+        onDispose {
+            if (editing) saveDraftIfChanged()
         }
     }
 
@@ -1383,6 +1395,10 @@ internal fun DeviceTile(
                     TextButton(
                         text = stringResource(R.string.button_cancel),
                         onClick = {
+                            // 先把本地草稿退回原值, 否则关闭时的补保存会把已撤销的修改又写回去
+                            draft = currentOriginalDraft
+                            draftAddresses.clear()
+                            draftAddresses.addAll(currentOriginalDraft.addresses)
                             onEditorSave(currentOriginalDraft)
                             onEditorCancel()
                         },

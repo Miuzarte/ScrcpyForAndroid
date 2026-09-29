@@ -386,18 +386,20 @@ internal class DeviceTabViewModel(
         scrcpyProfileId: String? = null,
         newPort: Int? = null,
         updateNameOnlyWhenEmpty: Boolean = false,
+        addresses: List<String>? = null,
     ) {
         _savedShortcuts.update {
             it.update(
-                id,
-                host,
-                port,
-                name,
-                startScrcpyOnConnect,
-                openFullscreenOnStart,
-                scrcpyProfileId,
-                newPort,
-                updateNameOnlyWhenEmpty,
+                id = id,
+                host = host,
+                port = port,
+                name = name,
+                startScrcpyOnConnect = startScrcpyOnConnect,
+                openFullscreenOnStart = openFullscreenOnStart,
+                scrcpyProfileId = scrcpyProfileId,
+                newPort = newPort,
+                updateNameOnlyWhenEmpty = updateNameOnlyWhenEmpty,
+                addresses = addresses,
             )
         }
     }
