@@ -59,8 +59,8 @@ android {
         applicationId = "io.github.miuzarte.scrcpyforandroid"
         minSdk = 26
         targetSdk = 37
-        versionCode = 51
-        versionName = "0.6.8"
+        versionCode = 52
+        versionName = "0.7.0"
 
         externalNativeBuild {
             cmake {
@@ -186,16 +186,21 @@ dependencies {
 }
 
 val scrcpyServerAssetDir = "${project.projectDir}/src/main/assets/bin"
-val scrcpyServerAssetFile = "$scrcpyServerAssetDir/scrcpy-server-v4.1"
-val scrcpyServerDownloadUrl = "https://github.com/Genymobile/scrcpy/releases/download/v4.1/scrcpy-server-v4.1"
-val scrcpyServerSha256 = "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae"
+val scrcpyServerVersion = "5.0"
+val scrcpyServerAssetName = "scrcpy-server-v$scrcpyServerVersion"
+val scrcpyServerAssetFile = "$scrcpyServerAssetDir/$scrcpyServerAssetName"
+val scrcpyServerDownloadUrl =
+    "https://github.com/Genymobile/scrcpy/releases/download/v$scrcpyServerVersion/$scrcpyServerAssetName"
+val scrcpyServerSha256 = "26cbc9ad0aced6c2282455bef4fb43462605c1f8758c74b4ab1dbf818c229daa"
 
 val downloadScrcpyServer by tasks.registering {
-    description = "Download scrcpy-server binary from GitHub releases if absent or SHA256 mismatch"
+    description = "Download $scrcpyServerAssetName from GitHub releases if absent or SHA256 mismatch, and delete stale versions"
     group = "build setup"
 
     inputs.property("downloadUrl", scrcpyServerDownloadUrl)
     inputs.property("expectedSha256", scrcpyServerSha256)
+    // 目录存在历史版本时也需要重新执行该任务才能清理掉
+    inputs.files(fileTree(scrcpyServerAssetDir) { include("scrcpy-server-v*") })
     outputs.file(scrcpyServerAssetFile)
 
     doLast {
@@ -221,7 +226,7 @@ val downloadScrcpyServer by tasks.registering {
         val needsDownload = !file.exists() || computeSha256(file) != expectedSha
 
         if (needsDownload) {
-            logger.lifecycle("Downloading scrcpy-server-v4.1 from GitHub releases...")
+            logger.lifecycle("Downloading $scrcpyServerAssetName from GitHub releases...")
             try {
                 URI(url).toURL().openStream().use { input ->
                     file.outputStream().use { output ->
@@ -230,7 +235,7 @@ val downloadScrcpyServer by tasks.registering {
                 }
             } catch (e: Exception) {
                 throw GradleException(
-                    "Failed to download scrcpy-server-v4.1 from GitHub releases.\n" +
+                    "Failed to download $scrcpyServerAssetName from GitHub releases.\n" +
                     "  URL: $url\n" +
                     "  You may download it manually and place it at: ${file.absolutePath}\n" +
                     "  If you are behind a proxy, check your Gradle proxy settings\n" +
@@ -241,14 +246,27 @@ val downloadScrcpyServer by tasks.registering {
 
             val actualSha = computeSha256(file)
             require(actualSha == expectedSha) {
-                "SHA256 mismatch for scrcpy-server-v4.1!\n" +
+                "SHA256 mismatch for $scrcpyServerAssetName!\n" +
                 "  Expected: $expectedSha\n" +
                 "  Got:      $actualSha\n" +
                 "  Delete ${file.absolutePath} to retry download."
             }
-            logger.lifecycle("scrcpy-server-v4.1 downloaded and verified.")
+            logger.lifecycle("$scrcpyServerAssetName downloaded and verified.")
         } else {
-            logger.lifecycle("scrcpy-server-v4.1 exists with correct SHA256, skip download.")
+            logger.lifecycle("$scrcpyServerAssetName exists with correct SHA256, skip download.")
+        }
+
+        // 只保留当前固定的版本
+        val staleServers = dir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith("scrcpy-server-v") && it.name != file.name }
+            .orEmpty()
+
+        for (stale in staleServers) {
+            if (stale.delete()) {
+                logger.lifecycle("Removed stale scrcpy server: ${stale.name}")
+            } else {
+                logger.warn("Failed to remove stale scrcpy server: ${stale.absolutePath}")
+            }
         }
     }
 }

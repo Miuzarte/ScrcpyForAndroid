@@ -136,9 +136,9 @@ class Scrcpy(
         @Volatile
         private var lastRemoteDisconnectSnackbarAt = 0L
 
-        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v4.1"
-        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v4.1"
-        const val DEFAULT_SERVER_VERSION = "4.1"
+        const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v5.0"
+        const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v5.0"
+        const val DEFAULT_SERVER_VERSION = "5.0"
         const val DEFAULT_REMOTE_PATH = "/data/local/tmp/scrcpy-server.jar"
 
         // Regex patterns for parsing server output
