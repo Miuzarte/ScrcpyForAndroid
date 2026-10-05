@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # sdkmanager and the cache path below both rely on it; this is the
+      # preinstalled path on GitHub-hosted runners
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - uses: actions/checkout@v7
@@ -37,6 +41,36 @@ jobs:
             ~/.gradle/caches/build-cache-*
           key: gradle-builds-${{ github.sha }}
           restore-keys: gradle-builds-
+
+      - name: Read NDK version
+        id: ndk
+        run: |
+          set -euo pipefail
+          # The libcxx prefab is published per NDK version, and ndkVersion in
+          # app/build.gradle.kts reads this very same catalog entry
+          version="$(sed -n 's/^libcxx[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' gradle/libs.versions.toml)"
+          if [[ -z "$version" ]]; then
+            echo "libcxx version not found in gradle/libs.versions.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Android NDK
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ steps.ndk.outputs.version }}
+          key: ndk-${{ runner.os }}-${{ steps.ndk.outputs.version }}
+
+      - name: Install Android NDK ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          sdkmanager="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort | tail -n1)"
+          if [[ -z "$sdkmanager" ]]; then
+            echo "sdkmanager not found under $ANDROID_SDK_ROOT/cmdline-tools" >&2
+            exit 1
+          fi
+          "$sdkmanager" --install "ndk;${{ steps.ndk.outputs.version }}"
+          ls -d "$ANDROID_SDK_ROOT/ndk/${{ steps.ndk.outputs.version }}"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew

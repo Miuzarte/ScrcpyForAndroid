@@ -124,7 +124,8 @@ android {
     }
 
     buildToolsVersion = "37.0.0"
-    ndkVersion = "29.0.14206865"
+    // ndk 与 libcxx 版本要匹配
+    ndkVersion = libs.versions.libcxx.get()
 }
 
 kotlin {

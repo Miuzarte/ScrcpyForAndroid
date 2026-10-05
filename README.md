@@ -133,7 +133,7 @@
 
 - JDK 21
 - Android SDK (`compileSdk 37` / `buildTools 37.0.0`)
-- Android NDK `29.0.14206865`
+- Android NDK `30.0.16248370` (需要与 `libcxx` 一致)
 
 ```bash
 git clone --recursive https://github.com/Miuzarte/ScrcpyForAndroid.git
