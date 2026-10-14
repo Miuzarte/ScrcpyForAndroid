@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * 负责 USB 设备的连接管理和数据传输:
  * 1. 打开 USB 设备连接
- * 2. 查找 ADB 接口 (接口类 0xFF)
+ * 2. 查找 ADB 接口 (接口三元组 class 0xFF / subclass 0x42 / protocol 0x01)
  * 3. 配置 Bulk IN/OUT 端点
  * 4. 封装为 InputStream/OutputStream
  * 5. 处理 USB 权限申请
@@ -34,9 +34,6 @@ class UsbAdbTunnel(
 
     companion object {
         private const val TAG = "UsbAdbTunnel"
-
-        // ADB 接口类 (Android Debug Bridge)
-        private const val ADB_INTERFACE_CLASS = 0xFF
 
         // USB 传输超时 (毫秒)
         private const val USB_TRANSFER_TIMEOUT_MS = 5000
@@ -237,12 +234,12 @@ class UsbAdbTunnel(
     /**
      * 查找 ADB 接口
      *
-     * ADB 接口的 class 为 0xFF(Vendor Specific)
+     * 判断依据是完整的 ADB 接口三元组, 见 [UsbAdbMatch]
      */
     private fun findAdbInterface(): UsbInterface? {
         for (i in 0 until usbDevice.interfaceCount) {
             val iface = usbDevice.getInterface(i)
-            if (iface.interfaceClass == ADB_INTERFACE_CLASS) {
+            if (UsbAdbMatch.isAdbInterface(iface)) {
                 Log.d(TAG, "findAdbInterface(): found ADB interface at index $i")
                 return iface
             }

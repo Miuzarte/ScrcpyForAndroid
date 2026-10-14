@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * 功能:
  * 1. 监听 USB 设备插拔事件
- * 2. 过滤 ADB 设备 (接口类 0xFF)
+ * 2. 过滤 ADB 设备 (接口三元组 class 0xFF / subclass 0x42 / protocol 0x01)
  * 3. 处理 USB 权限请求
  * 4. 提供设备列表和事件通知
  *
@@ -30,9 +30,6 @@ class UsbAdbDeviceWatcher(
 ) {
     companion object {
         private const val TAG = "UsbAdbDeviceWatcher"
-
-        // ADB 接口类 (Android Debug Bridge)
-        private const val ADB_INTERFACE_CLASS = 0xFF
 
         // USB 权限 Action
         private const val ACTION_USB_PERMISSION = "io.github.miuzarte.scrcpyforandroid.USB_PERMISSION"
@@ -168,17 +165,9 @@ class UsbAdbDeviceWatcher(
     /**
      * 检查设备是否为 ADB 设备
      *
-     * ADB 设备的接口类为 0xFF (Vendor Specific)
+     * 判断依据是完整的 ADB 接口三元组, 见 [UsbAdbMatch]
      */
-    private fun isAdbDevice(device: UsbDevice): Boolean {
-        for (i in 0 until device.interfaceCount) {
-            val iface = device.getInterface(i)
-            if (iface.interfaceClass == ADB_INTERFACE_CLASS) {
-                return true
-            }
-        }
-        return false
-    }
+    private fun isAdbDevice(device: UsbDevice): Boolean = UsbAdbMatch.isAdbDevice(device)
 
     /**
      * 处理设备连接事件
