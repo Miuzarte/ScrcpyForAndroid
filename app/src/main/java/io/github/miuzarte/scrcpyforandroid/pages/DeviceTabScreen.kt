@@ -37,6 +37,7 @@ import io.github.miuzarte.scrcpyforandroid.models.DeviceConnectionType
 import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbDeviceWatcher
 import io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceEvent
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.password.rememberPasswordPickerEntries
 import io.github.miuzarte.scrcpyforandroid.scaffolds.LazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SectionSmallTitle
@@ -378,129 +379,131 @@ internal fun DeviceTabPage(
     }
 
     @Composable
+    fun UsbDeviceTile(deviceInfo: UsbDeviceInfo) {
+        val vidPid = String.format(
+            "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
+        )
+        val connectedToThis = adbConnected &&
+                currentTarget?.connectionType == DeviceConnectionType.USB &&
+                currentTarget?.host == vidPid
+        val actionInProgress = adbConnecting && activeDeviceActionId == vidPid
+
+        // 卡片样式需与 DeviceTile 保持一致 (灰白系底色 + Sink 反馈), 改无线样式时同步此处
+        Card(
+            colors = CardDefaults.defaultColors(
+                color =
+                    if (connectedToThis) colorScheme.surfaceContainer
+                    else colorScheme.surfaceContainer.copy(alpha = 0.6f),
+            ),
+            pressFeedbackType = PressFeedbackType.Sink,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {
+                            haptic.contextClick()
+                            when {
+                                connectedToThis -> Unit
+                                !deviceInfo.hasPermission -> {
+                                    AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                                    usbWatcher.requestUsbPermission(deviceInfo.device)
+                                }
+
+                                else -> viewModel.connectUsbDevice(deviceInfo)
+                            }
+                        },
+                    )
+                    .padding(UiSpacing.PageItem),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // status dot (与无线卡片同一套逻辑)
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                color =
+                                    if (connectedToThis) Color(0xFF44C74F)
+                                    else colorScheme.outline,
+                                shape = CircleShape,
+                            ),
+                    )
+                    Spacer(modifier = Modifier.width(UiSpacing.PageItem))
+                    Column {
+                        Text(
+                            deviceInfo.getDisplayName(),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = colorScheme.onSurface,
+                        )
+                        Text(
+                            vidPid,
+                            fontSize = 13.sp,
+                            color = colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (actionInProgress) {
+                        CircularProgressIndicator(progress = null)
+                        Spacer(Modifier.width(UiSpacing.Medium))
+                        TextButton(
+                            text = stringResource(R.string.button_cancel),
+                            onClick = {
+                                haptic.contextClick()
+                                viewModel.cancelUsbConnect()
+                            },
+                            colors = ButtonDefaults.textButtonColors(),
+                        )
+                    } else {
+                        TextButton(
+                            text = stringResource(
+                                when {
+                                    connectedToThis -> R.string.button_disconnect
+                                    !deviceInfo.hasPermission -> R.string.button_authorize
+                                    else -> R.string.button_connect
+                                },
+                            ),
+                            onClick = {
+                                haptic.contextClick()
+                                when {
+                                    connectedToThis -> viewModel.disconnectUsbDevice()
+                                    !deviceInfo.hasPermission -> {
+                                        AppRuntime.snackbar(R.string.usb_permission_request_hint)
+                                        usbWatcher.requestUsbPermission(deviceInfo.device)
+                                    }
+
+                                    else -> viewModel.connectUsbDevice(deviceInfo)
+                                }
+                            },
+                            enabled = (!busy && !adbConnecting) || connectedToThis,
+                            colors = ButtonDefaults.textButtonColors(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     fun UsbDevicesSection() {
         // watcher 与插拔 Snackbar 响应提升至 DeviceTabPage 页面级, 此处只消费状态
 
-        // 已断开的设备不显示条目: 无设备时整个区块不渲染
-        if (usbDevices.isEmpty()) return
-
-        // 与无线 DeviceTileList 相同的容器样式, USB 条目置顶, 视觉连续
+        // 容器始终参与组合: 无设备时高度为 0, 让 DeviceListSection 能按可见性补间隔
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(UiSpacing.ContentVertical),
         ) {
             usbDevices.forEach { deviceInfo ->
-                val vidPid = String.format(
-                    "0x%04X/0x%04X", deviceInfo.device.vendorId, deviceInfo.device.productId,
-                )
-                val connectedToThis = adbConnected &&
-                        currentTarget?.connectionType == DeviceConnectionType.USB &&
-                        currentTarget?.host == vidPid
-                val actionInProgress = adbConnecting && activeDeviceActionId == vidPid
-
-                // 卡片样式需与 DeviceTile 保持一致 (灰白系底色 + Sink 反馈), 改无线样式时同步此处
-                Card(
-                    colors = CardDefaults.defaultColors(
-                        color =
-                            if (connectedToThis) colorScheme.surfaceContainer
-                            else colorScheme.surfaceContainer.copy(alpha = 0.6f),
-                    ),
-                    pressFeedbackType = PressFeedbackType.Sink,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = {
-                                    haptic.contextClick()
-                                    when {
-                                        connectedToThis -> Unit
-                                        !deviceInfo.hasPermission -> {
-                                            AppRuntime.snackbar(R.string.usb_permission_request_hint)
-                                            usbWatcher.requestUsbPermission(deviceInfo.device)
-                                        }
-
-                                        else -> viewModel.connectUsbDevice(deviceInfo)
-                                    }
-                                },
-                            )
-                            .padding(UiSpacing.PageItem),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // status dot (与无线卡片同一套逻辑)
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(
-                                        color =
-                                            if (connectedToThis) Color(0xFF44C74F)
-                                            else colorScheme.outline,
-                                        shape = CircleShape,
-                                    ),
-                            )
-                            Spacer(modifier = Modifier.width(UiSpacing.PageItem))
-                            Column {
-                                Text(
-                                    deviceInfo.getDisplayName(),
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = colorScheme.onSurface,
-                                )
-                                Text(
-                                    vidPid,
-                                    fontSize = 13.sp,
-                                    color = colorScheme.onSurfaceVariantSummary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (actionInProgress) {
-                                CircularProgressIndicator(progress = null)
-                                Spacer(Modifier.width(UiSpacing.Medium))
-                                TextButton(
-                                    text = stringResource(R.string.button_cancel),
-                                    onClick = {
-                                        haptic.contextClick()
-                                        viewModel.cancelUsbConnect()
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(),
-                                )
-                            } else {
-                                TextButton(
-                                    text = stringResource(
-                                        when {
-                                            connectedToThis -> R.string.button_disconnect
-                                            !deviceInfo.hasPermission -> R.string.button_authorize
-                                            else -> R.string.button_connect
-                                        },
-                                    ),
-                                    onClick = {
-                                        haptic.contextClick()
-                                        when {
-                                            connectedToThis -> viewModel.disconnectUsbDevice()
-                                            !deviceInfo.hasPermission -> {
-                                                AppRuntime.snackbar(R.string.usb_permission_request_hint)
-                                                usbWatcher.requestUsbPermission(deviceInfo.device)
-                                            }
-
-                                            else -> viewModel.connectUsbDevice(deviceInfo)
-                                        }
-                                    },
-                                    enabled = (!busy && !adbConnecting) || connectedToThis,
-                                    colors = ButtonDefaults.textButtonColors(),
-                                )
-                            }
-                        }
-                    }
-                }
+                UsbDeviceTile(deviceInfo)
             }
         }
     }
@@ -509,6 +512,9 @@ internal fun DeviceTabPage(
     fun DeviceListSection() {
         // USB 设备条目置顶, 与无线设备构成同一列表
         UsbDevicesSection()
+        // 两个列表之间补上 LazyColumn 的 item 间隔 (原来各自是一个 item 时由 itemSpacing 提供);
+        // 无 USB 设备时容器高度为 0, 不再额外占位
+        if (usbDevices.isNotEmpty()) Spacer(Modifier.height(UiSpacing.PageItem))
         DeviceTileList(
             devices = savedShortcuts,
             currentTarget = currentTarget,
