@@ -11,14 +11,24 @@ import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.blur.*
 import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
+import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 val LocalEnableBlur = staticCompositionLocalOf { false }
 val LocalBlurMode = staticCompositionLocalOf { AppSettings.BlurMode.NONE }
 
+/**
+ * 当前设备是否支持模糊
+ *
+ * miuix 的模糊整条管线由 RuntimeShader 与 RenderEffect 构成:
+ * 前者是 android.graphics.RuntimeShader (AGSL, API 33+ 引入), 后者是 android.graphics.RenderEffect (API 31+ 引入),
+ * 低版本只会画出底色而没有任何模糊, 所以两者都要判断
+ */
+fun isBlurEffectSupported(): Boolean = isRenderEffectSupported() && isRuntimeShaderSupported()
+
 @Composable
 fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur || !isRenderEffectSupported()) return null
+    if (!enableBlur || !isBlurEffectSupported()) return null
     val surfaceColor = colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)

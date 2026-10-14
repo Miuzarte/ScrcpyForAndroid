@@ -39,12 +39,12 @@ import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
 import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
 import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
 import io.github.miuzarte.scrcpyforandroid.ui.contextClick
+import io.github.miuzarte.scrcpyforandroid.ui.isBlurEffectSupported
 import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
 import kotlinx.coroutines.flow.onEach
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.*
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles
 import java.util.Locale.getDefault
@@ -145,7 +145,7 @@ private fun AboutContent(
     val updateState by AppUpdateChecker.state.collectAsState()
     val backdrop = rememberLayerBackdrop()
     var isOs3Effect by remember { mutableStateOf(true) }
-    val blurEnabled = remember(enableBlur) { enableBlur && isRenderEffectSupported() }
+    val blurEnabled = remember(enableBlur) { enableBlur && isBlurEffectSupported() }
     val isDark = colorScheme.background.luminance() < 0.5f
     val heroBlendColors = remember(isDark) { heroBlendColors(isDark) }
     val cardBlendColors = remember(isDark) { aboutCardBlendToken(isDark) }

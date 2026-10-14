@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -50,6 +51,7 @@ internal fun ThemeSettingsScreen() {
     val haptic = LocalHapticFeedback.current
     val navigator = LocalRootNavigator.current
     val localBlurMode = LocalBlurMode.current
+    val blurSupported = remember { isBlurEffectSupported() }
     val blurBackdrop = rememberBlurBackdrop(localBlurMode != AppSettings.BlurMode.NONE)
     val blurActive = blurBackdrop != null
     val scrollBehavior = MiuixScrollBehavior()
@@ -63,6 +65,13 @@ internal fun ThemeSettingsScreen() {
     val asBundleLatest by rememberUpdatedState(asBundle)
     LaunchedEffect(asBundleShared) {
         if (asBundle != asBundleShared) asBundle = asBundleShared
+    }
+    // 设备不支持模糊时清掉可能残留的已存值 (换机恢复备份等情况), 避免升级后仍被读取;
+    // asBundle 只被本页的 asBundleShared 同步写入, 先等一帧再改可避免与那次同步抢同一帧
+    LaunchedEffect(blurSupported) {
+        if (blurSupported || asBundle.blur == AppSettings.BlurMode.NONE) return@LaunchedEffect
+        withFrameNanos { }
+        asBundle = asBundle.copy(blur = AppSettings.BlurMode.NONE)
     }
     LaunchedEffect(asBundle) {
         delay(Settings.BUNDLE_SAVE_DELAY)
@@ -180,15 +189,20 @@ internal fun ThemeSettingsScreen() {
                                 asBundle = asBundle.copy(squircle = it)
                             },
                         )
-                        OverlayDropdownPreference(
-                            title = stringResource(R.string.pref_title_blur),
-                            summary = stringResource(R.string.pref_summary_blur),
-                            items = blurModeLabels.map { stringResource(it) },
-                            selectedIndex = asBundle.blur.coerceIn(0, blurModeLabels.lastIndex),
-                            onSelectedIndexChange = { idx ->
-                                asBundle = asBundle.copy(blur = idx)
-                            },
-                        )
+                        // miuix 的模糊依赖 android.graphics.RuntimeShader / RenderEffect (API 33+ 才有完整实现),
+                        // 低版本只会画出底色而没有任何模糊, 故不显示该设置; 组合处的版本兜底在 rememberBlurBackdrop
+                        if (blurSupported) {
+                            OverlayDropdownPreference(
+                                title = stringResource(R.string.pref_title_blur),
+                                summary = stringResource(R.string.pref_summary_blur),
+                                items = blurModeLabels.map { stringResource(it) },
+                                selectedIndex = asBundle.blur.coerceIn(0, blurModeLabels.lastIndex),
+                                onSelectedIndexChange = { idx ->
+                                    asBundle = asBundle.copy(blur = idx)
+                                },
+                            )
+                        }
+
                         // 悬浮底栏依赖 InteractiveHighlight, 其内部构造 android.graphics.RuntimeShader (API 33+ 引入),
                         // 低版本不显示该开关; 组合处的版本兜底在 MainScreen
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
