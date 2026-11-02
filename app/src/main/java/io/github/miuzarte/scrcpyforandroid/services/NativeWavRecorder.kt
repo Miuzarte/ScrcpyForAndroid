@@ -4,16 +4,15 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import java.io.File
-import java.io.RandomAccessFile
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class NativeWavRecorder(
-    outputFile: File,
+    private val output: RecordingTarget,
     private val inputCodec: Codec,
 ) {
-    private val output = RandomAccessFile(outputFile, "rw")
+    private val stream = output.outputStream()
     private val decoderBufferInfo = MediaCodec.BufferInfo()
     private var decoder: MediaCodec? = null
     private var released = false
@@ -23,8 +22,7 @@ class NativeWavRecorder(
     private var reusablePcmBuffer = ByteArray(0)
 
     init {
-        output.setLength(0)
-        output.write(ByteArray(WAV_HEADER_SIZE))
+        stream.write(ByteArray(WAV_HEADER_SIZE))
     }
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
@@ -67,10 +65,12 @@ class NativeWavRecorder(
         runCatching { decoder?.stop() }
         runCatching { decoder?.release() }
         runCatching {
-            output.seek(0)
-            output.write(wavHeader(bytesWritten))
+            stream.channel.position(0)
+            stream.write(wavHeader(bytesWritten))
+            stream.flush()
         }
-        runCatching { output.close() }
+        runCatching { stream.close() }
+        output.finish(true)
         decoder = null
     }
 
@@ -137,7 +137,7 @@ class NativeWavRecorder(
     }
 
     private fun writePcm(buffer: ByteArray, size: Int) {
-        output.write(buffer, 0, size)
+        stream.write(buffer, 0, size)
         bytesWritten += size
     }
 

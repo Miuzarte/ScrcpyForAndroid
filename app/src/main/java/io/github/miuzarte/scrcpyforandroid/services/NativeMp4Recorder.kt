@@ -8,12 +8,12 @@ import android.util.Log
 import android.view.Surface
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.ArrayDeque
 
 class NativeMp4Recorder(
-    outputFile: File,
+    private val output: RecordingTarget,
     private val includeVideo: Boolean,
     private val includeAudio: Boolean,
     private val inputAudioCodec: Codec?,
@@ -33,7 +33,7 @@ class NativeMp4Recorder(
 
     private val lock = Any()
     private val muxer = MediaMuxer(
-        outputFile.absolutePath,
+        output.fileDescriptor,
         MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4,
     )
     private val audioBitRate = audioBitRate.takeIf { it > 0 } ?: DEFAULT_AAC_BIT_RATE
@@ -57,6 +57,10 @@ class NativeMp4Recorder(
     private var videoBasePtsUs: Long? = null
     private var lastAudioPtsUs = 0L
     private var lastVideoPtsUs = 0L
+    private var nextAudioPtsUs = 0L
+    private val videoFramePtsUs = ArrayDeque<Long>()
+    private var firstVideoFrameNs: Long? = null
+    private var lastVideoFramePtsUs = 0L
 
     private var audioDecoderPrepared = !includeAudio || inputAudioCodec == Codec.RAW
     private var audioEncoderPrepared = false
@@ -65,6 +69,7 @@ class NativeMp4Recorder(
     private var audioEncoderOutputEnded = false
     private var videoEncoderInputEnded = false
     private var videoEncoderOutputEnded = false
+    private var samplesWritten = 0L
 
     private var reusablePcmBuffer = ByteArray(0)
     private val pendingSamples = mutableListOf<PendingSample>()
@@ -96,7 +101,7 @@ class NativeMp4Recorder(
             ensureAudioEncoder()
 
             if (inputAudioCodec == Codec.RAW) {
-                queuePcmToAudioEncoder(data, ptsUs)
+                queuePcmToAudioEncoder(data)
                 drainAudioEncoderLocked()
                 return
             }
@@ -153,6 +158,7 @@ class NativeMp4Recorder(
                 }
             }
             runCatching { muxer.release() }
+            output.finish(samplesWritten > 0)
 
             audioDecoder = null
             audioEncoder = null
@@ -164,6 +170,11 @@ class NativeMp4Recorder(
     private fun onVideoFrameRendered() {
         synchronized(lock) {
             if (released) return
+            val nowNs = System.nanoTime()
+            val baseNs = firstVideoFrameNs ?: nowNs.also { firstVideoFrameNs = it }
+            val ptsUs = ((nowNs - baseNs) / 1_000L).coerceAtLeast(lastVideoFramePtsUs)
+            lastVideoFramePtsUs = ptsUs
+            videoFramePtsUs.addLast(ptsUs)
             drainVideoEncoderLocked()
         }
     }
@@ -244,7 +255,6 @@ class NativeMp4Recorder(
                         outputBuffer.get(reusablePcmBuffer, 0, audioDecoderBufferInfo.size)
                         queuePcmToAudioEncoder(
                             reusablePcmBuffer,
-                            audioDecoderBufferInfo.presentationTimeUs,
                             audioDecoderBufferInfo.size,
                         )
                     }
@@ -263,7 +273,6 @@ class NativeMp4Recorder(
 
     private fun queuePcmToAudioEncoder(
         data: ByteArray,
-        ptsUs: Long,
         sizeOverride: Int = data.size,
     ) {
         val currentEncoder = audioEncoder ?: return
@@ -279,7 +288,8 @@ class NativeMp4Recorder(
             val chunkSize = minOf(inputBuffer.capacity(), remaining)
             inputBuffer.clear()
             inputBuffer.put(data, offset, chunkSize)
-            val chunkPtsUs = ptsUs + pcmBytesToDurationUs(offset)
+            val chunkPtsUs = nextAudioPtsUs
+            nextAudioPtsUs += pcmBytesToDurationUs(chunkSize)
             currentEncoder.queueInputBuffer(inputIndex, 0, chunkSize, chunkPtsUs, 0)
             offset += chunkSize
             remaining -= chunkSize
@@ -340,10 +350,20 @@ class NativeMp4Recorder(
                         videoEncoderBufferInfo.size > 0 &&
                         !codecConfig
                     ) {
+                        val framePtsUs = videoFramePtsUs.pollFirst()
+                            ?: (lastVideoFramePtsUs + DEFAULT_FRAME_DURATION_US)
+                        val writeInfo = MediaCodec.BufferInfo().apply {
+                            set(
+                                videoEncoderBufferInfo.offset,
+                                videoEncoderBufferInfo.size,
+                                framePtsUs,
+                                videoEncoderBufferInfo.flags,
+                            )
+                        }
                         writeSampleLocked(
                             TrackType.VIDEO,
                             outputBuffer,
-                            videoEncoderBufferInfo,
+                            writeInfo,
                         )
                     }
                     val eos =
@@ -399,6 +419,7 @@ class NativeMp4Recorder(
                     flags = sample.flags
                 }
                 muxer.writeSampleData(trackIndex, ByteBuffer.wrap(sample.data), bufferInfo)
+                samplesWritten += 1
             }
         }
     }
@@ -439,6 +460,7 @@ class NativeMp4Recorder(
             flags = bufferInfo.flags
         }
         muxer.writeSampleData(trackIndex, ByteBuffer.wrap(data), writeInfo)
+        samplesWritten += 1
     }
 
     private fun normalizePtsLocked(
@@ -577,6 +599,7 @@ class NativeMp4Recorder(
         private const val MAX_AUDIO_ENCODER_INPUT_SIZE = 16 * 1024
         private const val BYTES_PER_SECOND_PCM_16_STEREO = SAMPLE_RATE * CHANNEL_COUNT * 2
         private const val DEFAULT_FRAME_RATE = 60
+        private const val DEFAULT_FRAME_DURATION_US = 1_000_000L / DEFAULT_FRAME_RATE
         private const val DEFAULT_I_FRAME_INTERVAL = 2
         private const val DEFAULT_VIDEO_BITS_PER_PIXEL = 6
         private const val MIN_VIDEO_BIT_RATE = 4_000_000

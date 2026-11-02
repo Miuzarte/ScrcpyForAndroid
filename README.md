@@ -120,8 +120,9 @@
    - 每个 Slider 选项的标题都可以点开自己输入值
 
 4. 录制/下载的文件在哪
-   - /sdcard/Movies/Scrcpy/
-   - /sdcard/Download/Scrcpy/
+   - 视频录制: /sdcard/Movies/Scrcpy/
+   - 音频录制: /sdcard/Music/Scrcpy/
+   - 下载: /sdcard/Download/Scrcpy/
 
 5. 横屏模式对左撇子不太友好
    - 右上角有按钮可以对调方向

@@ -1,16 +1,17 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
+import android.content.Context
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import java.io.File
 import java.time.LocalDateTime
 
 object RecordingFileResolver {
     fun resolve(
+        context: Context,
         options: ClientOptions,
         sessionInfo: Scrcpy.Session.SessionInfo,
         now: LocalDateTime = LocalDateTime.now(),
-    ): File {
+    ): RecordingTarget {
         val resolvedName = RecordFilenameTemplate.resolve(options.recordFilename, sessionInfo, now)
         val fileName = ensureExtension(
             sanitizeFileName(resolvedName).ifBlank {
@@ -18,49 +19,41 @@ object RecordingFileResolver {
             },
             options.recordFormat,
         )
-        val directory = PublicDirs.recordDirectory()
-        ensureDirectory(directory)
-        return uniqueFile(directory, fileName)
+        val mimeType = mimeTypeFor(options)
+        val isVideo = options.recordFormat == ClientOptions.RecordFormat.MP4
+        return RecordingTarget.create(
+            context = context,
+            displayName = fileName,
+            mimeType = mimeType,
+            isVideo = isVideo,
+        )
     }
 
     private fun ensureExtension(
         fileName: String,
         format: ClientOptions.RecordFormat,
     ): String {
-        if (fileName.contains('.')) return fileName
         val extension = when (format) {
             ClientOptions.RecordFormat.M4A -> "m4a"
             ClientOptions.RecordFormat.AAC -> "aac"
             ClientOptions.RecordFormat.WAV -> "wav"
             else -> "mp4"
         }
+        if (fileName.substringAfterLast('.', "").equals(extension, ignoreCase = true)) {
+            return fileName
+        }
         return "$fileName.$extension"
+    }
+
+    private fun mimeTypeFor(options: ClientOptions): String {
+        return when (options.recordFormat) {
+            ClientOptions.RecordFormat.M4A -> "audio/mp4"
+            ClientOptions.RecordFormat.AAC -> "audio/aac"
+            ClientOptions.RecordFormat.WAV -> "audio/x-wav"
+            else -> "video/mp4"
+        }
     }
 
     fun sanitizeFileName(name: String): String =
         name.replace(Regex("""[\\/:*?"<>|]"""), "").trim()
-
-    private fun ensureDirectory(directory: File) {
-        if (directory.exists()) return
-        if (!directory.mkdirs()) {
-            throw IllegalStateException("Unable to create directory: ${directory.absolutePath}")
-        }
-    }
-
-    private fun uniqueFile(directory: File, fileName: String): File {
-        val baseName = fileName.substringBeforeLast('.', fileName)
-        val extension = fileName.substringAfterLast('.', "")
-        var index = 0
-        var candidate = File(directory, fileName)
-        while (candidate.exists()) {
-            index += 1
-            val suffix = " ($index)"
-            candidate = if (extension.isBlank()) {
-                File(directory, baseName + suffix)
-            } else {
-                File(directory, "$baseName$suffix.$extension")
-            }
-        }
-        return candidate
-    }
 }

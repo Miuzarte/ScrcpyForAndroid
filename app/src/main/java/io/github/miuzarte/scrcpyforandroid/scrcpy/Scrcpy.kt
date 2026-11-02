@@ -22,6 +22,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,6 +31,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.ArrayDeque
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -136,6 +138,8 @@ class Scrcpy(
         @Volatile
         private var lastRemoteDisconnectSnackbarAt = 0L
 
+        private const val RECORDING_VIDEO_SIZE_TIMEOUT_MS = 5_000L
+
         const val DEFAULT_SERVER_ASSET = "bin/scrcpy-server-v5.0"
         const val DEFAULT_SERVER_ASSET_NAME = "scrcpy-server-v5.0"
         const val DEFAULT_SERVER_VERSION = "5.0"
@@ -161,6 +165,22 @@ class Scrcpy(
             // Only use 31 bits to avoid issues with signed values on the Java-side
             return (Random.nextUInt() and 0x7FFFFFFFu)
         }
+    }
+
+    /**
+     * 录制需要真实视频尺寸
+     *
+     * scrcpy v4+ 的视频尺寸在首个 session packet 中, start() 返回时 [Session.SessionInfo.width] 还是 0.
+     * 直接拿 0x0 配置 MediaCodec 会抛 IllegalArgumentException, 因此等首个 session packet.
+     */
+    private suspend fun awaitRecordingInfo(
+        options: ClientOptions,
+        info: Session.SessionInfo,
+    ): Session.SessionInfo {
+        if (!options.video || (info.width > 0 && info.height > 0)) return info
+        return withTimeoutOrNull(RECORDING_VIDEO_SIZE_TIMEOUT_MS) {
+            currentSessionState.first { it != null && it.width > 0 && it.height > 0 }
+        } ?: throw IllegalStateException("Video size is unavailable for recording")
     }
 
     suspend fun start(options: ClientOptions): Session.SessionInfo = withContext(Dispatchers.IO) {
@@ -255,60 +275,66 @@ class Scrcpy(
             }
 
             if (options.recordFilename.isNotBlank()) {
-                val recordFile = RecordingFileResolver.resolve(options, info)
-                when (options.recordFormat) {
-                    ClientOptions.RecordFormat.MP4,
-                    ClientOptions.RecordFormat.M4A,
-                        -> {
-                        val recorder = NativeMp4Recorder(
-                            outputFile = recordFile,
-                            includeVideo = options.video,
-                            includeAudio = options.audio && info.audioCodec != null,
-                            inputAudioCodec = info.audioCodec,
-                            width = info.width,
-                            height = info.height,
-                            videoBitRate = options.videoBitRate,
-                            audioBitRate = options.audioBitRate,
-                        )
-                        recorder.start()
-                        mp4Recorder = recorder
-                        if (options.audio && info.audioCodec != null) {
-                            session.attachAudioConsumer { packet ->
-                                recorder.feedAudioPacket(packet.data, packet.ptsUs, packet.isConfig)
+                val recordingInfo = awaitRecordingInfo(options, info)
+                val target = RecordingFileResolver.resolve(appContext, options, recordingInfo)
+                try {
+                    when (options.recordFormat) {
+                        ClientOptions.RecordFormat.MP4,
+                        ClientOptions.RecordFormat.M4A,
+                            -> {
+                            val recorder = NativeMp4Recorder(
+                                output = target,
+                                includeVideo = options.video,
+                                includeAudio = options.audio && recordingInfo.audioCodec != null,
+                                inputAudioCodec = recordingInfo.audioCodec,
+                                width = recordingInfo.width,
+                                height = recordingInfo.height,
+                                videoBitRate = options.videoBitRate,
+                                audioBitRate = options.audioBitRate,
+                            )
+                            recorder.start()
+                            mp4Recorder = recorder
+                            if (options.audio && recordingInfo.audioCodec != null) {
+                                session.attachAudioConsumer { packet ->
+                                    recorder.feedAudioPacket(packet.data, packet.ptsUs, packet.isConfig)
+                                }
                             }
                         }
-                    }
 
-                    ClientOptions.RecordFormat.WAV -> {
-                        val codec = info.audioCodec
-                            ?: throw IllegalStateException("WAV recording requires an audio stream")
-                        val recorder = NativeWavRecorder(
-                            outputFile = recordFile,
-                            inputCodec = codec,
-                        )
-                        wavRecorder = recorder
-                        session.attachAudioConsumer { packet ->
-                            recorder.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+                        ClientOptions.RecordFormat.WAV -> {
+                            val codec = recordingInfo.audioCodec
+                                ?: throw IllegalStateException("WAV recording requires an audio stream")
+                            val recorder = NativeWavRecorder(
+                                output = target,
+                                inputCodec = codec,
+                            )
+                            wavRecorder = recorder
+                            session.attachAudioConsumer { packet ->
+                                recorder.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+                            }
                         }
-                    }
 
-                    ClientOptions.RecordFormat.AAC -> {
-                        val codec = info.audioCodec
-                            ?: throw IllegalStateException("AAC recording requires an audio stream")
-                        val recorder = NativeAacRecorder(
-                            outputFile = recordFile,
-                            inputCodec = codec,
-                            bitRate = options.audioBitRate,
-                        )
-                        aacRecorder = recorder
-                        session.attachAudioConsumer { packet ->
-                            recorder.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+                        ClientOptions.RecordFormat.AAC -> {
+                            val codec = recordingInfo.audioCodec
+                                ?: throw IllegalStateException("AAC recording requires an audio stream")
+                            val recorder = NativeAacRecorder(
+                                target = target,
+                                inputCodec = codec,
+                                bitRate = options.audioBitRate,
+                            )
+                            aacRecorder = recorder
+                            session.attachAudioConsumer { packet ->
+                                recorder.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+                            }
                         }
-                    }
 
-                    else -> Unit
+                        else -> Unit
+                    }
+                    Log.i(TAG, "start(): recording -> ${target.displayName}")
+                } catch (e: Exception) {
+                    runCatching { target.finish(false) }
+                    throw e
                 }
-                Log.i(TAG, "start(): recording -> ${recordFile.absolutePath}")
             }
 
             Log.i(
@@ -336,6 +362,9 @@ class Scrcpy(
             wavRecorder = null
             runCatching { aacRecorder?.release() }
             aacRecorder = null
+            runCatching { NativeCoreFacade.onScrcpySessionStopped() }
+            runCatching { session.stop() }
+            stopClipboardSync()
             isRunning = false
             flexDisplay = false
             _currentSessionState.value = null
@@ -1065,12 +1094,15 @@ class Scrcpy(
         @Volatile
         private var controlChannelAlive: Boolean = false
 
-        private val videoConsumers = linkedSetOf<(VideoPacket) -> Unit>()
+        private val videoConsumers = CopyOnWriteArraySet<(VideoPacket) -> Unit>()
 
         @Volatile
         private var videoReaderThread: Thread? = null
 
-        private val audioConsumers = linkedSetOf<(AudioPacket) -> Unit>()
+        private val audioConsumers = CopyOnWriteArraySet<(AudioPacket) -> Unit>()
+
+        @Volatile
+        private var lastAudioConfigPacket: AudioPacket? = null
 
         @Volatile
         private var audioReaderThread: Thread? = null
@@ -1318,6 +1350,7 @@ class Scrcpy(
             val aInput = session.audioInput ?: return
             val aStream = session.audioStream ?: return
             audioConsumers += consumer
+            lastAudioConfigPacket?.let { consumer(it) }
             if (audioReaderThread?.isAlive == true) return
 
             audioReaderThread = thread(start = true, name = "scrcpy-audio-reader") {
@@ -1338,6 +1371,7 @@ class Scrcpy(
                                 ptsUs = ptsUs,
                                 isConfig = isConfig,
                             )
+                            if (isConfig) lastAudioConfigPacket = packet
                             audioConsumers.forEach { it(packet) }
                         } catch (_: EOFException) {
                             break
@@ -1357,7 +1391,10 @@ class Scrcpy(
             }
         }
 
-        suspend fun clearAudioConsumer() = mutex.withLock { audioConsumers.clear() }
+        suspend fun clearAudioConsumer() = mutex.withLock {
+            audioConsumers.clear()
+            lastAudioConfigPacket = null
+        }
 
         suspend fun startApp(name: String) = mutex.withLock {
             withControlWriter("startApp") { startApp(name) }
@@ -1474,6 +1511,7 @@ class Scrcpy(
             controlChannelAlive = false
             videoConsumers.clear()
             audioConsumers.clear()
+            lastAudioConfigPacket = null
 
             if (Thread.currentThread() !== videoReaderThread) {
                 runCatching { videoReaderThread?.interrupt() }

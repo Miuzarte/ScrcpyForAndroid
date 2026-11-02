@@ -5,17 +5,16 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class NativeAacRecorder(
-    outputFile: File,
+    private val target: RecordingTarget,
     private val inputCodec: Codec,
     bitRate: Int,
 ) {
-    private val output = FileOutputStream(outputFile)
+    private val output = target.outputStream()
     private val outputBitRate = bitRate.takeIf { it > 0 } ?: DEFAULT_AAC_BIT_RATE
     private val decoderBufferInfo = MediaCodec.BufferInfo()
     private val encoderBufferInfo = MediaCodec.BufferInfo()
@@ -29,6 +28,7 @@ class NativeAacRecorder(
     private var encoderInputEnded = false
     private var encoderOutputEnded = false
     private var reusablePcmBuffer = ByteArray(0)
+    private var bytesWritten = 0L
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
         if (released) return
@@ -79,6 +79,7 @@ class NativeAacRecorder(
         runCatching { encoder?.release() }
         runCatching { output.flush() }
         runCatching { output.close() }
+        target.finish(bytesWritten > 0)
         decoder = null
         encoder = null
     }
@@ -198,8 +199,10 @@ class NativeAacRecorder(
                         outputBuffer.limit(encoderBufferInfo.offset + encoderBufferInfo.size)
                         val data = ByteArray(encoderBufferInfo.size)
                         outputBuffer.get(data)
-                        output.write(adtsHeader(data.size))
+                        val header = adtsHeader(data.size)
+                        output.write(header)
                         output.write(data)
+                        bytesWritten += header.size + data.size
                     }
                     val eos = encoderBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                     currentEncoder.releaseOutputBuffer(index, false)
