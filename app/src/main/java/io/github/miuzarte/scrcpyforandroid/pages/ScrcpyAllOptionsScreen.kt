@@ -405,13 +405,6 @@ internal fun ScrcpyAllOptionsPage(
             onSaveBundleForProfile(currentProfileId, soBundle)
         }
     }
-    DisposableEffect(Unit) {
-        onDispose {
-            taskScope.launch {
-                onSaveBundleForProfile(selectedProfileIdLatest, soBundleLatest)
-            }
-        }
-    }
     val listState = rememberSaveable(
         saver = LazyListState.Saver,
     ) {
@@ -794,6 +787,28 @@ internal fun ScrcpyAllOptionsPage(
     var cropYInput by rememberSaveable(soBundle.crop) {
         mutableStateOf(cY?.toString() ?: "")
     }
+    val draftSnapshotState = rememberUpdatedState(
+        OptionDraftSnapshot(
+            videoSource = soBundle.videoSource,
+            cameraSizeCustom = cameraSizeCustomInput,
+            cameraSizeUseCustom = soBundle.cameraSizeUseCustom,
+            cameraSizes = cameraSizes,
+            cameraAr = cameraArInput,
+            cameraZoom = cameraZoomInput,
+            videoCodecOptions = videoCodecOptionsInput,
+            audioCodecOptions = audioCodecOptionsInput,
+            startAppCustom = startAppCustomInput,
+            startAppUseCustom = soBundle.startAppUseCustom,
+            appPackages = apps.map { it.packageName },
+            newDisplayWidth = newDisplayWidthInput,
+            newDisplayHeight = newDisplayHeightInput,
+            newDisplayDpi = newDisplayDpiInput,
+            cropWidth = cropWidthInput,
+            cropHeight = cropHeightInput,
+            cropX = cropXInput,
+            cropY = cropYInput,
+        ),
+    )
 
     val logLevelItems = rememberSaveable { LogLevel.entries.map { it.string } }
     val logLevelIndex = rememberSaveable(soBundle.logLevel) {
@@ -2182,6 +2197,90 @@ internal fun ScrcpyAllOptionsPage(
         }
 
     }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            taskScope.launch {
+                onSaveBundleForProfile(
+                    selectedProfileIdLatest,
+                    soBundleLatest.commitDrafts(draftSnapshotState.value),
+                )
+            }
+        }
+    }
+}
+
+private data class OptionDraftSnapshot(
+    val videoSource: String,
+    val cameraSizeCustom: String,
+    val cameraSizeUseCustom: Boolean,
+    val cameraSizes: List<String>,
+    val cameraAr: String,
+    val cameraZoom: String,
+    val videoCodecOptions: String,
+    val audioCodecOptions: String,
+    val startAppCustom: String,
+    val startAppUseCustom: Boolean,
+    val appPackages: List<String>,
+    val newDisplayWidth: String,
+    val newDisplayHeight: String,
+    val newDisplayDpi: String,
+    val cropWidth: String,
+    val cropHeight: String,
+    val cropX: String,
+    val cropY: String,
+)
+
+private fun ScrcpyOptions.Bundle.commitDrafts(
+    snapshot: OptionDraftSnapshot,
+): ScrcpyOptions.Bundle {
+    var next = this
+    if (snapshot.videoSource == "camera") {
+        if (snapshot.cameraSizeUseCustom) {
+            next = if (snapshot.cameraSizeCustom in snapshot.cameraSizes) {
+                next.copy(
+                    cameraSize = snapshot.cameraSizeCustom,
+                    cameraSizeUseCustom = false,
+                )
+            } else {
+                next.copy(cameraSizeCustom = snapshot.cameraSizeCustom)
+            }
+        }
+        next = next.copy(
+            cameraAr = snapshot.cameraAr,
+            cameraZoom = snapshot.cameraZoom,
+        )
+    }
+    next = next.copy(
+        videoCodecOptions = snapshot.videoCodecOptions,
+        audioCodecOptions = snapshot.audioCodecOptions,
+    )
+    if (snapshot.startAppUseCustom) {
+        next = if (snapshot.startAppCustom in snapshot.appPackages) {
+            next.copy(
+                startApp = snapshot.startAppCustom,
+                startAppUseCustom = false,
+            )
+        } else {
+            next.copy(startAppCustom = snapshot.startAppCustom)
+        }
+    }
+    if (snapshot.videoSource == "display") {
+        next = next.copy(
+            newDisplay = NewDisplay.parseFrom(
+                snapshot.newDisplayWidth,
+                snapshot.newDisplayHeight,
+                snapshot.newDisplayDpi,
+            ).toString(),
+            crop = Crop.parseFrom(
+                snapshot.cropWidth,
+                snapshot.cropHeight,
+                snapshot.cropX,
+                snapshot.cropY,
+            ).toString(),
+        )
+    }
+    return next
 }
 
 private enum class ProfileDialogMode {

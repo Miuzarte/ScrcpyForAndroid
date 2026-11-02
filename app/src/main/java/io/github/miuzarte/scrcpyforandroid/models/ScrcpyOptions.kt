@@ -49,8 +49,8 @@ class ScrcpyOptions {
         override fun toString() =
             if (width != null && width > 0
                 && height != null && height > 0
-                && x != null && x > 0
-                && y != null && y > 0
+                && x != null && x >= 0
+                && y != null && y >= 0
             ) "$width:$height:$x:$y"
             else ""
 
@@ -59,8 +59,8 @@ class ScrcpyOptions {
                 Crop(
                     width = width.toIntOrNull()?.takeIf { it > 0 },
                     height = height.toIntOrNull()?.takeIf { it > 0 },
-                    x = x.toIntOrNull()?.takeIf { it > 0 },
-                    y = y.toIntOrNull()?.takeIf { it > 0 },
+                    x = x.toIntOrNull()?.takeIf { it >= 0 },
+                    y = y.toIntOrNull()?.takeIf { it >= 0 },
                 )
 
             fun parseFrom(input: String): Crop {
