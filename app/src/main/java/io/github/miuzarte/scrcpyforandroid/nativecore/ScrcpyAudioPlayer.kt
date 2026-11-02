@@ -5,6 +5,7 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 import android.content.Context
 import android.media.*
 import android.os.Build
+import android.os.Process
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import java.nio.ByteBuffer
@@ -275,7 +276,7 @@ class ScrcpyAudioPlayer(
     private fun applyAudioThreadPriorityIfNeeded() {
         if (!lowLatency || audioThreadPriorityApplied) return
         runCatching {
-            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
+            Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             audioThreadPriorityApplied = true
         }.onFailure {
             Log.w(TAG, "set audio thread priority failed", it)

@@ -256,11 +256,11 @@ class UsbAdbTunnel(
         for (i in 0 until iface.endpointCount) {
             val endpoint = iface.getEndpoint(i)
 
-            if (endpoint.type == android.hardware.usb.UsbConstants.USB_ENDPOINT_XFER_BULK) {
-                if (endpoint.direction == android.hardware.usb.UsbConstants.USB_DIR_IN) {
+            if (endpoint.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                if (endpoint.direction == UsbConstants.USB_DIR_IN) {
                     bulkInEndpoint = endpoint
                     Log.d(TAG, "findBulkEndpoints(): found Bulk IN endpoint at index $i")
-                } else if (endpoint.direction == android.hardware.usb.UsbConstants.USB_DIR_OUT) {
+                } else if (endpoint.direction == UsbConstants.USB_DIR_OUT) {
                     bulkOutEndpoint = endpoint
                     Log.d(TAG, "findBulkEndpoints(): found Bulk OUT endpoint at index $i")
                 }

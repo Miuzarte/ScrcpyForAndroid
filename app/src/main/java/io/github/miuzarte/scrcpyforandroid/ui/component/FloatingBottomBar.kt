@@ -30,37 +30,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
-import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.InnerShadow
-import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.innerShadow
-import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.lens
-import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.rememberCombinedBackdrop
-import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.vibrancy
+import io.github.miuzarte.scrcpyforandroid.ui.component.liquid.*
 import io.github.miuzarte.scrcpyforandroid.ui.component.miuix.animation.DampedDragAnimation
 import io.github.miuzarte.scrcpyforandroid.ui.component.miuix.animation.InteractiveHighlight
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.blur
-import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.*
 import top.yukonga.miuix.kmp.blur.highlight.BloomStroke
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.highlight.LightPosition
 import top.yukonga.miuix.kmp.blur.highlight.LightSource
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
-import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.roundToInt
-import kotlin.math.sign
-import kotlin.math.sin
+import kotlin.math.*
 
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
 
@@ -475,7 +458,9 @@ fun FloatingBottomBar(
                                 },
                             )
                         } else {
-                            Modifier.clip(pillShape).background(accentColor.copy(alpha = 0.15f), pillShape)
+                            Modifier
+                                .clip(pillShape)
+                                .background(accentColor.copy(alpha = 0.15f), pillShape)
                         },
                     )
                     .then(

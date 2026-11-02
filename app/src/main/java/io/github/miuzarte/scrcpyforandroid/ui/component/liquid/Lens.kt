@@ -66,10 +66,18 @@ private fun BackdropEffectScope.roundedRectCornerRadii(): FloatArray? {
     val sizePx = size
     val maxRadius = sizePx.minDimension / 2f
     val isLtr = layoutDirection == LayoutDirection.Ltr
-    val topLeft = if (isLtr) cornerShape.topStart.toPx(sizePx, this) else cornerShape.topEnd.toPx(sizePx, this)
-    val topRight = if (isLtr) cornerShape.topEnd.toPx(sizePx, this) else cornerShape.topStart.toPx(sizePx, this)
-    val bottomRight = if (isLtr) cornerShape.bottomEnd.toPx(sizePx, this) else cornerShape.bottomStart.toPx(sizePx, this)
-    val bottomLeft = if (isLtr) cornerShape.bottomStart.toPx(sizePx, this) else cornerShape.bottomEnd.toPx(sizePx, this)
+    val topLeft =
+        if (isLtr) cornerShape.topStart.toPx(sizePx, this)
+        else cornerShape.topEnd.toPx(sizePx, this)
+    val topRight =
+        if (isLtr) cornerShape.topEnd.toPx(sizePx, this)
+        else cornerShape.topStart.toPx(sizePx, this)
+    val bottomRight =
+        if (isLtr) cornerShape.bottomEnd.toPx(sizePx, this)
+        else cornerShape.bottomStart.toPx(sizePx, this)
+    val bottomLeft =
+        if (isLtr) cornerShape.bottomStart.toPx(sizePx, this)
+        else cornerShape.bottomEnd.toPx(sizePx, this)
     return floatArrayOf(
         topLeft.fastCoerceAtMost(maxRadius),
         topRight.fastCoerceAtMost(maxRadius),

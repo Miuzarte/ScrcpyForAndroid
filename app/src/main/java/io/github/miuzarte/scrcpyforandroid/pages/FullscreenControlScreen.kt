@@ -34,11 +34,7 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.password.rememberPasswordPickerEntries
-import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
-import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadHid
-import io.github.miuzarte.scrcpyforandroid.scrcpy.GamepadInputHandler
-import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
-import io.github.miuzarte.scrcpyforandroid.scrcpy.TouchEventHandler
+import io.github.miuzarte.scrcpyforandroid.scrcpy.*
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import io.github.miuzarte.scrcpyforandroid.services.LocalInputService
 import io.github.miuzarte.scrcpyforandroid.services.LocalSnackbarController
@@ -399,6 +395,7 @@ fun FullscreenControlScreen(
             },
         )
     }
+
     suspend fun startApp(packageName: String) =
         runCatching {
             withContext(Dispatchers.IO) {

@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.nativecore
 
 import android.annotation.SuppressLint
+import android.util.Base64
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.bouncycastle.cert.X509v3CertificateBuilder
@@ -17,6 +18,7 @@ import java.security.cert.X509Certificate
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
+import java.util.Date
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
@@ -46,8 +48,8 @@ internal class AdbPairingKey(
         val builder = X509v3CertificateBuilder(
             X500Name("CN=00"),
             BigInteger.ONE,
-            java.util.Date(0),
-            java.util.Date(2_461_449_600_000L),
+            Date(0),
+            Date(2_461_449_600_000L),
             X500Name("CN=00"),
             SubjectPublicKeyInfo.getInstance(rsaPublicKey.encoded),
         )
@@ -74,7 +76,7 @@ internal class AdbPairingKey(
 
             override fun chooseClientAlias(
                 keyType: Array<out String>?,
-                issuers: Array<out java.security.Principal>?,
+                issuers: Array<out Principal>?,
                 socket: Socket?,
             ): String = keyAlias
 
@@ -88,17 +90,17 @@ internal class AdbPairingKey(
 
             override fun getClientAliases(
                 keyType: String?,
-                issuers: Array<out java.security.Principal>?,
+                issuers: Array<out Principal>?,
             ): Array<String>? = null
 
             override fun getServerAliases(
                 keyType: String?,
-                issuers: Array<out java.security.Principal>?,
+                issuers: Array<out Principal>?,
             ): Array<String>? = null
 
             override fun chooseServerAlias(
                 keyType: String?,
-                issuers: Array<out java.security.Principal>?,
+                issuers: Array<out Principal>?,
                 socket: Socket?,
             ): String? = null
         }
@@ -198,7 +200,7 @@ private fun RSAPublicKey.adbEncoded(name: String): ByteArray {
     rr.toAdbEncoded().forEach { buffer.putInt(it) }
     buffer.putInt(publicExponent.toInt())
 
-    val base64 = android.util.Base64.encode(buffer.array(), android.util.Base64.NO_WRAP)
+    val base64 = Base64.encode(buffer.array(), Base64.NO_WRAP)
     val suffix = " $name\u0000".toByteArray(Charsets.UTF_8)
     return ByteArray(base64.size + suffix.size).also {
         base64.copyInto(it)

@@ -1,5 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.constants
 
+import kotlin.math.abs
+
 /**
  * A generic preset class that holds a list of preset values and provides
  * methods to find the index of a value or its nearest match.
@@ -26,7 +28,7 @@ class Preset<T: Comparable<T>>(val values: List<T>) {
         return values.withIndex().minByOrNull { (_, preset) ->
             when {
                 preset is Number && value is Number -> {
-                    kotlin.math.abs(preset.toDouble() - value.toDouble())
+                    abs(preset.toDouble() - value.toDouble())
                 }
 
                 else -> if (preset > value) 1.0 else -1.0

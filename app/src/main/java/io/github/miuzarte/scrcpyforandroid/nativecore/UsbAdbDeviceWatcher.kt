@@ -9,6 +9,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * USB ADB 设备监听器
@@ -332,7 +333,7 @@ class UsbPermissionReceiver: BroadcastReceiver() {
  */
 object UsbPermissionBus {
     // Binder 线程的广播回调与主线程的 add/remove 并发, 使用写时复制容器保证线程安全
-    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(UsbDevice, Boolean) -> Unit>()
+    private val listeners = CopyOnWriteArrayList<(UsbDevice, Boolean) -> Unit>()
 
     fun addListener(listener: (UsbDevice, Boolean) -> Unit) {
         listeners.add(listener)

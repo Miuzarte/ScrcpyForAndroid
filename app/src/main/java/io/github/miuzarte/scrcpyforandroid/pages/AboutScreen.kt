@@ -36,11 +36,7 @@ import io.github.miuzarte.scrcpyforandroid.BuildConfig
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.pages.effect.BgEffectBackground
 import io.github.miuzarte.scrcpyforandroid.services.AppUpdateChecker
-import io.github.miuzarte.scrcpyforandroid.ui.BlurredBar
-import io.github.miuzarte.scrcpyforandroid.ui.LocalEnableBlur
-import io.github.miuzarte.scrcpyforandroid.ui.contextClick
-import io.github.miuzarte.scrcpyforandroid.ui.isBlurEffectSupported
-import io.github.miuzarte.scrcpyforandroid.ui.rememberBlurBackdrop
+import io.github.miuzarte.scrcpyforandroid.ui.*
 import kotlinx.coroutines.flow.onEach
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.*

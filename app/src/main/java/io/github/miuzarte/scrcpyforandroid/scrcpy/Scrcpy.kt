@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import androidx.core.net.toUri
@@ -19,11 +20,7 @@ import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.services.EventLogger.logEvent
 import io.github.miuzarte.scrcpyforandroid.storage.Storage.appSettings
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.*
@@ -404,7 +401,7 @@ class Scrcpy(
                 stopClipboardSync()
                 if (reason == StopReason.REMOTE_DISCONNECTED) {
                     logEvent(R.string.vm_session_disconnected, level = Log.WARN)
-                    val now = android.os.SystemClock.elapsedRealtime()
+                    val now = SystemClock.elapsedRealtime()
                     if (now - lastRemoteDisconnectSnackbarAt > 500L) {
                         lastRemoteDisconnectSnackbarAt = now
                         AppRuntime.snackbar(R.string.vm_session_disconnected)

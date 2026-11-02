@@ -8,6 +8,8 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.services.AppRuntime
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -49,8 +51,8 @@ object BiometricGate {
         val sessionId = sessionIds.incrementAndGet()
         var resumed = false
         lateinit var prompt: BiometricPrompt
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
                 prompt.cancelAuthentication()
                 if (!resumed && continuation.isActive) {
                     resumed = true

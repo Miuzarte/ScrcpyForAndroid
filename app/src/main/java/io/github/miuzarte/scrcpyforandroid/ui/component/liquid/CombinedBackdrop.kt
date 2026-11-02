@@ -18,7 +18,7 @@ import top.yukonga.miuix.kmp.blur.Backdrop
 class CombinedBackdrop(
     val first: Backdrop,
     val second: Backdrop,
-) : Backdrop {
+): Backdrop {
 
     override val isCoordinatesDependent: Boolean = first.isCoordinatesDependent || second.isCoordinatesDependent
 

@@ -47,6 +47,7 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import io.github.miuzarte.scrcpyforandroid.services.*
 import io.github.miuzarte.scrcpyforandroid.storage.AppSettings
@@ -60,13 +61,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
-import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
-import top.yukonga.miuix.kmp.nav.core.NavEntryBuilder
-import top.yukonga.miuix.kmp.nav.core.NavKey
-import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
-import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.core.*
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.nav.transition.NavTransition
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
@@ -120,16 +115,22 @@ private enum class MainBottomTabDestination(
 sealed interface RootScreen: NavKey {
     @Serializable
     data object Home: RootScreen
+
     @Serializable
     data object Advanced: RootScreen
+
     @Serializable
     data object About: RootScreen
+
     @Serializable
     data object ThemeSettings: RootScreen
+
     @Serializable
     data object VirtualButtonOrder: RootScreen
+
     @Serializable
     data object FullscreenControl: RootScreen // compatibility mode
+
     @Serializable
     data class ScrcpyOptionRecord(val profileId: String): RootScreen
 }
@@ -429,7 +430,7 @@ fun MainScreen() {
                         runCatching { scrcpy.stop() }
                         runCatching { NativeAdbService.disconnect() }
                         // 释放 USB 隧道, 避免进程存活期间 USB 设备被持续占用
-                        runCatching { io.github.miuzarte.scrcpyforandroid.nativecore.UsbAdbSession.disconnect() }
+                        runCatching { UsbAdbSession.disconnect() }
                         // 清理连接状态 (ConnectionStateStore/AppRuntime)
                         runCatching {
                             deviceConnectionServices.connectionController.disconnectAdbConnection(
@@ -630,7 +631,7 @@ fun MainScreen() {
                     // 低版本组合即崩, 故在此拦截, 不依赖设置页的清理
                     if (
                         asBundle.floatingBottomBar &&
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                     ) {
                         FloatingBottomBar(
                             modifier = Modifier

@@ -89,7 +89,7 @@ fun <T> rememberBundleState(
     }
     DisposableEffect(Unit) {
         onDispose {
-            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            runBlocking(Dispatchers.IO) {
                 if (localLatest != sharedFlow.value) save(localLatest)
             }
             taskScope.cancel()

@@ -32,6 +32,7 @@ import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonSurface
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import java.util.concurrent.atomic.AtomicLong
 
 private const val ADB_CONNECT_TIMEOUT_MS = 12_000L
 private const val ADB_KEEPALIVE_INTERVAL_MS = 3_000L
@@ -125,7 +126,7 @@ internal class DeviceTabViewModel(
     private val sessionReconnectBlacklistHosts = mutableSetOf<String>()
 
     // 防止快速多次点击 USB 卡片 (1 秒 debounce)
-    private val lastUsbClickMs = java.util.concurrent.atomic.AtomicLong(0L)
+    private val lastUsbClickMs = AtomicLong(0L)
 
     // 用户主动取消 USB 连接尝试 (cancelUsbConnect 置位): 失败路径据此静默, 不弹误导提示
     @Volatile

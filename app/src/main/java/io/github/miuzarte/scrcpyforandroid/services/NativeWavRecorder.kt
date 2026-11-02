@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
-import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

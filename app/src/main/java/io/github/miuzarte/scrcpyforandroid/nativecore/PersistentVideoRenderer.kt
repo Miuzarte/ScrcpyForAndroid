@@ -6,6 +6,9 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -79,7 +82,7 @@ class PersistentVideoRenderer {
      */
     fun recreateDecoderSurface(): Surface {
         ensureInitialized()
-        val latch = java.util.concurrent.CountDownLatch(1)
+        val latch = CountDownLatch(1)
         var result: Surface? = null
         handler.post {
             try {
@@ -264,7 +267,7 @@ class PersistentVideoRenderer {
         if (initialized) return
         synchronized(initLock) {
             if (initialized) return
-            val latch = java.util.concurrent.CountDownLatch(1)
+            val latch = CountDownLatch(1)
             handler.post {
                 initializeLocked()
                 initialized = true
@@ -493,8 +496,8 @@ class PersistentVideoRenderer {
     }
 
     companion object {
-        private val VERTICES = java.nio.ByteBuffer.allocateDirect(4 * 4 * 4)
-            .order(java.nio.ByteOrder.nativeOrder())
+        private val VERTICES = ByteBuffer.allocateDirect(4 * 4 * 4)
+            .order(ByteOrder.nativeOrder())
             .asFloatBuffer()
             .apply {
                 put(

@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import io.github.miuzarte.scrcpyforandroid.R
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 object RecordFilenameTemplate {
     data class Entry(
@@ -94,7 +95,7 @@ object RecordFilenameTemplate {
         "m" -> now.minute.toString()
         "SS" -> now.second.toString().padStart(2, '0')
         "S" -> now.second.toString()
-        "timestamp" -> now.atZone(java.time.ZoneId.systemDefault()).toEpochSecond().toString()
+        "timestamp" -> now.atZone(ZoneId.systemDefault()).toEpochSecond().toString()
         "deviceName" -> sessionInfo.deviceName
         "deviceIp" -> sessionInfo.host
         "devicePort" -> sessionInfo.port.toString()

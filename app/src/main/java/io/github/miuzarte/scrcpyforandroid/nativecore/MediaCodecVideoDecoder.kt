@@ -5,6 +5,7 @@ import android.media.MediaFormat
 import android.os.Looper
 import android.util.Log
 import android.view.Surface
+import java.nio.ByteBuffer
 
 /**
  * MediaCodecVideoDecoder
@@ -71,10 +72,10 @@ class MediaCodecVideoDecoder(
         }
         val format = MediaFormat.createVideoFormat(mimeType, width, height)
         if (sps != null) {
-            format.setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(sps))
+            format.setByteBuffer("csd-0", ByteBuffer.wrap(sps))
         }
         if (pps != null) {
-            format.setByteBuffer("csd-1", java.nio.ByteBuffer.wrap(pps))
+            format.setByteBuffer("csd-1", ByteBuffer.wrap(pps))
         }
         try {
             codec.configure(format, outputSurface, null, 0)

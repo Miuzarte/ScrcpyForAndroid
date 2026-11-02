@@ -7,7 +7,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.Socket
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -41,7 +43,7 @@ object NativeAdbService {
      * 当前正在连接中的 socket, 用于取消连接时强制关闭
      */
     @Volatile
-    private var pendingSocket: java.net.Socket? = null
+    private var pendingSocket: Socket? = null
 
     var keyName: String
         get() = transport.keyName
@@ -185,9 +187,9 @@ object NativeAdbService {
             disconnectInternal()
 
             // 超时标志须跨线程可见: 守卫协程 (IO) 写, 主协程 catch 读 (与 UsbAdbTunnel.closed 同款处理)
-            val handshakeTimedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+            val handshakeTimedOut = AtomicBoolean(false)
             // 握手完成标志: 防止守卫在 10s 边界与握手完成竞态时误关已就绪的隧道
-            val handshakeDone = java.util.concurrent.atomic.AtomicBoolean(false)
+            val handshakeDone = AtomicBoolean(false)
             try {
                 // 通过 USB 流创建连接
                 val conn = DirectAdbConnection(
@@ -200,7 +202,7 @@ object NativeAdbService {
                 )
                 // USB 流无 soTimeout 机制, recvMsg 可能永久阻塞;
                 // 协程取消无法打断 bulkTransfer 阻塞循环, 须由独立守卫到点后
-                // 强制关闭隧道 (closed 标志使 read 循环 ≤5s 内抛出), 解除阻塞并释放锁
+                // 强制关闭隧道 (closed 标志使 read 循环 <=5s 内抛出), 解除阻塞并释放锁
                 val timeoutGuard = CoroutineScope(Dispatchers.IO).launch {
                     delay(USB_HANDSHAKE_TIMEOUT_MS)
                     // 握手已完成则不 abort, 避免误关就绪连接
@@ -221,7 +223,7 @@ object NativeAdbService {
                 connection = conn
                 connectedHost = "usb:$deviceId"
                 connectedPort = 0
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "connectUsb(): failed deviceId=$deviceId", e)

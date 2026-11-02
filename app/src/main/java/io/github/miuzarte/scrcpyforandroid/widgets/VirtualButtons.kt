@@ -638,7 +638,9 @@ class VirtualButtonBar(
         // 按钮会全部挤在槽位起点那一侧, 看起来整排按钮偏向一端
         val buttonModifier =
             if (isVertical) Modifier.fillMaxSize()
-            else Modifier.fillMaxWidth().height(thickness)
+            else Modifier
+                .fillMaxWidth()
+                .height(thickness)
 
         if (isVertical) Column(
             modifier = containerModifier,

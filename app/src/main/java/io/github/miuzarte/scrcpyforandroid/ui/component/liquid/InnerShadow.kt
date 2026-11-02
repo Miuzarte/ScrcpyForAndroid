@@ -5,15 +5,7 @@ package io.github.miuzarte.scrcpyforandroid.ui.component.liquid
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.layer.CompositingStrategy
@@ -50,7 +42,7 @@ fun Modifier.innerShadow(
 private class InnerShadowElement(
     val shape: Shape,
     val shadow: () -> InnerShadow?,
-) : ModifierNodeElement<InnerShadowNode>() {
+): ModifierNodeElement<InnerShadowNode>() {
 
     override fun create(): InnerShadowNode = InnerShadowNode(shape, shadow)
 
@@ -84,7 +76,7 @@ private class InnerShadowElement(
 private class InnerShadowNode(
     var shape: Shape,
     var shadow: () -> InnerShadow?,
-) : Modifier.Node(),
+): Modifier.Node(),
     DrawModifierNode {
 
     override val shouldAutoInvalidate: Boolean = false
