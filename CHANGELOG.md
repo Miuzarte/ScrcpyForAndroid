@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.7.2
+
+- 修复: 启用录制后启动崩溃 (#130, #131)
+- 修复: `--crop` 的 `x` / `y` 为 0 时被当作无效, 导致裁剪不生效且设置不保存 (#132)
+- 修复: 离开所有参数页时, `crop` / `new-display` / `camera` / `codec options` / `start-app` 等文本输入未统一保存
+- 依赖: Android Gradle Plugin `9.5.0`, Gradle `9.8.2`, datastore `1.3.0`, conscrypt `2.8.0`, kotlinx-serialization `1.12.0`
+- 依赖: miuix submodule 更新至 `23b469ee` (配合 AGP `9.5.0`)
+
 ## 0.7.1
 
 - 修复: 为低版本安卓隐藏更多的模糊设置项 (#126)
