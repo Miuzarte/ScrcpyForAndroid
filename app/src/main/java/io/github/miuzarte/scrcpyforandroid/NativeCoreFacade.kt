@@ -59,6 +59,11 @@ object NativeCoreFacade {
     @Volatile
     private var isRestarting = false
 
+    // How many times the current connection was downgraded to a smaller max_size.
+    // Reset on a user-initiated session start; caps the downgrade loop.
+    @Volatile
+    private var downgradeAttempts = 0
+
     suspend fun close() {
         sessionLifecycleMutex.withLock {
             controller.releaseAll()
@@ -175,6 +180,10 @@ object NativeCoreFacade {
     ) = sessionLifecycleMutex.withLock {
         scrcpyRef = scrcpy
         cachedClientOptions = options
+        if (!isRestarting) {
+            // A user-initiated start: forget the downgrades of the previous connection.
+            downgradeAttempts = 0
+        }
         isRestarting = false
         controller.releaseAll()
         controller.resetBootstrap()
@@ -203,11 +212,14 @@ object NativeCoreFacade {
      */
     fun onVideoSizeChanged(width: Int, height: Int) {
         lifecycleScope.launch {
-            sessionLifecycleMutex.withLock {
-                if (isRestarting) return@withLock
-                val scrcpy = scrcpyRef ?: return@withLock
-                val info = scrcpy.currentSessionState.value ?: return@withLock
-                if (info.width <= 0 || info.height <= 0) return@withLock
+            // Decide under the lock, act outside it: restarting the session calls back into
+            // onScrcpySessionStopped() / onScrcpySessionStarted(), which take this same
+            // mutex, and it is not reentrant (a nested withLock would deadlock).
+            val unsupported = sessionLifecycleMutex.withLock {
+                if (isRestarting) return@withLock null
+                val scrcpy = scrcpyRef ?: return@withLock null
+                val info = scrcpy.currentSessionState.value ?: return@withLock null
+                if (info.width <= 0 || info.height <= 0) return@withLock null
 
                 val mime = info.codec?.mime ?: "video/avc"
                 if (!DecoderCapabilities.isSizeSupported(mime, info.width, info.height)) {
@@ -215,12 +227,33 @@ object NativeCoreFacade {
                         TAG,
                         "onVideoSizeChanged(): decoder does not support ${info.width}x${info.height} for $mime",
                     )
-                    handleUnsupportedSize(info.width, info.height, mime)
-                    return@withLock
+                    return@withLock UnsupportedVideoSize(
+                        info.width,
+                        info.height,
+                        mime,
+                        configureFailed = false,
+                    )
                 }
 
                 controller.rebuildDecoderForSize(info)
-            }
+                if (controller.isDecoderUsable()) return@withLock null
+
+                // MediaCodec.configure() threw although the capability table accepted the
+                // size (see DecoderCapabilities): nothing will ever render, so report it
+                // instead of leaving a silent black screen.
+                Log.w(
+                    TAG,
+                    "onVideoSizeChanged(): decoder creation failed for ${info.width}x${info.height}",
+                )
+                UnsupportedVideoSize(info.width, info.height, mime, configureFailed = true)
+            } ?: return@launch
+
+            handleUnsupportedSize(
+                unsupported.width,
+                unsupported.height,
+                unsupported.mime,
+                unsupported.configureFailed,
+            )
         }
     }
 
@@ -250,19 +283,43 @@ object NativeCoreFacade {
     }
 
     /**
-     * Handle the case where the local decoder does not support the target resolution.
+     * Handle a video size the local decoder cannot take.
      *
-     * When "downsize on decode error" is enabled (default), restarts the session with a
-     * lower `max_size` derived from [DecoderCapabilities.maxSupportedSize]. Otherwise,
-     * shows an error snackbar and leaves the decoder uncreated (black screen, no crash).
+     * When "downsize on decode error" is enabled (default) and a strictly smaller `max_size`
+     * is known, restarts the session with it. Otherwise shows an error snackbar and leaves
+     * the decoder uncreated (black screen, no crash, no restart loop).
+     *
+     * [configureFailed] tells whether [MediaCodec.configure] really threw; when the size was
+     * rejected by the capability table up front, the message must not claim an initialization
+     * failure.
      */
-    private suspend fun handleUnsupportedSize(width: Int, height: Int, mime: String) {
+    private suspend fun handleUnsupportedSize(
+        width: Int,
+        height: Int,
+        mime: String,
+        configureFailed: Boolean,
+    ) {
+        val longEdge = maxOf(width, height)
         val downsizeEnabled = Storage.appSettings.bundleState.value.downsizeOnDecodeError
-        if (!downsizeEnabled) {
-            AppRuntime.snackbar(R.string.vm_decoder_init_failed, "${width}x${height}")
+        val maxSize = if (downsizeEnabled) DecoderCapabilities.maxSupportedSize(mime) else 0
+
+        // Only restart when the probe proposes a strictly smaller long edge: otherwise the
+        // restarted session reports back the same size and would restart forever.
+        val canDowngrade = downsizeEnabled &&
+                maxSize > 0 &&
+                maxSize < longEdge &&
+                downgradeAttempts < MAX_DOWNGRADE_ATTEMPTS
+        if (!canDowngrade) {
+            Log.w(TAG, "handleUnsupportedSize(): giving up on ${width}x$height (maxSize=$maxSize)")
+            val sizeArg = "${width}x$height"
+            if (configureFailed) {
+                AppRuntime.snackbar(R.string.vm_decoder_init_failed, sizeArg)
+            } else {
+                AppRuntime.snackbar(R.string.vm_decoder_size_unsupported, sizeArg)
+            }
             return
         }
-        val maxSize = DecoderCapabilities.maxSupportedSize(mime)
+
         Log.i(TAG, "handleUnsupportedSize(): downgrading to max_size=$maxSize")
         AppRuntime.snackbar(R.string.vm_decoder_unsupported_size, width, height, maxSize)
         downgradeAndRestart(maxSize)
@@ -279,39 +336,34 @@ object NativeCoreFacade {
         Log.i(TAG, "handleDecoderError(): restarting session due to decoder error")
         AppRuntime.snackbar(R.string.vm_decoder_error_restarting)
         lifecycleScope.launch {
-            sessionLifecycleMutex.withLock {
-                restartSessionWith(cachedClientOptions)
-            }
+            restartSessionWith(cachedClientOptions)
         }
     }
 
     /**
      * Restart the scrcpy session with a modified `max_size`.
      *
-     * Persists the new max_size to [Storage.scrcpyOptions] so the user sees the change
-     * in the UI, then stops and restarts the session.
+     * The new value lives in memory for as long as the connection does: the restarted
+     * session hands it back through [onScrcpySessionStarted] and later restarts reuse it.
+     * It is deliberately *not* written back to [Storage.scrcpyOptions], so an automatic
+     * downgrade cannot silently overwrite the resolution the user configured.
      */
     private suspend fun downgradeAndRestart(maxSize: Int) {
+        val options = cachedClientOptions ?: return
         if (isRestarting) return
         isRestarting = true
-        val options = cachedClientOptions ?: return
+        downgradeAttempts += 1
         val newOptions = options.copy(maxSize = maxSize.toUShort()).fix().validate()
-
-        // Persist the new max_size so the UI reflects the downgrade.
-        runCatching {
-            val soBundle = Storage.scrcpyOptions.bundleState.value
-            Storage.scrcpyOptions.saveBundle(soBundle.copy(maxSize = maxSize))
-        }
-
         restartSessionWith(newOptions)
     }
 
     /**
      * Stop the current session and start a new one with [options].
      *
-     * Must be called while holding [sessionLifecycleMutex]. The [isRestarting] flag
-     * prevents recursive restarts — it is cleared in [onScrcpySessionStarted] when the
-     * new session comes up.
+     * Must NOT be called while holding [sessionLifecycleMutex]: Scrcpy calls back into
+     * [onScrcpySessionStopped] / [onScrcpySessionStarted] while stopping and starting, and
+     * those acquire the mutex. [isRestarting] serializes restarts instead — it is set by the
+     * caller and cleared in [onScrcpySessionStarted] when the new session comes up.
      */
     private suspend fun restartSessionWith(options: ClientOptions?) {
         val scrcpy = scrcpyRef ?: return
@@ -320,7 +372,26 @@ object NativeCoreFacade {
         runCatching { scrcpy.stop(Scrcpy.StopReason.USER) }
         Log.i(TAG, "restartSessionWith(): starting new session with max_size=${options.maxSize}")
         runCatching { scrcpy.start(options) }
+            .onFailure {
+                // The new session never came up, so onScrcpySessionStarted() will not clear
+                // the flag; without this, recovery would stay disabled for good.
+                Log.e(TAG, "restartSessionWith(): restart failed", it)
+                isRestarting = false
+            }
     }
+
+    // A video size the local decoder cannot take, plus whether configure() actually failed.
+    private data class UnsupportedVideoSize(
+        val width: Int,
+        val height: Int,
+        val mime: String,
+        val configureFailed: Boolean,
+    )
+
+    // Upper bound on automatic downgrades per connection, on top of the "strictly smaller"
+    // check in handleUnsupportedSize. Prevents an endless restart loop on devices whose
+    // codec table keeps proposing a max_size the decoder still cannot configure.
+    private const val MAX_DOWNGRADE_ATTEMPTS = 3
 
     private const val TAG = "NativeCoreFacade"
 }

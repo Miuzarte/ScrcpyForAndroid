@@ -612,6 +612,7 @@
     <string name="vm_clipboard_paste_failed">Local clipboard paste failed</string>
     <string name="vm_session_disconnected">Scrcpy session disconnected</string>
     <string name="vm_decoder_unsupported_size">Device decoder does not support %1$dx%2$d, downgrading to max_size=%3$d and restarting</string>
+    <string name="vm_decoder_size_unsupported">Device decoder cannot decode %1$s, lower max_size in scrcpy options</string>
     <string name="vm_decoder_init_failed">Decoder initialization failed: %1$s</string>
     <string name="vm_decoder_error_restarting">Decoder error, restarting session</string>
     <string name="vm_ime_text_failed">IME text submission failed: %1$s</string>

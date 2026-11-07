@@ -611,6 +611,7 @@
     <string name="vm_clipboard_paste_failed">本机剪贴板粘贴失败</string>
     <string name="vm_session_disconnected">Scrcpy 连接已断开</string>
     <string name="vm_decoder_unsupported_size">设备解码器不支持 %1$dx%2$d，正在降级为 max_size=%3$d 并重启</string>
+    <string name="vm_decoder_size_unsupported">设备解码器无法解码 %1$s，请降低 scrcpy 选项中的 max_size</string>
     <string name="vm_decoder_init_failed">解码器初始化失败：%1$s</string>
     <string name="vm_decoder_error_restarting">解码器错误，正在重启会话</string>
     <string name="vm_ime_text_failed">输入法文本提交失败：%1$s</string>

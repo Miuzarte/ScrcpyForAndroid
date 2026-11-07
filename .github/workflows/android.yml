@@ -236,7 +236,21 @@ jobs:
           download_base_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
           proxy_base_url="https://github.miuzarte.top/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
 
+          is_prerelease=false
+          if [[ "${GITHUB_REF_NAME}" == *_pre* ]]; then
+            is_prerelease=true
+          fi
+
           {
+            if [[ "$is_prerelease" == true ]]; then
+              echo "这是一个预发行版，遇到问题时随时可以通过覆盖安装上一个正式版以回退"
+              echo
+              echo "This is a pre-release. If you run into any issues, you can roll back by installing the latest release over it."
+              echo
+              echo "---"
+              echo
+            fi
+
             echo "[CHANGELOG.md](https://github.com/Miuzarte/ScrcpyForAndroid/blob/main/CHANGELOG.md)"
             echo "| 架构 | 文件 | 大小<br>SHA256 |"
             echo "| ---- | ---- | -------------- |"
